@@ -206,4 +206,72 @@ describe('Row-Level Access Control (RLS)', () => {
     );
     expect(delAdmin.status).toBe(200);
   });
+
+  it('supports shorthand rule presets (authenticated, owner:<col>, admin)', async () => {
+    const db = rlsDb();
+    const presetRules = defineRules({
+      notes: {
+        read: 'authenticated',
+        write: 'owner:user_id',
+        delete: 'admin',
+      },
+    });
+    const app = createApp(loadSettings(env), db, schema, new Map(), presetRules);
+    const u1 = await signup(app, 'u1@example.com');
+    const u2 = await signup(app, 'u2@example.com');
+
+    // u1 can insert their own note
+    const okInsert = await app.fetch(
+      new Request('http://x/sync', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${u1.token}` },
+        body: JSON.stringify({
+          operations: [{
+            tableName: 'notes',
+            rowId: 'n-preset',
+            operation: 'INSERT',
+            payload: { title: 'hello', user_id: u1.user.id, is_public: false },
+          }],
+        }),
+      }),
+    );
+    expect(okInsert.status).toBe(200);
+
+    // u2 cannot overwrite u1's note
+    const deniedWrite = await app.fetch(
+      new Request('http://x/sync', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${u2.token}` },
+        body: JSON.stringify({
+          operations: [{
+            tableName: 'notes',
+            rowId: 'n-preset',
+            operation: 'UPDATE',
+            payload: { title: 'hijack', user_id: u2.user.id, is_public: false },
+          }],
+        }),
+      }),
+    );
+    expect(deniedWrite.status).toBe(403);
+
+    // u2 can read because read is 'authenticated'
+    const u2Pull = (await (
+      await app.fetch(new Request('http://x/sync?tables=notes&since=0', {
+        headers: { authorization: `Bearer ${u2.token}` },
+      }))
+    ).json()) as any;
+    expect(u2Pull.changes.changes.map((c: any) => c.rowId)).toEqual(['n-preset']);
+
+    // u1 cannot delete because delete is 'admin'
+    const deniedDel = await app.fetch(
+      new Request('http://x/sync', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${u1.token}` },
+        body: JSON.stringify({
+          operations: [{ tableName: 'notes', rowId: 'n-preset', operation: 'DELETE', payload: {} }],
+        }),
+      }),
+    );
+    expect(deniedDel.status).toBe(403);
+  });
 });
