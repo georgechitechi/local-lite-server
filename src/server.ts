@@ -133,7 +133,16 @@ export function createApp(
         if (request.method === 'OPTIONS') {
           return new Response(null, { status: 204, headers: cors });
         }
-        const res = await next();
+        let res: Response;
+        try {
+          res = await next();
+        } catch (err) {
+          console.error('[local-lite-server]', err);
+          return Response.json(
+            { error: err instanceof Error ? err.message : 'Internal Server Error' },
+            { status: 500, headers: cors },
+          );
+        }
         const out = new Response(res.body, res);
         for (const [k, v] of Object.entries(cors)) out.headers.set(k, v);
         return out;
