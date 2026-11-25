@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import { build } from 'esbuild';
 
 // Self-contained ESM bundle for cPanel "Setup Node.js App" (Node 24+).
@@ -10,6 +11,12 @@ const common = {
   target: 'node24',
   format: 'esm',
   splitting: true,
+  treeShaking: true,
+  legalComments: 'none',
+  drop: ['debugger'],
+  alias: {
+    nodemailer: path.resolve('node_modules/nodemailer'),
+  },
   outdir: 'dist/cpanel',
   entryNames: 'app',
   chunkNames: 'chunks/[name]-[hash]',
