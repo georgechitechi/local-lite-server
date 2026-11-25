@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { SlideDrawer } from '@/components/SlideDrawer';
 import type { ToastType } from '@/components/Toast';
 import { adminFetch } from '@/lib/api';
 import {
@@ -31,20 +32,6 @@ export function ApiKeyDrawer({
     setCreatedKey(null);
     onClose();
   };
-
-  useEffect(() => {
-    if (!open || saving) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setCreatedKey(null);
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, saving, onClose]);
-
-  if (!open) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,56 +79,13 @@ export function ApiKeyDrawer({
   };
 
   return (
-    <div
-      onClick={handleClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0, 0, 0, 0.55)',
-        zIndex: 55,
-        display: 'flex',
-        justifyContent: 'flex-end',
-      }}
+    <SlideDrawer
+      open={open}
+      title={createdKey ? 'API Key Created' : 'Create API Key'}
+      onClose={handleClose}
+      disabled={saving}
     >
-      <aside
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '100%',
-          maxWidth: 440,
-          height: '100%',
-          background: 'var(--surface)',
-          borderLeft: '1px solid var(--border)',
-          padding: 24,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 16,
-          overflowY: 'auto',
-          boxShadow: '-8px 0 32px rgba(0, 0, 0, 0.45)',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            borderBottom: '1px solid var(--border)',
-            paddingBottom: 14,
-          }}
-        >
-          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>
-            {createdKey ? 'API Key Created' : 'Create API Key'}
-          </h3>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={handleClose}
-            style={secondaryBtnStyle}
-          >
-            Close
-          </button>
-        </div>
-
-        {createdKey ? (
+      {createdKey ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div
               style={{
@@ -269,7 +213,6 @@ export function ApiKeyDrawer({
             </div>
           </form>
         )}
-      </aside>
-    </div>
+    </SlideDrawer>
   );
 }

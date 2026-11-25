@@ -100,6 +100,12 @@ export function createApp(
     }
   };
   const unauthorized = () => Response.json({ error: 'Unauthorized' }, { status: 401 });
+  const withAdmin =
+    (run: (request: Request, session: NonNullable<Awaited<ReturnType<typeof consoleApi.authenticate>>>) => Promise<Response> | Response) =>
+    async ({ request }: { request: Request }) => {
+      const s = await consoleApi.authenticate(request);
+      return s ? run(request, s) : unauthorized();
+    };
   const rateLimited = async (request: Request): Promise<Response | null> => {
     const limit = await authLimiter(clientIp(request));
     if (limit.ok) return null;
@@ -267,61 +273,22 @@ export function createApp(
               POST: async ({ request }: { request: Request }) =>
                 consoleApi.postLogout(request, await consoleApi.authenticate(request)),
             },
-            '/admin/overview': {
-              GET: async ({ request }: { request: Request }) => {
-                const s = await consoleApi.authenticate(request);
-                return s ? consoleApi.overview(s) : unauthorized();
-              },
-            },
-            '/admin/table': {
-              ALL: async ({ request }: { request: Request }) =>
-                (await consoleApi.authenticate(request)) ? consoleApi.handleTable(request) : unauthorized(),
-            },
-            '/admin/endpoints': {
-              GET: async ({ request }: { request: Request }) =>
-                (await consoleApi.authenticate(request)) ? consoleApi.listEndpoints() : unauthorized(),
-            },
+            '/admin/overview': { GET: withAdmin((_req, s) => consoleApi.overview(s)) },
+            '/admin/table': { ALL: withAdmin((req) => consoleApi.handleTable(req)) },
+            '/admin/endpoints': { GET: withAdmin(() => consoleApi.listEndpoints()) },
             '/admin/users': {
-              GET: async ({ request }: { request: Request }) =>
-                (await consoleApi.authenticate(request)) ? consoleApi.listUsers() : unauthorized(),
-              POST: async ({ request }: { request: Request }) =>
-                (await consoleApi.authenticate(request)) ? consoleApi.manageUsers(request) : unauthorized(),
+              GET: withAdmin(() => consoleApi.listUsers()),
+              POST: withAdmin((req) => consoleApi.manageUsers(req)),
             },
-            '/admin/logs': {
-              GET: async ({ request }: { request: Request }) =>
-                (await consoleApi.authenticate(request))
-                  ? consoleApi.handleLogs(new URL(request.url))
-                  : unauthorized(),
-            },
-            '/admin/env': {
-              ALL: async ({ request }: { request: Request }) =>
-                (await consoleApi.authenticate(request)) ? consoleApi.handleEnv(request) : unauthorized(),
-            },
-            '/admin/backups': {
-              ALL: async ({ request }: { request: Request }) =>
-                (await consoleApi.authenticate(request)) ? consoleApi.handleBackups(request) : unauthorized(),
-            },
-            '/admin/storage': {
-              ALL: async ({ request }: { request: Request }) =>
-                (await consoleApi.authenticate(request)) ? consoleApi.handleStorage(request) : unauthorized(),
-            },
-            '/admin/crons': {
-              ALL: async ({ request }: { request: Request }) =>
-                (await consoleApi.authenticate(request)) ? consoleApi.handleCrons(request) : unauthorized(),
-            },
-            '/admin/settings': {
-              ALL: async ({ request }: { request: Request }) =>
-                (await consoleApi.authenticate(request)) ? consoleApi.handleSettings(request) : unauthorized(),
-            },
+            '/admin/logs': { GET: withAdmin((req) => consoleApi.handleLogs(new URL(req.url))) },
+            '/admin/env': { ALL: withAdmin((req) => consoleApi.handleEnv(req)) },
+            '/admin/backups': { ALL: withAdmin((req) => consoleApi.handleBackups(req)) },
+            '/admin/storage': { ALL: withAdmin((req) => consoleApi.handleStorage(req)) },
+            '/admin/crons': { ALL: withAdmin((req) => consoleApi.handleCrons(req)) },
+            '/admin/settings': { ALL: withAdmin((req) => consoleApi.handleSettings(req)) },
             '/admin/api-keys': {
-              GET: async ({ request }: { request: Request }) => {
-                const s = await consoleApi.authenticate(request);
-                if (!s) return unauthorized();
-                return Response.json({ keys: await apiKeys.listKeys() });
-              },
-              POST: async ({ request }: { request: Request }) => {
-                const s = await consoleApi.authenticate(request);
-                if (!s) return unauthorized();
+              GET: withAdmin(async () => Response.json({ keys: await apiKeys.listKeys() })),
+              POST: withAdmin(async (request, s) => {
                 const body = (await request.json().catch(() => null)) as {
                   name?: string;
                   role?: 'admin' | 'user';
@@ -342,25 +309,21 @@ export function createApp(
                 } catch (err) {
                   return Response.json({ error: (err as Error).message }, { status: 400 });
                 }
-              },
-              PATCH: async ({ request }: { request: Request }) => {
-                const s = await consoleApi.authenticate(request);
-                if (!s) return unauthorized();
+              }),
+              PATCH: withAdmin(async (request) => {
                 const body = (await request.json().catch(() => null)) as { id?: string; action?: string } | null;
                 if (!body?.id || body.action !== 'revoke') {
                   return Response.json({ error: 'Provide id and action: "revoke".' }, { status: 400 });
                 }
                 const ok = await apiKeys.revokeKey(String(body.id));
                 return ok ? Response.json({ ok: true }) : Response.json({ error: 'Key not found or already revoked.' }, { status: 404 });
-              },
-              DELETE: async ({ request }: { request: Request }) => {
-                const s = await consoleApi.authenticate(request);
-                if (!s) return unauthorized();
+              }),
+              DELETE: withAdmin(async (request) => {
                 const id = new URL(request.url).searchParams.get('id') ?? '';
                 if (!id) return Response.json({ error: 'Missing id.' }, { status: 400 });
                 const ok = await apiKeys.deleteKey(id);
                 return ok ? Response.json({ ok: true }) : Response.json({ error: 'Key not found.' }, { status: 404 });
-              },
+              }),
             },
             '/admin/*': {
               GET: ({ request }: { request: Request }) => consoleApi.serveStatic(new URL(request.url).pathname),

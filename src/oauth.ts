@@ -98,6 +98,18 @@ function cacheUser(token: string, userId: string): { id: string } {
   return { id: userId };
 }
 
+function toGoogleUserId(info: any): string | null {
+  if (typeof info?.sub !== 'string' || !info.sub) return null;
+  return resolveUnifiedUserId(
+    {
+      id: info.sub,
+      email: info.email,
+      emailVerified: info.email_verified === true || info.email_verified === 'true',
+    },
+    'google',
+  );
+}
+
 /** Verifies a Google (ID/access) or GitHub OAuth token and maps it to a unified userId. */
 export async function verifyOAuthToken(token: string): Promise<{ id: string } | null> {
   if (!token || token.length < 16) return null;
@@ -114,18 +126,8 @@ export async function verifyOAuthToken(token: string): Promise<{ id: string } | 
         { signal: AbortSignal.timeout(8_000) },
       );
       if (gRes.ok) {
-        const info = (await gRes.json()) as any;
-        if (typeof info?.sub === 'string' && info.sub) {
-          const id = resolveUnifiedUserId(
-            {
-              id: info.sub,
-              email: info.email,
-              emailVerified: info.email_verified === true || info.email_verified === 'true',
-            },
-            'google',
-          );
-          return cacheUser(token, id);
-        }
+        const id = toGoogleUserId(await gRes.json());
+        if (id) return cacheUser(token, id);
       }
     }
 
@@ -135,18 +137,8 @@ export async function verifyOAuthToken(token: string): Promise<{ id: string } | 
         headers: { Authorization: `Bearer ${token}` },
       });
       if (uRes.ok) {
-        const info = (await uRes.json()) as any;
-        if (typeof info?.sub === 'string' && info.sub) {
-          const id = resolveUnifiedUserId(
-            {
-              id: info.sub,
-              email: info.email,
-              emailVerified: info.email_verified === true || info.email_verified === 'true',
-            },
-            'google',
-          );
-          return cacheUser(token, id);
-        }
+        const id = toGoogleUserId(await uRes.json());
+        if (id) return cacheUser(token, id);
       }
     }
 
