@@ -19,17 +19,31 @@ export function defineSchema<T extends SchemaDictionary>(schema: T): T {
 
 const NAME_RE = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
 
-/** Validates names and guarantees an `id` column on every table. */
+const VALID_TYPES = new Set<string>([
+  'string', 'string | null',
+  'number', 'number | null',
+  'boolean', 'boolean | null',
+  'json', 'json | null',
+  'string[]', 'string[] | null',
+]);
+
+/** Validates names, field types, and guarantees an `id` column on every table. */
 export function normalizeSchema(input: SchemaDictionary): SchemaDictionary {
   const out: SchemaDictionary = {};
   for (const [table, fields] of Object.entries(input)) {
     if (!NAME_RE.test(table) || table.startsWith('_')) {
       throw new Error(`Invalid table name "${table}" in schema (letters, digits, _; must not start with _).`);
     }
+    if (!fields || typeof fields !== 'object' || Array.isArray(fields)) {
+      throw new Error(`Table "${table}" in schema must be an object of { column: type }.`);
+    }
     const cols: Record<string, SchemaFieldType> = { id: 'string' };
     for (const [col, type] of Object.entries(fields)) {
       if (!NAME_RE.test(col)) throw new Error(`Invalid column name "${table}.${col}" in schema.`);
-      cols[col] = type;
+      if (typeof type !== 'string' || !VALID_TYPES.has(type)) {
+        throw new Error(`Invalid field type for "${table}.${col}": "${String(type)}".`);
+      }
+      cols[col] = type as SchemaFieldType;
     }
     cols.id = 'string';
     out[table] = cols;
@@ -54,12 +68,15 @@ export function resolveSchemaFile(explicit?: string, cwd = process.cwd()): strin
     if (!fs.existsSync(abs)) throw new Error(`SCHEMA_PATH not found: ${abs}`);
     return abs;
   }
+  // Inside the local-lite-server repo itself, src/schema.ts is the package's own loader.
+  const isOwnRepo = fs.existsSync(path.resolve(cwd, 'src/cli.ts'));
   for (const name of CANDIDATES) {
+    if (isOwnRepo && name.startsWith('src/')) continue;
     const abs = path.resolve(cwd, name);
     if (fs.existsSync(abs)) return abs;
   }
   throw new Error(
-    `No schema file found. Create schema.ts next to your .env (or set SCHEMA_PATH):\n` +
+    `No schema file found. Create src/schema.ts (or set SCHEMA_PATH):\n` +
       `  export default { notes: { id: 'string', title: 'string', body: 'string | null' } };`,
   );
 }
@@ -70,7 +87,7 @@ export async function loadSchemaFile(file: string): Promise<SchemaDictionary> {
     mod = JSON.parse(fs.readFileSync(file, 'utf8'));
   } else {
     const loaded = await import(pathToFileURL(file).href);
-    mod = loaded.default ?? loaded.schema ?? loaded;
+    mod = loaded.default ?? loaded.schema;
   }
   if (!mod || typeof mod !== 'object' || Array.isArray(mod)) {
     throw new Error(`${file} must export default an object of { table: { column: type } }.`);

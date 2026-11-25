@@ -8,7 +8,14 @@ const EXTENSIONS = ['.ts', '.mts', '.mjs', '.js'];
 function resolveFunctionsDir(dir: string | undefined, cwd: string): string {
   if (dir) return path.resolve(cwd, dir);
   const inSrc = path.resolve(cwd, 'src/functions');
-  if (fs.existsSync(inSrc) && fs.statSync(inSrc).isDirectory()) return inSrc;
+  // Avoid loading local-lite-server's own internal src/functions/ runtime when running inside this repo.
+  if (
+    fs.existsSync(inSrc) &&
+    fs.statSync(inSrc).isDirectory() &&
+    !fs.existsSync(path.join(inSrc, 'runtime.ts'))
+  ) {
+    return inSrc;
+  }
   return path.resolve(cwd, 'functions');
 }
 

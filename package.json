@@ -20,6 +20,7 @@
   },
   "files": [
     "dist",
+    "!dist/cpanel/**",
     "admin/dist",
     "templates",
     "docs",
@@ -36,7 +37,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "local-lite": "file:../local-lite",
+    "local-lite": "^3.3.4",
     "mysql2": "^3.24.6",
     "nodemailer": "^10.6.1",
     "pg": "^8.23.1"

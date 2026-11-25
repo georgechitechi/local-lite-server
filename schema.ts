@@ -10,4 +10,11 @@ export default {
     pinned: 'boolean',
     created_at: 'number',
   },
+  actions: {
+    id: 'string',
+    title: 'string',
+    body: 'string | null',
+    pinned: 'boolean',
+    created_at: 'number',
+  },
 };

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { loadSettings } from '../src/config.js';
 import { createApp } from '../src/server.js';
-import { normalizeSchema } from '../src/schema.js';
+import { normalizeSchema, resolveSchemaFile } from '../src/schema.js';
 import { ClientError, TableSyncStorage, fromDbRow, toDbValue } from '../src/tableStorage.js';
 
 const env = {
@@ -41,6 +41,13 @@ describe('local-lite-server app', () => {
   it('rejects bad dialect and missing vars', () => {
     expect(() => loadSettings({ ...env, DB_DIALECT: 'sqlite' })).toThrow();
     expect(() => loadSettings({})).toThrow(/Missing/);
+  });
+
+  it('resolves root schema.ts inside the package repo and rejects invalid schema values', () => {
+    expect(resolveSchemaFile().endsWith('schema.ts')).toBe(true);
+    expect(resolveSchemaFile().replace(/\\/g, '/')).not.toContain('/src/schema.ts');
+    expect(() => normalizeSchema({ bad: (() => {}) as any })).toThrow();
+    expect(() => normalizeSchema({ bad: { col: 'invalid' as any } })).toThrow();
   });
 
   it('serves /health without auth', async () => {
