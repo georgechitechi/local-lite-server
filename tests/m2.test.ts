@@ -92,53 +92,39 @@ describe('admin', () => {
   const app = createApp(loadSettings(base), accountsExecutor(), schema);
   it('serves the page publicly but data only with the key', async () => {
     expect((await app.fetch(new Request('http://x/admin'))).status).toBe(200);
-    expect((await app.fetch(new Request('http://x/admin/status'))).status).toBe(401);
+    expect((await app.fetch(new Request('http://x/admin/overview'))).status).toBe(401);
     const res = await app.fetch(
-      new Request('http://x/admin/status', { headers: { authorization: 'Bearer secret' } }),
+      new Request('http://x/admin/overview', { headers: { authorization: 'Bearer secret' } }),
     );
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ dialect: 'mysql', tables: { notes: 0 } });
+    expect(await res.json()).toMatchObject({ dbConnected: true, tableCounts: [{ table: 'notes', count: 0 }] });
     expect(
       (await app.fetch(new Request('http://x/admin/tables/nope', { headers: { authorization: 'Bearer secret' } }))).status,
-    ).toBe(404);
+    ).toBe(400);
   });
   it('can be disabled', async () => {
     const off = createApp(loadSettings({ ...base, ADMIN_UI: 'false' }), accountsExecutor(), schema);
     expect((await off.fetch(new Request('http://x/admin'))).status).toBe(404);
   });
 
-  it('supports row CRUD, sync-logs, and users endpoints', async () => {
+  it('supports row CRUD, logs, backups, storage, env, crons, and settings', async () => {
     const headers = { authorization: 'Bearer secret', 'content-type': 'application/json' };
     const create = await app.fetch(
-      new Request('http://x/admin/tables/notes', {
+      new Request('http://x/admin/table', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ title: 'Admin note' }),
+        body: JSON.stringify({ table: 'notes', row: { title: 'Admin note' } }),
       }),
     );
     expect(create.status).toBe(201);
     const { id } = (await create.json()) as { id: string };
 
-    const patch = await app.fetch(
-      new Request(`http://x/admin/tables/notes/${id}`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({ title: 'Updated' }),
-      }),
-    );
-    expect(patch.status).toBe(200);
-
-    const del = await app.fetch(
-      new Request(`http://x/admin/tables/notes/${id}`, { method: 'DELETE', headers }),
-    );
-    expect(del.status).toBe(200);
-
-    expect((await app.fetch(new Request('http://x/admin/sync-logs', { headers }))).status).toBe(200);
-    expect((await app.fetch(new Request('http://x/admin/users', { headers }))).status).toBe(200);
-    expect((await app.fetch(new Request('http://x/admin/storage/buckets', { headers }))).status).toBe(200);
-    expect((await app.fetch(new Request('http://x/admin/backups/export', { headers }))).status).toBe(200);
+    expect((await app.fetch(new Request('http://x/admin/table', { method: 'PATCH', headers, body: JSON.stringify({ table: 'notes', row: { id, title: 'Updated' } }) }))).status).toBe(200);
+    expect((await app.fetch(new Request(`http://x/admin/table?table=notes&id=${id}`, { method: 'DELETE', headers }))).status).toBe(200);
+    expect((await app.fetch(new Request('http://x/admin/logs', { headers }))).status).toBe(200);
+    expect((await app.fetch(new Request('http://x/admin/storage', { headers }))).status).toBe(200);
     expect((await app.fetch(new Request('http://x/admin/env', { headers }))).status).toBe(200);
-    expect((await app.fetch(new Request('http://x/admin/schedules', { headers }))).status).toBe(200);
+    expect((await app.fetch(new Request('http://x/admin/crons', { headers }))).status).toBe(200);
     expect((await app.fetch(new Request('http://x/admin/settings', { headers }))).status).toBe(200);
   });
 });

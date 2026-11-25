@@ -10,8 +10,7 @@ import type { ServerSettings } from './config.js';
 import type { SchemaDictionary } from './schema.js';
 import { ClientError, TableSyncStorage } from './tableStorage.js';
 import { createAuthService } from './auth.js';
-import { createAdmin } from './admin.js';
-import { createAdminExtras } from './adminExtras.js';
+import { createAdminConsole } from './adminConsole.js';
 import { clientIp, createRateLimiter } from './rateLimit.js';
 import {
   createFunctionRuntime,
@@ -38,11 +37,7 @@ export function createApp(
   const storage = new TableSyncStorage(executor, { schema, broker });
   const auth = createAuthService(settings, executor);
   const fnRuntime = createFunctionRuntime({ registry: functions, db: executor, schema, broker });
-  const admin = createAdmin(settings, executor, schema, auth, {
-    broker,
-    listFunctions: () => fnRuntime.list(),
-  });
-  const adminExtras = createAdminExtras({ settings, db: executor, schema, broker, fnRuntime });
+  const consoleApi = createAdminConsole({ settings, db: executor, schema, broker, fnRuntime });
   const authLimiter = createRateLimiter(20, 60_000);
 
   const bearer = (request: Request): string => {
@@ -216,94 +211,69 @@ export function createApp(
       },
       ...(settings.adminUi
         ? {
-            '/admin': { GET: () => admin.page() },
-            '/admin/status': {
-              GET: async ({ request }: { request: Request }) =>
-                isAdmin(request) ? admin.status() : unauthorized(),
+            '/admin': { GET: ({ request }: { request: Request }) => consoleApi.serveStatic(new URL(request.url).pathname) },
+            '/admin/login': {
+              GET: () => consoleApi.getLogin(),
+              POST: ({ request }: { request: Request }) => consoleApi.postLogin(request),
+            },
+            '/admin/logout': {
+              POST: async ({ request }: { request: Request }) =>
+                consoleApi.postLogout(request, await consoleApi.authenticate(request)),
+            },
+            '/admin/overview': {
+              GET: async ({ request }: { request: Request }) => {
+                const s = await consoleApi.authenticate(request);
+                return s ? consoleApi.overview(s) : unauthorized();
+              },
+            },
+            '/admin/table': {
+              ALL: async ({ request }: { request: Request }) =>
+                (await consoleApi.authenticate(request)) ? consoleApi.handleTable(request) : unauthorized(),
             },
             '/admin/tables/:table': {
-              GET: async ({ request, params }: { request: Request; params: Record<string, string> }) =>
-                isAdmin(request) ? admin.rows(params.table, new URL(request.url)) : unauthorized(),
-              POST: async ({ request, params }: { request: Request; params: Record<string, string> }) =>
-                isAdmin(request) ? admin.createRow(params.table, request) : unauthorized(),
+              ALL: async ({ request, params }: { request: Request; params: Record<string, string> }) =>
+                (await consoleApi.authenticate(request))
+                  ? consoleApi.handleTable(request, params.table)
+                  : unauthorized(),
             },
             '/admin/tables/:table/:id': {
-              PATCH: async ({ request, params }: { request: Request; params: Record<string, string> }) =>
-                isAdmin(request) ? admin.updateRow(params.table, params.id, request) : unauthorized(),
-              DELETE: async ({ request, params }: { request: Request; params: Record<string, string> }) =>
-                isAdmin(request) ? admin.deleteRow(params.table, params.id, new URL(request.url)) : unauthorized(),
-            },
-            '/admin/sync-logs': {
-              GET: async ({ request }: { request: Request }) =>
-                isAdmin(request) ? admin.syncLogs(new URL(request.url)) : unauthorized(),
+              ALL: async ({ request, params }: { request: Request; params: Record<string, string> }) =>
+                (await consoleApi.authenticate(request))
+                  ? consoleApi.handleTable(request, params.table, params.id)
+                  : unauthorized(),
             },
             '/admin/users': {
-              GET: async ({ request }: { request: Request }) =>
-                isAdmin(request) ? admin.listUsers() : unauthorized(),
-            },
-            '/admin/users/:id/revoke': {
-              POST: async ({ request, params }: { request: Request; params: Record<string, string> }) =>
-                isAdmin(request) ? admin.revokeUser(params.id) : unauthorized(),
-            },
-            '/admin/storage/buckets': {
-              GET: async ({ request }: { request: Request }) =>
-                isAdmin(request) ? adminExtras.listBuckets() : unauthorized(),
               POST: async ({ request }: { request: Request }) =>
-                isAdmin(request) ? adminExtras.createBucket(request) : unauthorized(),
+                (await consoleApi.authenticate(request)) ? consoleApi.manageUsers(request) : unauthorized(),
             },
-            '/admin/storage/buckets/:name': {
-              DELETE: async ({ request, params }: { request: Request; params: Record<string, string> }) =>
-                isAdmin(request) ? adminExtras.deleteBucket(params.name) : unauthorized(),
-            },
-            '/admin/storage/files': {
+            '/admin/logs': {
               GET: async ({ request }: { request: Request }) =>
-                isAdmin(request) ? adminExtras.listFiles(new URL(request.url)) : unauthorized(),
-              POST: async ({ request }: { request: Request }) =>
-                isAdmin(request) ? adminExtras.uploadFile(request) : unauthorized(),
-            },
-            '/admin/storage/files/:id': {
-              DELETE: async ({ request, params }: { request: Request; params: Record<string, string> }) =>
-                isAdmin(request) ? adminExtras.deleteFile(params.id) : unauthorized(),
-            },
-            '/admin/backups/export': {
-              GET: async ({ request }: { request: Request }) =>
-                isAdmin(request) ? adminExtras.exportBackup() : unauthorized(),
-            },
-            '/admin/backups/restore': {
-              POST: async ({ request }: { request: Request }) =>
-                isAdmin(request) ? adminExtras.restoreBackup(request) : unauthorized(),
+                (await consoleApi.authenticate(request))
+                  ? consoleApi.handleLogs(new URL(request.url))
+                  : unauthorized(),
             },
             '/admin/env': {
-              GET: async ({ request }: { request: Request }) =>
-                isAdmin(request) ? adminExtras.listEnv() : unauthorized(),
-              POST: async ({ request }: { request: Request }) =>
-                isAdmin(request) ? adminExtras.setEnv(request) : unauthorized(),
+              ALL: async ({ request }: { request: Request }) =>
+                (await consoleApi.authenticate(request)) ? consoleApi.handleEnv(request) : unauthorized(),
             },
-            '/admin/env/:key': {
-              DELETE: async ({ request, params }: { request: Request; params: Record<string, string> }) =>
-                isAdmin(request) ? adminExtras.deleteEnv(params.key) : unauthorized(),
+            '/admin/backups': {
+              ALL: async ({ request }: { request: Request }) =>
+                (await consoleApi.authenticate(request)) ? consoleApi.handleBackups(request) : unauthorized(),
             },
-            '/admin/schedules': {
-              GET: async ({ request }: { request: Request }) =>
-                isAdmin(request) ? adminExtras.listSchedules() : unauthorized(),
-              POST: async ({ request }: { request: Request }) =>
-                isAdmin(request) ? adminExtras.saveSchedule(request) : unauthorized(),
+            '/admin/storage': {
+              ALL: async ({ request }: { request: Request }) =>
+                (await consoleApi.authenticate(request)) ? consoleApi.handleStorage(request) : unauthorized(),
             },
-            '/admin/schedules/:name/run': {
-              POST: async ({ request, params }: { request: Request; params: Record<string, string> }) =>
-                isAdmin(request) ? adminExtras.runSchedule(params.name) : unauthorized(),
-            },
-            '/admin/schedules/:name': {
-              DELETE: async ({ request, params }: { request: Request; params: Record<string, string> }) =>
-                isAdmin(request) ? adminExtras.deleteSchedule(params.name) : unauthorized(),
+            '/admin/crons': {
+              ALL: async ({ request }: { request: Request }) =>
+                (await consoleApi.authenticate(request)) ? consoleApi.handleCrons(request) : unauthorized(),
             },
             '/admin/settings': {
-              GET: async ({ request }: { request: Request }) =>
-                isAdmin(request) ? adminExtras.settingsInfo() : unauthorized(),
+              ALL: async ({ request }: { request: Request }) =>
+                (await consoleApi.authenticate(request)) ? consoleApi.handleSettings(request) : unauthorized(),
             },
-            '/admin/schema/apply': {
-              POST: async ({ request }: { request: Request }) =>
-                isAdmin(request) ? adminExtras.applyPendingSchema() : unauthorized(),
+            '/admin/*': {
+              GET: ({ request }: { request: Request }) => consoleApi.serveStatic(new URL(request.url).pathname),
             },
           }
         : {}),

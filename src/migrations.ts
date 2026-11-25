@@ -173,6 +173,59 @@ export const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    id: '0004_console_auth',
+    mysql: [
+      `ALTER TABLE _local_auth_accounts ADD COLUMN IF NOT EXISTS console_role VARCHAR(32) NULL`,
+      `ALTER TABLE _local_auth_accounts ADD COLUMN IF NOT EXISTS console_active TINYINT(1) NOT NULL DEFAULT 0`,
+      `CREATE TABLE IF NOT EXISTS _lls_backups (
+        id VARCHAR(64) NOT NULL PRIMARY KEY,
+        user_id VARCHAR(64) NOT NULL,
+        file_name VARCHAR(255) NOT NULL,
+        status VARCHAR(32) NOT NULL,
+        size_bytes BIGINT NOT NULL,
+        record_count INT NOT NULL,
+        created_at BIGINT NOT NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS _lls_crons (
+        job_key VARCHAR(128) NOT NULL PRIMARY KEY,
+        label VARCHAR(255) NOT NULL,
+        action_type VARCHAR(64) NOT NULL,
+        cron_expr VARCHAR(64) NOT NULL,
+        timezone VARCHAR(64) NOT NULL DEFAULT 'UTC',
+        enabled TINYINT(1) NOT NULL DEFAULT 1,
+        config_json TEXT NULL,
+        last_run_at BIGINT NULL,
+        last_status VARCHAR(32) NULL,
+        last_summary TEXT NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+    ],
+    postgres: [
+      `ALTER TABLE _local_auth_accounts ADD COLUMN IF NOT EXISTS console_role VARCHAR(32) NULL`,
+      `ALTER TABLE _local_auth_accounts ADD COLUMN IF NOT EXISTS console_active BOOLEAN NOT NULL DEFAULT FALSE`,
+      `CREATE TABLE IF NOT EXISTS _lls_backups (
+        id VARCHAR(64) NOT NULL PRIMARY KEY,
+        user_id VARCHAR(64) NOT NULL,
+        file_name VARCHAR(255) NOT NULL,
+        status VARCHAR(32) NOT NULL,
+        size_bytes BIGINT NOT NULL,
+        record_count INT NOT NULL,
+        created_at BIGINT NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS _lls_crons (
+        job_key VARCHAR(128) NOT NULL PRIMARY KEY,
+        label VARCHAR(255) NOT NULL,
+        action_type VARCHAR(64) NOT NULL,
+        cron_expr VARCHAR(64) NOT NULL,
+        timezone VARCHAR(64) NOT NULL DEFAULT 'UTC',
+        enabled BOOLEAN NOT NULL DEFAULT TRUE,
+        config_json TEXT NULL,
+        last_run_at BIGINT NULL,
+        last_status VARCHAR(32) NULL,
+        last_summary TEXT NULL
+      )`,
+    ],
+  },
 ];
 
 export async function runMigrations(

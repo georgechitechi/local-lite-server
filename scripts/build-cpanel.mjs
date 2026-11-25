@@ -37,4 +37,7 @@ fs.copyFileSync('docs/cpanel.md', 'dist/cpanel/README-cpanel.md');
 if (fs.existsSync('functions')) {
   fs.cpSync('functions', 'dist/cpanel/functions', { recursive: true });
 }
+if (fs.existsSync('admin/dist')) {
+  fs.cpSync('admin/dist', 'dist/cpanel/admin-ui', { recursive: true });
+}
 console.log('\ncPanel package ready: dist/cpanel/ (app.cjs, schema.ts, .env.example, README-cpanel.md)');
