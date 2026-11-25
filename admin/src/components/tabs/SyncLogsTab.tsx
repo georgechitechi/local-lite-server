@@ -16,7 +16,13 @@ interface LogsResponse {
   rows: SyncChangeRow[];
 }
 
-export function SyncLogsTab({ tables }: { tables: string[] }) {
+export function SyncLogsTab({
+  tables,
+  refreshSignal = 0,
+}: {
+  tables: string[];
+  refreshSignal?: number;
+}) {
   const [logTableFilter, setLogTableFilter] = useState('ALL');
   const [data, setData] = useState<LogsResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -38,7 +44,7 @@ export function SyncLogsTab({ tables }: { tables: string[] }) {
 
   useEffect(() => {
     void loadLogs(logTableFilter, 0);
-  }, [logTableFilter, loadLogs]);
+  }, [logTableFilter, loadLogs, refreshSignal]);
 
   const hasPrev = Boolean(!loading && data && data.offset > 0);
   const hasNext = Boolean(

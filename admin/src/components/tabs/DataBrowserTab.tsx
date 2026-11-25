@@ -23,6 +23,7 @@ export function DataBrowserTab({
   tableCounts,
   selectedTable,
   showDeleted = false,
+  refreshSignal = 0,
   onSelectTable,
   onRefreshOverview,
   onToast,
@@ -30,6 +31,7 @@ export function DataBrowserTab({
   tableCounts: Array<{ table: string; count: number }>;
   selectedTable: string;
   showDeleted?: boolean;
+  refreshSignal?: number;
   onSelectTable: (table: string) => void;
   onRefreshOverview: () => Promise<void>;
   onToast: (msg: string, type?: ToastType) => void;
@@ -65,7 +67,7 @@ export function DataBrowserTab({
     if (selectedTable) {
       void loadTable(selectedTable, 0);
     }
-  }, [selectedTable, loadTable]);
+  }, [selectedTable, loadTable, refreshSignal]);
 
   const filteredTables = useMemo(() => {
     const q = tableFilter.trim().toLowerCase();

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
+import { PaginationBar } from '@/components/PaginationBar';
 import {
   type CronJob,
   type DrawerMode,
@@ -14,13 +15,18 @@ import {
   secondaryBtnStyle,
 } from '@/styles/adminStyles';
 
+const PAGE_SIZE = 30;
+
 export function SchedulesTab({
   onToast,
+  refreshSignal = 0,
 }: {
   onToast: (msg: string, type?: ToastType) => void;
+  refreshSignal?: number;
 }) {
   const [jobs, setJobs] = useState<CronJob[]>([]);
   const [loading, setLoading] = useState(true);
+  const [offset, setOffset] = useState(0);
   const [runningKey, setRunningKey] = useState<string | null>(null);
   const [drawer, setDrawer] = useState<DrawerMode>({ kind: 'closed' });
 
@@ -41,7 +47,7 @@ export function SchedulesTab({
 
   useEffect(() => {
     void loadJobs();
-  }, [loadJobs]);
+  }, [loadJobs, refreshSignal]);
 
   const openEditDrawer = (job: CronJob) => setDrawer({ kind: 'edit', job });
 
@@ -71,6 +77,10 @@ export function SchedulesTab({
   };
 
   const hasEnabledJobs = jobs.some((j) => j.enabled);
+  const safeOffset = offset >= jobs.length ? 0 : offset;
+  const pageRows = jobs.slice(safeOffset, safeOffset + PAGE_SIZE);
+  const hasPrev = safeOffset > 0;
+  const hasNext = safeOffset + pageRows.length < jobs.length;
 
   return (
     <Card
@@ -78,14 +88,6 @@ export function SchedulesTab({
       subtitle="Manage standing automations, cadence, and execution results."
       actions={
         <>
-          <button
-            type="button"
-            onClick={() => void loadJobs()}
-            disabled={loading}
-            style={secondaryBtnStyle}
-          >
-            Refresh
-          </button>
           <button
             type="button"
             onClick={() => setDrawer({ kind: 'create' })}
@@ -119,19 +121,10 @@ export function SchedulesTab({
         <EmptyState
           title="No scheduled automations yet."
           description="Create a schedule to run recurring server tasks automatically."
-          action={
-            <button
-              type="button"
-              onClick={() => setDrawer({ kind: 'create' })}
-              style={primaryBtnStyle}
-            >
-              + New Schedule
-            </button>
-          }
         />
       ) : (
         <div style={{ display: 'grid', gap: 12 }}>
-          {jobs.map((job) => {
+          {pageRows.map((job) => {
             const isRunning =
               runningKey === job.job_key || runningKey === 'all';
             return (
@@ -258,6 +251,17 @@ export function SchedulesTab({
           })}
         </div>
       )}
+
+      <PaginationBar
+        total={jobs.length}
+        offset={safeOffset}
+        count={pageRows.length}
+        unit="schedule"
+        hasPrev={hasPrev}
+        hasNext={hasNext}
+        onPrev={() => setOffset(Math.max(0, safeOffset - PAGE_SIZE))}
+        onNext={() => setOffset(safeOffset + PAGE_SIZE)}
+      />
 
       <ScheduleDrawer
         drawer={drawer}

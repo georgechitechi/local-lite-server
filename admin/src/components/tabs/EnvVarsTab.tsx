@@ -20,8 +20,10 @@ type SourceFilter = 'all' | 'database' | 'env';
 
 export function EnvVarsTab({
   onToast,
+  refreshSignal = 0,
 }: {
   onToast: (msg: string, type?: ToastType) => void;
+  refreshSignal?: number;
 }) {
   const [vars, setVars] = useState<EnvVarItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -78,7 +80,7 @@ export function EnvVarsTab({
 
   useEffect(() => {
     void loadEnvVars();
-  }, [loadEnvVars]);
+  }, [loadEnvVars, refreshSignal]);
 
   const handleToggleReveal = async (item: EnvVarItem) => {
     if (revealedValues[item.key] !== undefined) {
@@ -240,14 +242,9 @@ export function EnvVarsTab({
       <Card
         title="Environment Variables"
         actions={
-          <>
-            <button type="button" onClick={() => void loadEnvVars()} disabled={loading} style={secondaryBtnStyle}>
-              {loading ? 'Loading...' : 'Refresh'}
-            </button>
-            <button type="button" onClick={() => setDrawer({ kind: 'create' })} style={primaryBtnStyle}>
-              + Add Variable
-            </button>
-          </>
+          <button type="button" onClick={() => setDrawer({ kind: 'create' })} style={primaryBtnStyle}>
+            + Add Variable
+          </button>
         }
         toolbar={
           <>

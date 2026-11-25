@@ -37,8 +37,10 @@ const PAGE_SIZE = 50;
 
 export function StorageTab({
   onToast,
+  refreshSignal = 0,
 }: {
   onToast: (msg: string, type?: ToastType) => void;
+  refreshSignal?: number;
 }) {
   const [files, setFiles] = useState<StorageFileRow[]>([]);
   const [buckets, setBuckets] = useState<StorageBucket[]>([]);
@@ -83,7 +85,7 @@ export function StorageTab({
 
   useEffect(() => {
     void loadStorage(offset, selectedBucket);
-  }, [offset, selectedBucket, loadStorage]);
+  }, [offset, selectedBucket, loadStorage, refreshSignal]);
 
   const handleDeleteBucket = async (bucketName: string) => {
     if (!window.confirm(`Delete empty bucket "${bucketName}"?`)) return;
@@ -238,14 +240,6 @@ export function StorageTab({
             style={secondaryBtnStyle}
           >
             + Create Bucket
-          </button>
-          <button
-            type="button"
-            disabled={loading}
-            onClick={() => void loadStorage(offset, selectedBucket)}
-            style={secondaryBtnStyle}
-          >
-            {loading ? 'Loading...' : 'Refresh'}
           </button>
           <button
             type="button"

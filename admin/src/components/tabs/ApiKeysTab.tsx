@@ -28,8 +28,10 @@ function keyStatus(item: ApiKeyItem): { label: string; color: string; bg: string
 
 export function ApiKeysTab({
   onToast,
+  refreshSignal = 0,
 }: {
   onToast: (msg: string, type?: ToastType) => void;
+  refreshSignal?: number;
 }) {
   const [keys, setKeys] = useState<ApiKeyItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -56,7 +58,7 @@ export function ApiKeysTab({
 
   useEffect(() => {
     void loadKeys();
-  }, [loadKeys]);
+  }, [loadKeys, refreshSignal]);
 
   const handleRevoke = async (item: ApiKeyItem) => {
     const res = await adminFetch('/admin/api-keys', {
@@ -191,14 +193,9 @@ export function ApiKeysTab({
       <Card
         title="API Keys"
         actions={
-          <>
-            <button type="button" onClick={() => void loadKeys()} disabled={loading} style={secondaryBtnStyle}>
-              {loading ? 'Refreshing...' : 'Refresh'}
-            </button>
-            <button type="button" onClick={() => setDrawerOpen(true)} style={primaryBtnStyle}>
-              + Create API Key
-            </button>
-          </>
+          <button type="button" onClick={() => setDrawerOpen(true)} style={primaryBtnStyle}>
+            + Create API Key
+          </button>
         }
         toolbar={
           <>

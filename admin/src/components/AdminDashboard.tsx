@@ -37,6 +37,7 @@ export function AdminDashboard() {
   const [backups, setBackups] = useState<BackupArchiveRow[]>([]);
   const [endpoints, setEndpoints] = useState<EndpointItem[]>([]);
   const [selectedTable, setSelectedTable] = useState<string>('');
+  const [refreshTick, setRefreshTick] = useState(0);
   const [showDeletedRows, setShowDeletedRows] = useState<boolean>(() => {
     try {
       return localStorage.getItem('lls_show_deleted_rows') === '1';
@@ -242,7 +243,10 @@ export function AdminDashboard() {
 
           <button
             type="button"
-            onClick={() => void loadOverview()}
+            onClick={() => {
+              void loadOverview();
+              setRefreshTick((n) => n + 1);
+            }}
             disabled={loading}
             style={secondaryBtnStyle}
           >
@@ -262,13 +266,16 @@ export function AdminDashboard() {
             />
           )}
 
-          {activeTab === 'api_keys' && <ApiKeysTab onToast={showToast} />}
+          {activeTab === 'api_keys' && (
+            <ApiKeysTab onToast={showToast} refreshSignal={refreshTick} />
+          )}
 
           {activeTab === 'data' && (
             <DataBrowserTab
               tableCounts={overview?.tableCounts ?? []}
               selectedTable={selectedTable}
               showDeleted={showDeletedRows}
+              refreshSignal={refreshTick}
               onSelectTable={setSelectedTable}
               onRefreshOverview={loadOverview}
               onToast={showToast}
@@ -286,7 +293,9 @@ export function AdminDashboard() {
 
           {activeTab === 'functions' && <FunctionsTab endpoints={endpoints} />}
 
-          {activeTab === 'schedules' && <SchedulesTab onToast={showToast} />}
+          {activeTab === 'schedules' && (
+            <SchedulesTab onToast={showToast} refreshSignal={refreshTick} />
+          )}
 
           {activeTab === 'backups' && (
             <BackupsTab
@@ -298,16 +307,19 @@ export function AdminDashboard() {
             />
           )}
 
-          {activeTab === 'storage' && <StorageTab onToast={showToast} />}
+          {activeTab === 'storage' && (
+            <StorageTab onToast={showToast} refreshSignal={refreshTick} />
+          )}
 
           {activeTab === 'logs' && (
             <SyncLogsTab
               tables={(overview?.tableCounts ?? []).map((t) => t.table)}
+              refreshSignal={refreshTick}
             />
           )}
 
           {activeTab === 'env' && overview?.consoleRole === 'super_admin' && (
-            <EnvVarsTab onToast={showToast} />
+            <EnvVarsTab onToast={showToast} refreshSignal={refreshTick} />
           )}
 
           {activeTab === 'settings' && (
