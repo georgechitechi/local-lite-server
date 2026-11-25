@@ -106,6 +106,41 @@ describe('admin', () => {
     const off = createApp(loadSettings({ ...base, ADMIN_UI: 'false' }), accountsExecutor(), schema);
     expect((await off.fetch(new Request('http://x/admin'))).status).toBe(404);
   });
+
+  it('supports row CRUD, sync-logs, and users endpoints', async () => {
+    const headers = { authorization: 'Bearer secret', 'content-type': 'application/json' };
+    const create = await app.fetch(
+      new Request('http://x/admin/tables/notes', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ title: 'Admin note' }),
+      }),
+    );
+    expect(create.status).toBe(201);
+    const { id } = (await create.json()) as { id: string };
+
+    const patch = await app.fetch(
+      new Request(`http://x/admin/tables/notes/${id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ title: 'Updated' }),
+      }),
+    );
+    expect(patch.status).toBe(200);
+
+    const del = await app.fetch(
+      new Request(`http://x/admin/tables/notes/${id}`, { method: 'DELETE', headers }),
+    );
+    expect(del.status).toBe(200);
+
+    expect((await app.fetch(new Request('http://x/admin/sync-logs', { headers }))).status).toBe(200);
+    expect((await app.fetch(new Request('http://x/admin/users', { headers }))).status).toBe(200);
+    expect((await app.fetch(new Request('http://x/admin/storage/buckets', { headers }))).status).toBe(200);
+    expect((await app.fetch(new Request('http://x/admin/backups/export', { headers }))).status).toBe(200);
+    expect((await app.fetch(new Request('http://x/admin/env', { headers }))).status).toBe(200);
+    expect((await app.fetch(new Request('http://x/admin/schedules', { headers }))).status).toBe(200);
+    expect((await app.fetch(new Request('http://x/admin/settings', { headers }))).status).toBe(200);
+  });
 });
 
 describe('rate limiter', () => {

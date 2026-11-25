@@ -1,22 +1,43 @@
-import { quoteIdent, type SqlExecutor } from 'local-lite/server';
+import crypto from 'node:crypto';
+import { buildUpsertSql, quoteIdent, type SqlExecutor, type SyncEventBroker } from 'local-lite/server';
 import type { ServerSettings } from './config.js';
 import { planSchema, type SchemaDictionary } from './schema.js';
 import { coreMigrationStatus } from './migrations.js';
 import type { AuthService } from './auth.js';
-
-const escapeHtml = (v: string) =>
-  v.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+import type { FunctionKind } from './functions.js';
+import { fromDbRow, toDbValue } from './tableStorage.js';
+import { renderAdminHtml } from './adminUi.js';
 
 const int = (v: string | null, d: number, min: number, max: number) =>
   Math.min(Math.max(Math.floor(Number(v ?? d)) || d, min), max);
+
+const SYSTEM_COLS = new Set(['id', 'updated_at', 'deleted']);
 
 export function createAdmin(
   s: ServerSettings,
   db: SqlExecutor,
   schema: SchemaDictionary,
   auth: AuthService,
+  opts: {
+    broker?: SyncEventBroker;
+    listFunctions?: () => Array<{ name: string; kind: FunctionKind }>;
+  } = {},
 ) {
   const q = (n: string) => quoteIdent(n, db.dialect);
+  const notDeleted = db.dialect === 'postgres' ? 'FALSE' : '0';
+
+  async function recordChange(tx: SqlExecutor, table: string, id: string): Promise<number> {
+    const clock = await tx.query<{ checkpoint: number }>(
+      `SELECT checkpoint FROM ${q('_server_sync_clock')} WHERE id = 1 FOR UPDATE`,
+    );
+    const ts = Math.max(Date.now(), Number(clock[0]?.checkpoint ?? 0) + 1);
+    await tx.execute(
+      `INSERT INTO ${q('_server_changes')} (table_name, row_id, ${q('timestamp')}) VALUES (?, ?, ?)`,
+      [table, id, ts],
+    );
+    await tx.execute(`UPDATE ${q('_server_sync_clock')} SET checkpoint = ? WHERE id = 1`, [ts]);
+    return ts;
+  }
 
   return {
     async status(): Promise<Response> {
@@ -34,6 +55,8 @@ export function createAdmin(
         smtp: Boolean(s.smtp),
         autoMigrate: s.autoMigrate,
         tables,
+        schema,
+        functions: opts.listFunctions?.() ?? [],
         core: await coreMigrationStatus(db),
         schemaPending: plan ? plan.up.length : null,
         schemaWarnings: plan?.warnings ?? [],
@@ -43,42 +66,127 @@ export function createAdmin(
 
     async rows(table: string, url: URL): Promise<Response> {
       if (!Object.hasOwn(schema, table)) return Response.json({ error: 'Unknown table.' }, { status: 404 });
+      const fields = schema[table];
       const limit = int(url.searchParams.get('limit'), 50, 1, 500);
       const offset = int(url.searchParams.get('offset'), 0, 0, 10_000_000);
-      const rows = await db.query(
-        `SELECT * FROM ${q(table)} ORDER BY ${q('updated_at')} DESC LIMIT ${limit} OFFSET ${offset}`,
+      const includeDeleted = url.searchParams.get('includeDeleted') === '1';
+      const where = includeDeleted ? '' : `WHERE ${q('deleted')} = ${notDeleted}`;
+      const total = Number(
+        (await db.query<any>(`SELECT COUNT(*) AS n FROM ${q(table)} ${where}`))[0]?.n ?? 0,
       );
-      return Response.json({ table, limit, offset, rows });
+      const raw = await db.query<Record<string, any>>(
+        `SELECT * FROM ${q(table)} ${where} ORDER BY ${q('updated_at')} DESC LIMIT ${limit} OFFSET ${offset}`,
+      );
+      const rows = raw.map((r) => ({ id: String(r.id), ...fromDbRow(fields, r) }));
+      const columns = [...Object.keys(fields), 'deleted', 'updated_at'];
+      return Response.json({ table, columns, total, limit, offset, rows });
+    },
+
+    async createRow(table: string, request: Request): Promise<Response> {
+      if (!Object.hasOwn(schema, table)) return Response.json({ error: 'Unknown table.' }, { status: 404 });
+      const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+      if (!body || typeof body !== 'object') return Response.json({ error: 'Invalid JSON.' }, { status: 400 });
+      const fields = schema[table];
+      const id = typeof body.id === 'string' && body.id.trim() ? body.id.trim() : crypto.randomUUID();
+      const cols = Object.keys(fields).filter(
+        (c) => !SYSTEM_COLS.has(c) && c !== 'created_at' && Object.hasOwn(body, c),
+      );
+      const ts = await db.withTransaction(async (tx) => {
+        const checkpoint = await recordChange(tx, table, id);
+        const insertCols = ['id', ...cols, 'updated_at', 'deleted'];
+        const params: unknown[] = [
+          id,
+          ...cols.map((c) => toDbValue(fields[c], body[c], db.dialect)),
+          checkpoint,
+          db.dialect === 'postgres' ? false : 0,
+        ];
+        if (fields.created_at) {
+          insertCols.push('created_at');
+          params.push(body.created_at != null ? toDbValue(fields.created_at, body.created_at, db.dialect) : checkpoint);
+        }
+        await tx.execute(
+          buildUpsertSql({
+            table,
+            conflictCols: ['id'],
+            insertCols,
+            updateCols: [...cols, 'updated_at', 'deleted'],
+            dialect: db.dialect,
+          }),
+          params,
+        );
+        return checkpoint;
+      });
+      opts.broker?.publish({ scopeId: 'default', tableName: table, checkpoint: ts });
+      return Response.json({ success: true, id, cursor: ts }, { status: 201 });
+    },
+
+    async updateRow(table: string, id: string, request: Request): Promise<Response> {
+      if (!Object.hasOwn(schema, table)) return Response.json({ error: 'Unknown table.' }, { status: 404 });
+      const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+      if (!body || typeof body !== 'object') return Response.json({ error: 'Invalid JSON.' }, { status: 400 });
+      const fields = schema[table];
+      const cols = Object.keys(fields).filter((c) => !SYSTEM_COLS.has(c) && Object.hasOwn(body, c));
+      const ts = await db.withTransaction(async (tx) => {
+        const checkpoint = await recordChange(tx, table, id);
+        const sets = [...cols.map((c) => `${q(c)} = ?`), `${q('updated_at')} = ?`];
+        const params = [...cols.map((c) => toDbValue(fields[c], body[c], db.dialect)), checkpoint, id];
+        await tx.execute(`UPDATE ${q(table)} SET ${sets.join(', ')} WHERE ${q('id')} = ?`, params);
+        return checkpoint;
+      });
+      opts.broker?.publish({ scopeId: 'default', tableName: table, checkpoint: ts });
+      return Response.json({ success: true, id, cursor: ts });
+    },
+
+    async deleteRow(table: string, id: string, url: URL): Promise<Response> {
+      if (!Object.hasOwn(schema, table)) return Response.json({ error: 'Unknown table.' }, { status: 404 });
+      const restore = url.searchParams.get('restore') === '1';
+      const delVal = db.dialect === 'postgres' ? !restore : restore ? 0 : 1;
+      const ts = await db.withTransaction(async (tx) => {
+        const checkpoint = await recordChange(tx, table, id);
+        await tx.execute(
+          `UPDATE ${q(table)} SET ${q('deleted')} = ?, ${q('updated_at')} = ? WHERE ${q('id')} = ?`,
+          [delVal, checkpoint, id],
+        );
+        return checkpoint;
+      });
+      opts.broker?.publish({ scopeId: 'default', tableName: table, checkpoint: ts });
+      return Response.json({ success: true, id, deleted: !restore, cursor: ts });
+    },
+
+    async syncLogs(url: URL): Promise<Response> {
+      const limit = int(url.searchParams.get('limit'), 100, 1, 500);
+      const table = url.searchParams.get('table')?.trim() || '';
+      if (table && !Object.hasOwn(schema, table)) {
+        return Response.json({ error: 'Unknown table.' }, { status: 400 });
+      }
+      const where = table ? 'WHERE table_name = ?' : '';
+      const params = table ? [table] : [];
+      const logs = await db.query(
+        `SELECT id, table_name, row_id, ${q('timestamp')} FROM ${q('_server_changes')} ${where} ORDER BY id DESC LIMIT ${limit}`,
+        params,
+      );
+      return Response.json({ logs });
+    },
+
+    async listUsers(): Promise<Response> {
+      const users = await db.query(
+        'SELECT id, email, display_name, failed_login_attempts, locked_until, token_version, created_at, updated_at FROM _local_auth_accounts ORDER BY created_at DESC LIMIT 200',
+      );
+      return Response.json({ users });
+    },
+
+    async revokeUser(id: string): Promise<Response> {
+      await db.execute(
+        'UPDATE _local_auth_accounts SET token_version = COALESCE(token_version, 1) + 1, failed_login_attempts = 0, locked_until = NULL, updated_at = ? WHERE id = ?',
+        [Date.now(), id],
+      );
+      return Response.json({ success: true });
     },
 
     page(): Response {
-      return new Response(ADMIN_HTML.replaceAll('__APP__', escapeHtml(s.appName)), {
+      return new Response(renderAdminHtml(s.appName), {
         headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
       });
     },
   };
 }
-
-const ADMIN_HTML = `<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
-<title>__APP__ admin</title>
-<style>body{font:14px system-ui;margin:0;background:#0f1115;color:#e6e6e6}main{max-width:960px;margin:auto;padding:20px}
-input,button,select{font:inherit;padding:6px 10px;border-radius:6px;border:1px solid #3a3f4b;background:#1a1d24;color:inherit}
-button{cursor:pointer}table{border-collapse:collapse;width:100%;margin-top:10px;font-size:12px}
-td,th{border:1px solid #2a2e38;padding:4px 8px;text-align:left;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.card{background:#171a21;border:1px solid #2a2e38;border-radius:10px;padding:12px;margin:12px 0}.warn{color:#f5b942}.err{color:#ff6b6b}</style>
-<main><h2>__APP__ admin</h2>
-<div class=card><input id=key type=password placeholder="SERVER_API_KEY" size=36> <button id=go>Connect</button> <span id=msg class=err></span></div>
-<div id=out></div></main>
-<script>
-const $=s=>document.querySelector(s),key=$('#key');key.value=sessionStorage.k||'';
-const api=async p=>{const r=await fetch(p,{headers:{authorization:'Bearer '+key.value}});if(!r.ok)throw new Error(r.status===401?'Invalid key':'Request failed ('+r.status+')');return r.json()};
-const esc=v=>String(v??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-async function load(){$('#msg').textContent='';try{const s=await api('/admin/status');sessionStorage.k=key.value;
-$('#out').innerHTML='<div class=card><b>'+esc(s.dialect)+'</b> · '+esc(s.database)+' · cursor '+s.cursor+' · users '+s.accounts.users+(s.accounts.enabled?'':' (accounts disabled)')+' · smtp '+(s.smtp?'on':'off')+
-(s.schemaPending?'<div class=warn>'+s.schemaPending+' pending schema change(s)</div>':'')+s.schemaWarnings.map(w=>'<div class=warn>'+esc(w)+'</div>').join('')+
-'</div><div class=card>Tables: '+Object.entries(s.tables).map(([t,n])=>'<button data-t="'+esc(t)+'">'+esc(t)+' ('+n+')</button>').join(' ')+'</div><div id=rows></div>';
-document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>rows(b.dataset.t))}catch(e){$('#msg').textContent=e.message}}
-async function rows(t){const d=await api('/admin/tables/'+encodeURIComponent(t));const c=d.rows[0]?Object.keys(d.rows[0]):[];
-$('#rows').innerHTML='<div class=card><b>'+esc(t)+'</b> (latest '+d.rows.length+')<table><tr>'+c.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr>'+d.rows.map(r=>'<tr>'+c.map(x=>'<td title="'+esc(r[x])+'">'+esc(typeof r[x]==='object'?JSON.stringify(r[x]):r[x])+'</td>').join('')+'</tr>').join('')+'</table></div>'}
-$('#go').onclick=load;key.addEventListener('keydown',e=>{if(e.key==='Enter')load()});if(key.value)load();
-</script>`;

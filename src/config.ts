@@ -25,6 +25,7 @@ export interface ServerSettings {
   autoMigrate: boolean;
   schemaPath?: string;
   functionsDir?: string;
+  uploadDir: string;
   apiKey: string;
   /** Signs user tokens. Enables /auth when set. */
   appSecret?: string;
@@ -60,6 +61,7 @@ export function loadSettings(env: NodeJS.ProcessEnv = process.env): ServerSettin
     autoMigrate: env.AUTO_MIGRATE !== 'false',
     schemaPath: env.SCHEMA_PATH || undefined,
     functionsDir: env.FUNCTIONS_DIR || undefined,
+    uploadDir: env.UPLOAD_DIR || './uploads',
     apiKey: env.SERVER_API_KEY!,
     appSecret: env.APP_SECRET?.trim() || undefined,
     appName: env.APP_NAME || 'local-lite-server',

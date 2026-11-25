@@ -63,11 +63,25 @@ export async function start() {
   }
 
   const server = createHttpServer(createApp(settings, database.executor, schema, functions));
-  server.listen(settings.port, () =>
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(
+        `[local-lite-server] port ${settings.port} is already in use. Stop the other process or change SERVER_PORT in .env.`,
+      );
+    } else {
+      console.error('[local-lite-server] server error:', err);
+    }
+    void database.close().finally(() => process.exit(1));
+  });
+  server.listen(settings.port, () => {
+    const addr = typeof settings.port === 'number' ? `http://localhost:${settings.port}` : settings.port;
     console.log(
-      `[local-lite-server] listening on ${settings.port} (${settings.dialect}); tables: ${Object.keys(schema).join(', ') || '(none)'}; functions: ${functions.size}`,
-    ),
-  );
+      `[local-lite-server] listening on ${addr} (${settings.dialect}); tables: ${Object.keys(schema).join(', ') || '(none)'}; functions: ${functions.size}`,
+    );
+    if (settings.adminUi && typeof settings.port === 'number') {
+      console.log(`[local-lite-server] admin console: ${addr}/admin`);
+    }
+  });
   const shutdown = () => {
     server.close();
     void database.close().finally(() => process.exit(0));

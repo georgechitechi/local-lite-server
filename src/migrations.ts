@@ -106,6 +106,73 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_otps_email ON _local_auth_reset_otps (email)`,
     ],
   },
+  {
+    id: '0003_admin_extras',
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS _lls_storage_buckets (
+        name VARCHAR(128) NOT NULL PRIMARY KEY,
+        visibility VARCHAR(16) NOT NULL DEFAULT 'private',
+        created_at BIGINT NOT NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS _lls_storage_files (
+        id VARCHAR(64) NOT NULL PRIMARY KEY,
+        storage_key VARCHAR(255) NOT NULL UNIQUE,
+        bucket VARCHAR(128) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        mime_type VARCHAR(128) NOT NULL,
+        size_bytes BIGINT NOT NULL,
+        created_at BIGINT NOT NULL,
+        INDEX idx_files_bucket (bucket)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS _lls_env_vars (
+        var_key VARCHAR(128) NOT NULL PRIMARY KEY,
+        var_value TEXT NOT NULL,
+        is_secret TINYINT(1) NOT NULL DEFAULT 0,
+        updated_at BIGINT NOT NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS _lls_schedules (
+        name VARCHAR(128) NOT NULL PRIMARY KEY,
+        fn_name VARCHAR(128) NOT NULL,
+        cron_expr VARCHAR(64) NOT NULL,
+        enabled TINYINT(1) NOT NULL DEFAULT 1,
+        last_run_at BIGINT NULL,
+        last_status VARCHAR(32) NULL,
+        last_error TEXT NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+    ],
+    postgres: [
+      `CREATE TABLE IF NOT EXISTS _lls_storage_buckets (
+        name VARCHAR(128) NOT NULL PRIMARY KEY,
+        visibility VARCHAR(16) NOT NULL DEFAULT 'private',
+        created_at BIGINT NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS _lls_storage_files (
+        id VARCHAR(64) NOT NULL PRIMARY KEY,
+        storage_key VARCHAR(255) NOT NULL UNIQUE,
+        bucket VARCHAR(128) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        mime_type VARCHAR(128) NOT NULL,
+        size_bytes BIGINT NOT NULL,
+        created_at BIGINT NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_files_bucket ON _lls_storage_files (bucket)`,
+      `CREATE TABLE IF NOT EXISTS _lls_env_vars (
+        var_key VARCHAR(128) NOT NULL PRIMARY KEY,
+        var_value TEXT NOT NULL,
+        is_secret BOOLEAN NOT NULL DEFAULT FALSE,
+        updated_at BIGINT NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS _lls_schedules (
+        name VARCHAR(128) NOT NULL PRIMARY KEY,
+        fn_name VARCHAR(128) NOT NULL,
+        cron_expr VARCHAR(64) NOT NULL,
+        enabled BOOLEAN NOT NULL DEFAULT TRUE,
+        last_run_at BIGINT NULL,
+        last_status VARCHAR(32) NULL,
+        last_error TEXT NULL
+      )`,
+    ],
+  },
 ];
 
 export async function runMigrations(
