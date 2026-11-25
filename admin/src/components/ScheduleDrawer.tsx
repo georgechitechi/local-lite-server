@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { SlideDrawer } from '@/components/SlideDrawer';
 import { ToggleSlider } from '@/components/ToggleSlider';
 import type { ToastType } from '@/components/Toast';
 import { adminFetch } from '@/lib/api';
@@ -207,58 +208,17 @@ export function ScheduleDrawer({
   };
 
   return (
-    <div
-      onClick={() => {
-        if (!saving) onClose();
-      }}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0, 0, 0, 0.55)',
-        zIndex: 55,
-        display: 'flex',
-        justifyContent: 'flex-end',
-      }}
+    <SlideDrawer
+      title={
+        drawer.kind === 'create'
+          ? 'New Schedule'
+          : drawer.kind === 'edit'
+            ? 'Edit Schedule'
+            : 'Delete Schedule'
+      }
+      onClose={onClose}
+      disabled={saving}
     >
-      <aside
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '100%',
-          maxWidth: 440,
-          height: '100%',
-          background: 'var(--surface)',
-          borderLeft: '1px solid var(--border)',
-          padding: 24,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 16,
-          overflowY: 'auto',
-          boxShadow: '-8px 0 32px rgba(0, 0, 0, 0.45)',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
-            {drawer.kind === 'create'
-              ? 'New Schedule'
-              : drawer.kind === 'edit'
-                ? 'Edit Schedule'
-                : 'Delete Schedule'}
-          </h3>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={onClose}
-            style={secondaryBtnStyle}
-          >
-            Close
-          </button>
-        </div>
 
         {drawer.kind === 'delete' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -433,7 +393,6 @@ export function ScheduleDrawer({
             </div>
           </form>
         )}
-      </aside>
-    </div>
+    </SlideDrawer>
   );
 }

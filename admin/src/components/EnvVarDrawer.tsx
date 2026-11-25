@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { SlideDrawer } from '@/components/SlideDrawer';
 import { ToggleSlider } from '@/components/ToggleSlider';
 import type { ToastType } from '@/components/Toast';
 import { adminFetch } from '@/lib/api';
@@ -108,58 +109,15 @@ export function EnvVarDrawer({
   };
 
   return (
-    <div
-      onClick={() => {
-        if (!saving) onClose();
-      }}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0, 0, 0, 0.55)',
-        zIndex: 55,
-        display: 'flex',
-        justifyContent: 'flex-end',
-      }}
+    <SlideDrawer
+      title={isEdit ? `Edit ${drawer.item.key}` : 'Add Variable'}
+      onClose={onClose}
+      disabled={saving}
     >
-      <aside
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '100%',
-          maxWidth: 440,
-          height: '100%',
-          background: 'var(--surface)',
-          borderLeft: '1px solid var(--border)',
-          padding: 24,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 16,
-          overflowY: 'auto',
-          boxShadow: '-8px 0 32px rgba(0, 0, 0, 0.45)',
-        }}
+      <form
+        onSubmit={(e) => void handleSubmit(e)}
+        style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
       >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            borderBottom: '1px solid var(--border)',
-            paddingBottom: 14,
-          }}
-        >
-          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>
-            {isEdit ? `Edit ${drawer.item.key}` : 'Add Variable'}
-          </h3>
-          {!saving && (
-            <button type="button" onClick={onClose} style={secondaryBtnStyle}>
-              Close
-            </button>
-          )}
-        </div>
-
-        <form
-          onSubmit={(e) => void handleSubmit(e)}
-          style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
-        >
           <div>
             <label style={labelStyle}>Key</label>
             <input
@@ -261,7 +219,6 @@ export function EnvVarDrawer({
             </button>
           </div>
         </form>
-      </aside>
-    </div>
+    </SlideDrawer>
   );
 }
