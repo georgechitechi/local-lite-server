@@ -1,0 +1,9 @@
+{
+  "name": "{{PKG_NAME}}",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "npx local-lite-server start",
+    "migrate": "npx local-lite-server migrate"
+  }
+}

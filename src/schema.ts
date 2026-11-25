@@ -37,7 +37,16 @@ export function normalizeSchema(input: SchemaDictionary): SchemaDictionary {
   return out;
 }
 
-const CANDIDATES = ['schema.ts', 'schema.mjs', 'schema.js', 'schema.json'];
+const CANDIDATES = [
+  'src/schema.ts',
+  'src/schema.mjs',
+  'src/schema.js',
+  'src/schema.json',
+  'schema.ts',
+  'schema.mjs',
+  'schema.js',
+  'schema.json',
+];
 
 export function resolveSchemaFile(explicit?: string, cwd = process.cwd()): string {
   if (explicit) {

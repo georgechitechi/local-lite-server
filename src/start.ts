@@ -1,3 +1,5 @@
+import mysql from 'mysql2/promise';
+import pg from 'pg';
 import { loadSettings, type ServerSettings } from './config.js';
 import { createDatabase, type Database } from './db.js';
 import { runMigrations } from './migrations.js';
@@ -5,6 +7,44 @@ import { applySchema, loadSchemaFile, planSchema, resolveSchemaFile } from './sc
 import type { SchemaDictionary } from './schema.js';
 import { loadFunctionsDir, watchFunctionsDir } from './functions.js';
 import { createApp, createHttpServer } from './server.js';
+
+async function tryCreateDatabase(s: ServerSettings): Promise<boolean> {
+  try {
+    if (s.dialect === 'postgres') {
+      const client = new pg.Client({
+        host: s.db.host,
+        port: s.db.port,
+        user: s.db.user,
+        password: s.db.password,
+        database: 'postgres',
+        ssl: s.db.ssl ? { rejectUnauthorized: false } : undefined,
+      });
+      await client.connect();
+      try {
+        await client.query(`CREATE DATABASE "${s.db.database.replace(/"/g, '')}"`);
+      } finally {
+        await client.end();
+      }
+      return true;
+    }
+    const conn = await mysql.createConnection({
+      host: s.db.host,
+      port: s.db.port,
+      user: s.db.user,
+      password: s.db.password,
+    });
+    try {
+      await conn.query(
+        `CREATE DATABASE IF NOT EXISTS \`${s.db.database.replace(/`/g, '')}\` CHARACTER SET utf8mb4`,
+      );
+    } finally {
+      await conn.end();
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function friendlyDbError(err: unknown, s: ServerSettings): unknown {
   const code = (err as { code?: string }).code;
@@ -30,13 +70,22 @@ export async function migrate(
   db: Database,
   schema: SchemaDictionary,
 ): Promise<void> {
-  try {
+  const applyAll = async () => {
     const core = await runMigrations(db.executor);
     if (core.applied.length) console.log('[local-lite-server] core migrations:', core.applied.join(', '));
     const plan = await applySchema(db.executor, schema);
     if (plan.up.length) console.log(`[local-lite-server] schema: applied ${plan.up.length} change(s)`);
     for (const w of plan.warnings) console.warn('[local-lite-server] schema warning:', w);
+  };
+  try {
+    await applyAll();
   } catch (err) {
+    const code = (err as { code?: string }).code;
+    if ((code === 'ER_BAD_DB_ERROR' || code === '3D000') && (await tryCreateDatabase(s))) {
+      console.log(`[local-lite-server] created database "${s.db.database}"`);
+      await applyAll();
+      return;
+    }
     throw friendlyDbError(err, s);
   }
 }
@@ -63,20 +112,31 @@ export async function start() {
   }
 
   const server = createHttpServer(createApp(settings, database.executor, schema, functions));
+  let activePort = settings.port;
+  let attempts = 0;
+
   server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE' && typeof activePort === 'number' && !process.env.PORT && attempts < 20) {
+      const nextPort = activePort + 1;
+      console.warn(`[local-lite-server] port ${activePort} is in use, trying ${nextPort}...`);
+      activePort = nextPort;
+      attempts += 1;
+      server.listen(activePort);
+      return;
+    }
     if (err.code === 'EADDRINUSE') {
       console.error(
-        `[local-lite-server] port ${settings.port} is already in use. Stop the other process or change SERVER_PORT in .env.`,
+        `[local-lite-server] port ${activePort} is already in use. Stop the other process or change SERVER_PORT in .env.`,
       );
     } else {
       console.error('[local-lite-server] server error:', err);
     }
     void database.close().finally(() => process.exit(1));
   });
-  server.listen(settings.port, () => {
-    const addr = typeof settings.port === 'number' ? `http://localhost:${settings.port}` : settings.port;
+  server.listen(activePort, () => {
+    const addr = typeof activePort === 'number' ? `http://localhost:${activePort}` : activePort;
     console.log(`[local-lite-server] listening on ${addr} (${settings.dialect})`);
-    if (settings.adminUi && typeof settings.port === 'number') {
+    if (settings.adminUi && typeof activePort === 'number') {
       console.log(`[local-lite-server] admin console: ${addr}/admin`);
     }
   });

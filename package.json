@@ -21,6 +21,7 @@
   "files": [
     "dist",
     "admin/dist",
+    "templates",
     "docs",
     "README.md"
   ],

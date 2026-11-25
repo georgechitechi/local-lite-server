@@ -106,13 +106,20 @@ export type FunctionRegistry = Map<string, FunctionDef<any, any, any>>;
 
 const EXTENSIONS = ['.ts', '.mts', '.mjs', '.js'];
 
+function resolveFunctionsDir(dir: string | undefined, cwd: string): string {
+  if (dir) return path.resolve(cwd, dir);
+  const inSrc = path.resolve(cwd, 'src/functions');
+  if (fs.existsSync(inSrc) && fs.statSync(inSrc).isDirectory()) return inSrc;
+  return path.resolve(cwd, 'functions');
+}
+
 export async function loadFunctionsDir(
   dir?: string,
   cwd = process.cwd(),
   bustCache = false,
 ): Promise<FunctionRegistry> {
   const registry: FunctionRegistry = new Map();
-  const abs = path.resolve(cwd, dir || 'functions');
+  const abs = resolveFunctionsDir(dir, cwd);
   if (!fs.existsSync(abs) || !fs.statSync(abs).isDirectory()) return registry;
 
   const entries = fs.readdirSync(abs, { withFileTypes: true });
@@ -143,7 +150,7 @@ export function watchFunctionsDir(
   registry: FunctionRegistry,
   cwd = process.cwd(),
 ): () => void {
-  const abs = path.resolve(cwd, dir || 'functions');
+  const abs = resolveFunctionsDir(dir, cwd);
   if (!fs.existsSync(abs)) return () => {};
   let timer: ReturnType<typeof setTimeout> | undefined;
   const watcher = fs.watch(abs, () => {

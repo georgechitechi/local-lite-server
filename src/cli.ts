@@ -21,89 +21,52 @@ function resolveInitDir(targetDir: string | undefined, force: boolean): { cwd: s
   }
   const here = process.cwd();
   const hasFiles = fs.readdirSync(here).some((f) => !f.startsWith('.'));
-  if (!hasFiles || force) {
-    return { cwd: here };
-  }
+  if (!hasFiles || force) return { cwd: here };
   let name = 'local-lite-server';
   let n = 2;
-  while (fs.existsSync(path.join(here, name))) {
-    name = `local-lite-server-${n++}`;
-  }
+  while (fs.existsSync(path.join(here, name))) name = `local-lite-server-${n++}`;
   console.log(`Current directory is not empty; creating ./${name}/`);
   return { cwd: path.join(here, name), relLabel: name };
+}
+
+function collectTemplates(dir: string, root = dir): string[] {
+  const out: string[] = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const abs = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...collectTemplates(abs, root));
+    else out.push(path.relative(root, abs));
+  }
+  return out;
 }
 
 function runInit(targetDir: string | undefined, force: boolean) {
   const { cwd, relLabel } = resolveInitDir(targetDir, force);
   fs.mkdirSync(cwd, { recursive: true });
-  const apiKey = crypto.randomBytes(24).toString('hex');
-  const appSecret = crypto.randomBytes(32).toString('hex');
+  const tplRoot = path.resolve(import.meta.dirname, '../templates');
+  const vars: Record<string, string> = {
+    PKG_NAME: path.basename(cwd).toLowerCase().replace(/[^a-z0-9-_]/g, '-') || 'my-local-lite-server',
+    API_KEY: crypto.randomBytes(24).toString('hex'),
+    APP_SECRET: crypto.randomBytes(32).toString('hex'),
+  };
 
-  const files: Array<[string, string]> = [
-    [
-      '.env',
-      `SERVER_PORT=3000
-DB_DIALECT=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=
-DB_NAME=local_lite
-DB_POOL_SIZE=5
-AUTO_MIGRATE=true
-SERVER_API_KEY=${apiKey}
-APP_SECRET=${appSecret}
-APP_NAME=local-lite-server
-ADMIN_UI=true
-CORS_ORIGINS=*
-`,
-    ],
-    [
-      'schema.ts',
-      `export default {
-  notes: {
-    id: 'string',
-    title: 'string',
-    body: 'string | null',
-    pinned: 'boolean',
-    created_at: 'number',
-  },
-};
-`,
-    ],
-    [
-      path.join('functions', 'notes.ts'),
-      `export const list = {
-  __kind: 'query' as const,
-  handler: ({ db }: any) => db.list('notes', { orderBy: 'updated_at', order: 'desc' }),
-};
-
-export const create = {
-  __kind: 'mutation' as const,
-  handler: ({ db }: any, args: { title: string; body?: string | null; pinned?: boolean }) => {
-    const title = typeof args.title === 'string' ? args.title.trim() : '';
-    if (!title) throw Object.assign(new Error('title is required.'), { status: 400 });
-    return db.insert('notes', { title, body: args.body ?? null, pinned: Boolean(args.pinned) });
-  },
-};
-`,
-    ],
-  ];
-
-  for (const [rel, content] of files) {
-    const abs = path.join(cwd, rel);
-    if (fs.existsSync(abs) && !force) {
-      console.log(`skip  ${rel} (already exists)`);
+  for (const rel of collectTemplates(tplRoot)) {
+    const outRel = rel === 'gitignore' ? '.gitignore' : rel;
+    const dest = path.join(cwd, outRel);
+    if (fs.existsSync(dest) && !force) {
+      console.log(`skip  ${relLabel ? path.join(relLabel, outRel) : outRel} (already exists)`);
       continue;
     }
-    fs.mkdirSync(path.dirname(abs), { recursive: true });
-    fs.writeFileSync(abs, content);
-    console.log(`write ${relLabel ? path.join(relLabel, rel) : rel}`);
+    let content = fs.readFileSync(path.join(tplRoot, rel), 'utf8');
+    for (const [k, v] of Object.entries(vars)) content = content.replaceAll(`{{${k}}}`, v);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.writeFileSync(dest, content);
+    console.log(`write ${relLabel ? path.join(relLabel, outRel) : outRel}`);
   }
+
   const cdStep = relLabel ? `  1. cd ${relLabel}\n` : '';
   const n = relLabel ? 2 : 1;
   console.log(
-    `\nNext:\n${cdStep}  ${n}. Edit .env with your MySQL/Postgres credentials\n  ${n + 1}. Run: npx local-lite-server start`,
+    `\nNext:\n${cdStep}  ${n}. Edit .env with your MySQL/Postgres credentials\n  ${n + 1}. Run: npm run start  (or npx local-lite-server start)`,
   );
 }
 
