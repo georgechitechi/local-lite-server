@@ -136,14 +136,14 @@ export function SettingsTab({
 
   const integrationList: Array<{ label: string; enabled: boolean }> = settings
     ? [
-        { label: 'APP_SECRET', enabled: settings.integrations.appSecret },
-        { label: 'SMTP Email', enabled: settings.integrations.smtp },
-        { label: 'Auto-Migrate', enabled: settings.integrations.autoMigrate },
-        { label: 'Internal Crons', enabled: settings.integrations.internalCrons },
-        { label: 'Multi-Instance', enabled: settings.integrations.multiInstance },
-        { label: 'Google OAuth', enabled: settings.integrations.googleOAuth },
-        { label: 'GitHub OAuth', enabled: settings.integrations.githubOAuth },
-      ]
+      { label: 'APP_SECRET', enabled: settings.integrations.appSecret },
+      { label: 'SMTP Email', enabled: settings.integrations.smtp },
+      { label: 'Auto-Migrate', enabled: settings.integrations.autoMigrate },
+      { label: 'Internal Crons', enabled: settings.integrations.internalCrons },
+      { label: 'Multi-Instance', enabled: settings.integrations.multiInstance },
+      { label: 'Google OAuth', enabled: settings.integrations.googleOAuth },
+      { label: 'GitHub OAuth', enabled: settings.integrations.githubOAuth },
+    ]
     : [];
 
   const pendingCount = settings?.pendingSql?.length ?? 0;
@@ -230,12 +230,6 @@ export function SettingsTab({
           <div style={infoTileStyle}>
             <span style={{ color: 'var(--muted)' }}>Uptime</span>
             <strong>{settings ? formatUptime(settings.uptimeSeconds) : '—'}</strong>
-          </div>
-          <div style={infoTileStyle}>
-            <span style={{ color: 'var(--muted)' }}>CORS Origins</span>
-            <strong style={{ fontFamily: 'monospace', fontSize: 12 }}>
-              {settings?.corsOrigins?.join(', ') || '—'}
-            </strong>
           </div>
           <div style={infoTileStyle}>
             <span style={{ color: 'var(--muted)' }}>Uploads / Backups</span>
