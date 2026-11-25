@@ -18,6 +18,17 @@ Runs on **MySQL** or **PostgreSQL**, deploys to **cPanel (Node.js App / Passenge
 
 ## Quick Start
 
+### On a Fresh PC (`npx`)
+
+```bash
+mkdir my-backend && cd my-backend
+npx local-lite-server init      # creates .env (with random keys), schema.ts, functions/notes.ts
+# Edit .env with your MySQL or Postgres database credentials, then:
+npx local-lite-server start
+```
+
+### From This Repo (Development)
+
 1. **Install dependencies & build the Admin UI:**
    ```bash
    npm install

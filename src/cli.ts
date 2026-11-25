@@ -1,14 +1,92 @@
 #!/usr/bin/env node
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { loadSettings } from './config.js';
 import { createDatabase } from './db.js';
 import { coreMigrationStatus } from './migrations.js';
 import { planSchema } from './schema.js';
 import { loadSchema, migrate, start } from './start.js';
 
+if (fs.existsSync('.env')) {
+  (process as { loadEnvFile?: (p?: string) => void }).loadEnvFile?.('.env');
+}
+
 const cmd = process.argv[2] ?? 'start';
 const sub = process.argv[3];
 
-if (cmd === 'start') {
+function runInit(force: boolean) {
+  const cwd = process.cwd();
+  const apiKey = crypto.randomBytes(24).toString('hex');
+  const appSecret = crypto.randomBytes(32).toString('hex');
+
+  const files: Array<[string, string]> = [
+    [
+      '.env',
+      `SERVER_PORT=3000
+DB_DIALECT=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=
+DB_NAME=local_lite
+DB_POOL_SIZE=5
+AUTO_MIGRATE=true
+SERVER_API_KEY=${apiKey}
+APP_SECRET=${appSecret}
+APP_NAME=local-lite-server
+ADMIN_UI=true
+CORS_ORIGINS=*
+`,
+    ],
+    [
+      'schema.ts',
+      `export default {
+  notes: {
+    id: 'string',
+    title: 'string',
+    body: 'string | null',
+    pinned: 'boolean',
+    created_at: 'number',
+  },
+};
+`,
+    ],
+    [
+      path.join('functions', 'notes.ts'),
+      `export const list = {
+  __kind: 'query' as const,
+  handler: ({ db }: any) => db.list('notes', { orderBy: 'updated_at', order: 'desc' }),
+};
+
+export const create = {
+  __kind: 'mutation' as const,
+  handler: ({ db }: any, args: { title: string; body?: string | null; pinned?: boolean }) => {
+    const title = typeof args.title === 'string' ? args.title.trim() : '';
+    if (!title) throw Object.assign(new Error('title is required.'), { status: 400 });
+    return db.insert('notes', { title, body: args.body ?? null, pinned: Boolean(args.pinned) });
+  },
+};
+`,
+    ],
+  ];
+
+  for (const [rel, content] of files) {
+    const abs = path.join(cwd, rel);
+    if (fs.existsSync(abs) && !force) {
+      console.log(`skip  ${rel} (already exists)`);
+      continue;
+    }
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(abs, content);
+    console.log(`write ${rel}`);
+  }
+  console.log('\nNext:\n  1. Edit .env with your MySQL/Postgres credentials\n  2. Run: npx local-lite-server start');
+}
+
+if (cmd === 'init') {
+  runInit(process.argv.includes('--force'));
+} else if (cmd === 'start') {
   await start();
 } else if (cmd === 'migrate') {
   const settings = loadSettings();
@@ -31,7 +109,14 @@ if (cmd === 'start') {
   } finally {
     await db.close();
   }
+} else if (cmd === '-v' || cmd === '--version') {
+  const pkg = JSON.parse(
+    fs.readFileSync(path.resolve(import.meta.dirname, '../package.json'), 'utf8'),
+  );
+  console.log(pkg.version);
 } else {
-  console.log('Usage: local-lite-server <start | migrate [status|diff]>');
-  process.exit(1);
+  console.log(
+    'Usage: local-lite-server <init [--force] | start | migrate [status|diff] | --version>',
+  );
+  process.exit(cmd === '-h' || cmd === '--help' || cmd === 'help' ? 0 : 1);
 }

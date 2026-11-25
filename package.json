@@ -18,6 +18,12 @@
   "bin": {
     "local-lite-server": "dist/cli.js"
   },
+  "files": [
+    "dist",
+    "admin/dist",
+    "docs",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "build:cpanel": "node scripts/build-cpanel.mjs",
