@@ -101,7 +101,7 @@ export async function buildCpanelBundle(cwd = process.cwd(), outDir = 'dist/cpan
 
   const adminDist = path.resolve(pkgRoot, 'admin/dist');
   if (fs.existsSync(adminDist)) {
-    fs.cpSync(adminDist, path.join(absOut, 'admin-ui'), { recursive: true });
+    fs.cpSync(adminDist, path.join(absOut, 'admin'), { recursive: true });
   }
 
   console.log(
