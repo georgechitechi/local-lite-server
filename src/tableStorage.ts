@@ -92,13 +92,15 @@ export interface TableSyncStorageOptions {
  * (table_name, row_id, timestamp) as a monotonic cursor/event log.
  */
 export class TableSyncStorage implements ServerSyncStorage {
+  private db: SqlExecutor;
   private schema: SchemaDictionary;
   private broker?: SyncEventBroker;
   private changes: string;
   private clock: string;
   private scopeField: string;
 
-  constructor(private db: SqlExecutor, opts: TableSyncStorageOptions) {
+  constructor(db: SqlExecutor, opts: TableSyncStorageOptions) {
+    this.db = db;
     this.schema = opts.schema;
     this.broker = opts.broker;
     this.changes = opts.changesTable ?? '_server_changes';

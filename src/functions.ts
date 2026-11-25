@@ -19,11 +19,10 @@ import { fromDbRow, toDbValue } from './tableStorage.js';
 export type FunctionKind = 'query' | 'mutation' | 'action';
 
 export class FunctionError extends Error {
-  constructor(
-    message: string,
-    public status = 400,
-  ) {
+  status: number;
+  constructor(message: string, status = 400) {
     super(message);
+    this.status = status;
   }
 }
 
