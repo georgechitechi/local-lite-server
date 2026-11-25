@@ -5,7 +5,7 @@ import { adminFetch } from '@/lib/api';
 import { formatBytes, formatTime } from '@/lib/formatters';
 import {
   cardStyle,
-  compactPrimaryBtnStyle,
+  primaryBtnStyle,
   secondaryBtnStyle,
   sectionTitleStyle,
   tableStyle,
@@ -155,7 +155,7 @@ export function BackupsTab({
           type="button"
           disabled={creating}
           onClick={() => void handleCreate()}
-          style={compactPrimaryBtnStyle}
+          style={primaryBtnStyle}
         >
           {creating ? 'Creating Backup...' : '+ Create Backup'}
         </button>

@@ -107,11 +107,16 @@ export function createAdminSession(settings: ServerSettings, db: SqlExecutor) {
       });
     },
 
-    async getLogin() {
+    async getLogin(request: Request) {
       const rows = await db.query<any>(
         'SELECT COUNT(*) AS n FROM _local_auth_accounts WHERE console_role IS NOT NULL AND console_active != 0',
       );
-      return Response.json({ hasConsoleAdmins: Number(rows[0]?.n ?? 0) > 0 });
+      const session = await authenticate(request).catch(() => null);
+      return Response.json({
+        hasConsoleAdmins: Number(rows[0]?.n ?? 0) > 0,
+        authenticated: Boolean(session),
+        consoleRole: session?.consoleRole ?? null,
+      });
     },
 
     async postLogin(request: Request) {

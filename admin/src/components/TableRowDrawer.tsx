@@ -3,7 +3,7 @@ import { ToggleSlider } from '@/components/ToggleSlider';
 import type { ToastType } from '@/components/Toast';
 import { adminFetch } from '@/lib/api';
 import {
-  compactPrimaryBtnStyle,
+  primaryBtnStyle,
   inputStyle,
   labelStyle,
   secondaryBtnStyle,
@@ -353,7 +353,7 @@ export function TableRowDrawer({
                   <button
                     type="submit"
                     disabled={saving}
-                    style={compactPrimaryBtnStyle}
+                    style={primaryBtnStyle}
                   >
                     {saving ? 'Saving...' : 'Save & Broadcast'}
                   </button>
@@ -372,7 +372,7 @@ export function TableRowDrawer({
                 <button
                   type="submit"
                   disabled={saving}
-                  style={compactPrimaryBtnStyle}
+                  style={primaryBtnStyle}
                 >
                   {saving ? 'Saving...' : 'Save & Broadcast'}
                 </button>

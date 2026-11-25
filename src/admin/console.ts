@@ -30,52 +30,55 @@ export function createAdminData(opts: {
           const r = await db.query<any>(`SELECT COUNT(*) AS n FROM ${q(t)}`);
           tableCounts.push({ table: t, count: Number(r[0]?.n ?? 0) });
         }
-      } catch (err) {
+      } catch {
         dbConnected = false;
-        dbError = err instanceof Error ? err.message : 'Database error';
+        dbError = 'Database unavailable';
       }
-      const accounts = await db.query<any>(
-        'SELECT id, email, display_name, failed_login_attempts, locked_until, token_version, console_role, console_active, created_at FROM _local_auth_accounts ORDER BY created_at DESC LIMIT 200',
-      );
-      const backups = await db.query<any>(
-        'SELECT id, user_id, file_name, status, size_bytes, record_count, created_at FROM _lls_backups ORDER BY created_at DESC LIMIT 50',
-      );
-      const fns = (fnRuntime?.list() ?? []).map((f) => ({ method: f.kind.toUpperCase(), path: `/fn/${f.name}` }));
+      const acctRow = await db.query<any>('SELECT COUNT(*) AS n FROM _local_auth_accounts');
+      const bkpRow = await db.query<any>('SELECT COUNT(*) AS n FROM _lls_backups');
       return Response.json({
-        health: { ok: dbConnected, dialect: settings.dialect, database: settings.db.database },
-        endpoints: {
-          endpoints: [
-            { method: 'GET', path: '/health' },
-            { method: 'GET', path: '/sync' },
-            { method: 'POST', path: '/sync' },
-            { method: 'GET', path: '/sync/events' },
-            ...fns,
-          ],
-        },
+        health: { ok: dbConnected, dialect: settings.dialect },
         dbConnected,
         dbError,
         tableCounts,
+        accountsCount: Number(acctRow[0]?.n ?? 0),
+        backupsCount: Number(bkpRow[0]?.n ?? 0),
+        consoleRole: session.consoleRole,
+      });
+    },
+
+    async listEndpoints() {
+      const fns = (fnRuntime?.list() ?? []).map((f) => ({
+        method: f.kind.toUpperCase(),
+        path: `/fn/${f.name}`,
+      }));
+      return Response.json({
+        endpoints: [
+          { method: 'GET', path: '/health' },
+          { method: 'GET', path: '/sync' },
+          { method: 'POST', path: '/sync' },
+          { method: 'GET', path: '/sync/events' },
+          ...fns,
+        ],
+      });
+    },
+
+    async listUsers() {
+      const accounts = await db.query<any>(
+        'SELECT id, email, display_name, failed_login_attempts, locked_until, console_role, console_active, created_at FROM _local_auth_accounts ORDER BY created_at DESC LIMIT 200',
+      );
+      return Response.json({
         localAccounts: accounts.map((a) => ({
           id: String(a.id),
           email: String(a.email),
           displayName: a.display_name ?? null,
           failedLoginAttempts: Number(a.failed_login_attempts ?? 0),
           lockedUntil: a.locked_until != null ? Number(a.locked_until) : null,
-          tokenVersion: Number(a.token_version ?? 1),
+          tokenVersion: 1,
           consoleRole: a.console_role ?? null,
           consoleActive: Boolean(a.console_active),
           createdAt: Number(a.created_at),
         })),
-        backups: backups.map((b) => ({
-          id: String(b.id),
-          userId: String(b.user_id),
-          fileName: String(b.file_name),
-          status: String(b.status),
-          sizeBytes: Number(b.size_bytes),
-          recordCount: Number(b.record_count),
-          createdAt: Number(b.created_at),
-        })),
-        consoleRole: session.consoleRole,
       });
     },
 

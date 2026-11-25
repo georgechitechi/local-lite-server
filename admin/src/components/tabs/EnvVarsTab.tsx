@@ -8,7 +8,7 @@ import type { ToastType } from '@/components/Toast';
 import { adminFetch } from '@/lib/api';
 import {
   cardStyle,
-  compactPrimaryBtnStyle,
+  primaryBtnStyle,
   inputStyle,
   secondaryBtnStyle,
   sectionTitleStyle,
@@ -194,7 +194,7 @@ export function EnvVarsTab({
             <button
               type="button"
               onClick={() => setDrawer({ kind: 'create' })}
-              style={compactPrimaryBtnStyle}
+              style={primaryBtnStyle}
             >
               Add Variable
             </button>

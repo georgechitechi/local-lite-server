@@ -4,7 +4,6 @@ import { PasswordInput } from '@/components/PasswordInput';
 import { formatTime } from '@/lib/formatters';
 import {
   cardStyle,
-  compactPrimaryBtnStyle,
   inputStyle,
   primaryBtnStyle,
   secondaryBtnStyle,
@@ -137,7 +136,7 @@ export function AuthUsersTab({
           <button
             type="button"
             onClick={openCreate}
-            style={compactPrimaryBtnStyle}
+            style={primaryBtnStyle}
           >
             + New Console Admin
           </button>

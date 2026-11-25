@@ -57,10 +57,6 @@ export const primaryBtnStyle: React.CSSProperties = {
   fontWeight: 600,
 };
 
-export const compactPrimaryBtnStyle: React.CSSProperties = {
-  ...primaryBtnStyle,
-};
-
 export const secondaryBtnStyle: React.CSSProperties = {
   ...baseBtnStyle,
   border: '1px solid var(--border)',

@@ -7,6 +7,7 @@ import {
   type SqlExecutor,
 } from 'local-lite/server';
 import type { ServerSettings } from './config.js';
+import { sendSmtpMail } from './core/mailer.js';
 
 const num = (v: unknown) => (v == null ? null : Number(v));
 
@@ -92,20 +93,6 @@ export function createAuthStorage(db: SqlExecutor): ServerAuthStorage {
   };
 }
 
-async function buildMailer(s: ServerSettings) {
-  const smtp = s.smtp;
-  if (!smtp) return null;
-  const nodemailer: any = await import('nodemailer');
-  const transport = (nodemailer.default ?? nodemailer).createTransport({
-    host: smtp.host,
-    port: smtp.port,
-    secure: smtp.secure,
-    auth: smtp.user ? { user: smtp.user, pass: smtp.pass } : undefined,
-  });
-  return (to: string, subject: string, text: string) =>
-    transport.sendMail({ from: smtp.from, to, subject, text });
-}
-
 export interface AuthService {
   enabled: boolean;
   handler: (request: Request) => Promise<Response>;
@@ -132,14 +119,13 @@ export function createAuthService(s: ServerSettings, db: SqlExecutor): AuthServi
   }
 
   const secret = s.appSecret;
-  let mailer: Awaited<ReturnType<typeof buildMailer>> | undefined;
   const handler = createAuthEndpoint({
     storage,
     secret,
     sendResetOtpEmail: async ({ to, otp, expiresMinutes }) => {
-      mailer ??= await buildMailer(s);
-      if (!mailer) throw new Error('SMTP is not configured (set SMTP_HOST etc.).');
-      await mailer(
+      if (!s.smtp) throw new Error('SMTP is not configured (set SMTP_HOST etc.).');
+      await sendSmtpMail(
+        s.smtp,
         to,
         `${s.appName} password reset code`,
         `Your verification code is: ${otp}\n\nIt expires in ${expiresMinutes} minutes.\nIf you did not request this, ignore this email.`,

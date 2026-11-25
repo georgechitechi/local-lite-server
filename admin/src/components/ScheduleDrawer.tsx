@@ -3,7 +3,7 @@ import { ToggleSlider } from '@/components/ToggleSlider';
 import type { ToastType } from '@/components/Toast';
 import { adminFetch } from '@/lib/api';
 import {
-  compactPrimaryBtnStyle,
+  primaryBtnStyle,
   inputStyle,
   labelStyle,
   secondaryBtnStyle,
@@ -285,7 +285,7 @@ export function ScheduleDrawer({
                 disabled={saving}
                 onClick={() => void handleConfirmDelete()}
                 style={{
-                  ...compactPrimaryBtnStyle,
+                  ...primaryBtnStyle,
                   background: 'var(--danger)',
                 }}
               >
@@ -422,7 +422,7 @@ export function ScheduleDrawer({
               <button
                 type="submit"
                 disabled={saving}
-                style={compactPrimaryBtnStyle}
+                style={primaryBtnStyle}
               >
                 {saving
                   ? 'Saving...'

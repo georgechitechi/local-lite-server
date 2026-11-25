@@ -8,7 +8,7 @@ import type { ToastType } from '@/components/Toast';
 import { adminFetch } from '@/lib/api';
 import {
   cardStyle,
-  compactPrimaryBtnStyle,
+  primaryBtnStyle,
   inputStyle,
   secondaryBtnStyle,
   tableStyle,
@@ -89,15 +89,23 @@ export function DataBrowserTab({
         display: 'grid',
         gridTemplateColumns: '230px 1fr',
         gap: 16,
-        alignItems: 'start',
+        alignItems: 'stretch',
       }}
     >
-      <div style={cardStyle}>
+      <div
+        style={{
+          ...cardStyle,
+          minHeight: 'calc(100vh - 130px)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflowY: 'auto',
+        }}
+      >
         <input
           placeholder="Filter tables..."
           value={tableFilter}
           onChange={(e) => setTableFilter(e.target.value)}
-          style={{ ...inputStyle, height: 36, marginBottom: 10 }}
+          style={{ ...inputStyle, height: 36, marginBottom: 10, flexShrink: 0 }}
         />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {filteredTables.map((t) => (
@@ -150,7 +158,7 @@ export function DataBrowserTab({
                   columns: tableData.columns,
                 })
               }
-              style={compactPrimaryBtnStyle}
+              style={primaryBtnStyle}
             >
               + New Row
             </button>

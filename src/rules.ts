@@ -23,14 +23,7 @@ export function defineRules<T extends RulesDictionary>(rules: T): T {
   return rules;
 }
 
-const CANDIDATES = [
-  'src/rules.ts',
-  'src/rules.mjs',
-  'src/rules.js',
-  'rules.ts',
-  'rules.mjs',
-  'rules.js',
-];
+const CANDIDATES = ['src/rules.ts', 'rules.ts'];
 
 export function resolveRulesFile(explicit?: string, cwd = process.cwd()): string | null {
   if (explicit) {
@@ -38,7 +31,9 @@ export function resolveRulesFile(explicit?: string, cwd = process.cwd()): string
     if (!fs.existsSync(abs)) throw new Error(`RULES_PATH not found: ${abs}`);
     return abs;
   }
+  const isOwnRepo = fs.existsSync(path.resolve(cwd, 'src/cli.ts'));
   for (const name of CANDIDATES) {
+    if (isOwnRepo && name === 'src/rules.ts') continue;
     const abs = path.resolve(cwd, name);
     if (fs.existsSync(abs)) return abs;
   }

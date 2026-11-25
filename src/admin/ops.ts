@@ -3,9 +3,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { buildUpsertSql, quoteIdent, type SqlExecutor } from 'local-lite/server';
 import type { ServerSettings } from '../config.js';
+import { sendSmtpMail } from '../core/mailer.js';
 import { runCronAction } from '../crons.js';
 import type { FunctionRuntime } from '../functions/index.js';
-import type { SchemaDictionary } from '../schema.js';
+import { applySchema, planSchema, type SchemaDictionary } from '../schema.js';
 import { fromDbRow } from '../tableStorage.js';
 
 const int = (v: string | null, d: number, min: number, max: number) =>
@@ -72,7 +73,22 @@ export function createAdminOps(
       const method = request.method.toUpperCase();
       if (method === 'GET') {
         const file = url.searchParams.get('file');
-        if (!file) return Response.json({ error: 'file query param required.' }, { status: 400 });
+        if (!file) {
+          const rows = await db.query<any>(
+            'SELECT id, user_id, file_name, status, size_bytes, record_count, created_at FROM _lls_backups ORDER BY created_at DESC LIMIT 50',
+          );
+          return Response.json({
+            backups: rows.map((b) => ({
+              id: String(b.id),
+              userId: String(b.user_id),
+              fileName: String(b.file_name),
+              status: String(b.status),
+              sizeBytes: Number(b.size_bytes),
+              recordCount: Number(b.record_count),
+              createdAt: Number(b.created_at),
+            })),
+          });
+        }
         const target = path.resolve(dir, path.basename(file));
         if (!fs.existsSync(target)) return Response.json({ error: 'Backup not found.' }, { status: 404 });
         return new Response(fs.readFileSync(target), { headers: { 'content-type': 'application/json; charset=utf-8' } });
@@ -237,6 +253,23 @@ export function createAdminOps(
 
     async handleSettings(request: Request) {
       if (request.method.toUpperCase() === 'POST') {
+        const body = (await request.json().catch(() => ({}))) as { action?: string; to?: string };
+        if (body.action === 'apply_schema') {
+          const plan = await applySchema(db, schema);
+          return Response.json({ ok: true, applied: plan.up.length, warnings: plan.warnings });
+        }
+        if (body.action === 'test_email') {
+          if (!settings.smtp) return Response.json({ ok: false, error: 'SMTP is not configured.' }, { status: 400 });
+          const to = String(body.to ?? '').trim();
+          if (!to || !to.includes('@')) return Response.json({ ok: false, error: 'Valid recipient email is required.' }, { status: 400 });
+          await sendSmtpMail(
+            settings.smtp,
+            to,
+            `${settings.appName} SMTP Test`,
+            `SMTP is working on ${settings.appName} (${new Date().toISOString()}).`,
+          );
+          return Response.json({ ok: true });
+        }
         const t0 = Date.now();
         try {
           await db.query('SELECT 1');
@@ -245,17 +278,28 @@ export function createAdminOps(
           return Response.json({ ok: false, status: 503, latencyMs: Date.now() - t0, error: String(err) });
         }
       }
+      const plan = await planSchema(db, schema).catch(() => null);
       return Response.json({
         mode: 'self-hosted',
-        remoteServerUrl: null,
+        dialect: settings.dialect,
         dbHost: settings.db.host,
         dbPort: String(settings.db.port),
         dbName: settings.db.database,
+        poolSize: settings.db.poolSize,
+        corsOrigins: settings.corsOrigins,
+        uploadDir: settings.uploadDir,
+        backupDir: settings.backupDir,
         nodeVersion: process.version,
         uptimeSeconds: Math.floor(process.uptime()),
+        memoryMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
+        pendingSql: plan?.up ?? [],
+        schemaWarnings: plan?.warnings ?? [],
         integrations: {
           appSecret: Boolean(settings.appSecret),
           smtp: Boolean(settings.smtp),
+          autoMigrate: settings.autoMigrate,
+          internalCrons: settings.internalCrons,
+          multiInstance: settings.multiInstance,
           googleOAuth: Boolean(process.env.GOOGLE_CLIENT_SECRET),
           githubOAuth: Boolean(process.env.GITHUB_CLIENT_SECRET),
         },

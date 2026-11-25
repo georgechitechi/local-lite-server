@@ -127,6 +127,16 @@ describe('admin', () => {
     expect((await app.fetch(new Request('http://x/admin/crons', { headers }))).status).toBe(200);
     expect((await app.fetch(new Request('http://x/admin/settings', { headers }))).status).toBe(200);
   });
+
+  it('reports authenticated: true on GET /admin/login when session cookie is valid', async () => {
+    const anon = await (await app.fetch(new Request('http://x/admin/login'))).json() as any;
+    expect(anon.authenticated).toBe(false);
+
+    const authed = await (
+      await app.fetch(new Request('http://x/admin/login', { headers: { authorization: 'Bearer secret' } }))
+    ).json() as any;
+    expect(authed.authenticated).toBe(true);
+  });
 });
 
 describe('rate limiter', () => {

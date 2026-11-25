@@ -241,7 +241,7 @@ export function createApp(
         ? {
             '/admin': { GET: ({ request }: { request: Request }) => consoleApi.serveStatic(new URL(request.url).pathname) },
             '/admin/login': {
-              GET: () => consoleApi.getLogin(),
+              GET: ({ request }: { request: Request }) => consoleApi.getLogin(request),
               POST: ({ request }: { request: Request }) => consoleApi.postLogin(request),
             },
             '/admin/logout': {
@@ -258,7 +258,13 @@ export function createApp(
               ALL: async ({ request }: { request: Request }) =>
                 (await consoleApi.authenticate(request)) ? consoleApi.handleTable(request) : unauthorized(),
             },
+            '/admin/endpoints': {
+              GET: async ({ request }: { request: Request }) =>
+                (await consoleApi.authenticate(request)) ? consoleApi.listEndpoints() : unauthorized(),
+            },
             '/admin/users': {
+              GET: async ({ request }: { request: Request }) =>
+                (await consoleApi.authenticate(request)) ? consoleApi.listUsers() : unauthorized(),
               POST: async ({ request }: { request: Request }) =>
                 (await consoleApi.authenticate(request)) ? consoleApi.manageUsers(request) : unauthorized(),
             },

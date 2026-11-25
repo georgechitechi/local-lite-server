@@ -18,13 +18,23 @@ import { SettingsTab } from '@/components/tabs/SettingsTab';
 import { SyncLogsTab } from '@/components/tabs/SyncLogsTab';
 import { adminFetch } from '@/lib/api';
 import { secondaryBtnStyle } from '@/styles/adminStyles';
-import { NAV_ITEMS, type NavTab, type OverviewData } from '@/types/admin';
+import {
+  NAV_ITEMS,
+  type BackupArchiveRow,
+  type EndpointItem,
+  type LocalAuthAccount,
+  type NavTab,
+  type OverviewData,
+} from '@/types/admin';
 
 export function AdminDashboard() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState<NavTab>('overview');
   const [loading, setLoading] = useState(false);
   const [overview, setOverview] = useState<OverviewData | null>(null);
+  const [localAccounts, setLocalAccounts] = useState<LocalAuthAccount[]>([]);
+  const [backups, setBackups] = useState<BackupArchiveRow[]>([]);
+  const [endpoints, setEndpoints] = useState<EndpointItem[]>([]);
   const [selectedTable, setSelectedTable] = useState<string>('');
   const [showDeletedRows, setShowDeletedRows] = useState<boolean>(() => {
     try {
@@ -68,19 +78,46 @@ export function AdminDashboard() {
         const data = (await res.json()) as OverviewData;
         setOverview(data);
         setAuthenticated(true);
-        if (
-          data.tableCounts.length > 0 &&
-          !data.tableCounts.some((t) => t.table === selectedTable)
-        ) {
-          setSelectedTable(data.tableCounts[0].table);
-        }
+        setSelectedTable((prev) =>
+          data.tableCounts.length > 0 && !data.tableCounts.some((t) => t.table === prev)
+            ? data.tableCounts[0].table
+            : prev,
+        );
       } else if (res.status === 401) {
         setAuthenticated(false);
       }
     } finally {
       setLoading(false);
     }
-  }, [selectedTable]);
+  }, []);
+
+  const loadTabDetails = useCallback(async (tab: NavTab) => {
+    if (tab === 'auth') {
+      const res = await adminFetch('/admin/users', { cache: 'no-store' });
+      if (res.ok) {
+        const d = (await res.json()) as { localAccounts?: LocalAuthAccount[] };
+        setLocalAccounts(d.localAccounts ?? []);
+      }
+    } else if (tab === 'backups') {
+      const res = await adminFetch('/admin/backups', { cache: 'no-store' });
+      if (res.ok) {
+        const d = (await res.json()) as { backups?: BackupArchiveRow[] };
+        setBackups(d.backups ?? []);
+      }
+    } else if (tab === 'functions') {
+      const res = await adminFetch('/admin/endpoints', { cache: 'no-store' });
+      if (res.ok) {
+        const d = (await res.json()) as { endpoints?: EndpointItem[] };
+        setEndpoints(d.endpoints ?? []);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authenticated) {
+      void loadTabDetails(activeTab);
+    }
+  }, [authenticated, activeTab, loadTabDetails]);
 
   useEffect(() => {
     if (authenticated === null) {
@@ -129,7 +166,7 @@ export function AdminDashboard() {
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
       showToast(successMsg, 'info');
-      await loadOverview();
+      await Promise.all([loadOverview(), loadTabDetails(activeTab)]);
       return true;
     }
     showToast(data?.error || `Action failed (${res.status})`, 'error');
@@ -237,29 +274,23 @@ export function AdminDashboard() {
 
           {activeTab === 'auth' && (
             <AuthUsersTab
-              accounts={overview?.localAccounts ?? []}
+              accounts={localAccounts}
               onAction={(payload, successMsg) =>
                 runAdminAction('/admin/users', payload, successMsg)
               }
             />
           )}
 
-          {activeTab === 'functions' && (
-            <FunctionsTab
-              endpoints={
-                Array.isArray(overview?.endpoints?.endpoints)
-                  ? overview!.endpoints.endpoints
-                  : []
-              }
-            />
-          )}
+          {activeTab === 'functions' && <FunctionsTab endpoints={endpoints} />}
 
           {activeTab === 'schedules' && <SchedulesTab onToast={showToast} />}
 
           {activeTab === 'backups' && (
             <BackupsTab
-              backups={overview?.backups ?? []}
-              onRefresh={loadOverview}
+              backups={backups}
+              onRefresh={async () => {
+                await Promise.all([loadOverview(), loadTabDetails('backups')]);
+              }}
               onToast={showToast}
             />
           )}

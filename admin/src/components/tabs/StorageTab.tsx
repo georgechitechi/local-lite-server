@@ -6,7 +6,7 @@ import { adminFetch, buildApiUrl } from '@/lib/api';
 import { formatBytes, formatTime } from '@/lib/formatters';
 import {
   cardStyle,
-  compactPrimaryBtnStyle,
+  primaryBtnStyle,
   secondaryBtnStyle,
   sectionTitleStyle,
   tableStyle,
@@ -207,7 +207,7 @@ export function StorageTab({
             type="button"
             disabled={pruning}
             onClick={() => void handlePrune()}
-            style={compactPrimaryBtnStyle}
+            style={primaryBtnStyle}
           >
             {pruning ? 'Pruning...' : 'Prune Orphans'}
           </button>

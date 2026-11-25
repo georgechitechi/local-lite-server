@@ -9,7 +9,7 @@ import { adminFetch } from '@/lib/api';
 import { formatTime } from '@/lib/formatters';
 import {
   cardStyle,
-  compactPrimaryBtnStyle,
+  primaryBtnStyle,
   secondaryBtnStyle,
   sectionTitleStyle,
 } from '@/styles/adminStyles';
@@ -113,7 +113,7 @@ export function SchedulesTab({
             disabled={runningKey !== null || !hasEnabledJobs}
             onClick={() => void runJob('all')}
             style={{
-              ...compactPrimaryBtnStyle,
+              ...primaryBtnStyle,
               opacity: runningKey !== null || !hasEnabledJobs ? 0.45 : 1,
               cursor:
                 runningKey !== null || !hasEnabledJobs
@@ -240,7 +240,7 @@ export function SchedulesTab({
                     type="button"
                     disabled={isRunning}
                     onClick={() => void runJob(job.job_key)}
-                    style={compactPrimaryBtnStyle}
+                    style={primaryBtnStyle}
                   >
                     {isRunning ? 'Running...' : 'Run Now'}
                   </button>

@@ -63,7 +63,7 @@ export function OverviewTab({
         <div style={cardStyle}>
           <div style={labelStyle}>Local Auth Accounts</div>
           <div style={{ fontSize: 22, fontWeight: 700 }}>
-            {overview?.localAccounts.length ?? 0}
+            {overview?.accountsCount ?? 0}
           </div>
           <div style={subLabelStyle}>PBKDF2-SHA256 + OTP</div>
         </div>
@@ -71,7 +71,7 @@ export function OverviewTab({
         <div style={cardStyle}>
           <div style={labelStyle}>Backup Archives</div>
           <div style={{ fontSize: 22, fontWeight: 700 }}>
-            {overview?.backups.length ?? 0}
+            {overview?.backupsCount ?? 0}
           </div>
           <div style={subLabelStyle}>Stored on server</div>
         </div>

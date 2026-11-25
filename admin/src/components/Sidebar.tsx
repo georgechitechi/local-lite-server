@@ -55,7 +55,7 @@ export function Sidebar({
               <span style={{ flex: 1 }}>{item.label}</span>
               {item.id === 'auth' && overview && (
                 <span style={pillCountStyle}>
-                  {overview.localAccounts.length}
+                  {overview.accountsCount ?? 0}
                 </span>
               )}
               {item.id === 'data' && overview && (

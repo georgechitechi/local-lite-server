@@ -47,12 +47,11 @@ export interface EndpointItem {
 
 export interface OverviewData {
   health: Record<string, any>;
-  endpoints: { endpoints?: EndpointItem[] } & Record<string, any>;
   dbConnected: boolean;
   dbError: string | null;
   tableCounts: Array<{ table: string; count: number }>;
-  localAccounts: LocalAuthAccount[];
-  backups: BackupArchiveRow[];
+  accountsCount: number;
+  backupsCount: number;
   consoleRole?: 'super_admin' | 'admin' | null;
 }
 
