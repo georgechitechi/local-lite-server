@@ -99,7 +99,7 @@ describe('admin', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ dbConnected: true, tableCounts: [{ table: 'notes', count: 0 }] });
     expect(
-      (await app.fetch(new Request('http://x/admin/tables/nope', { headers: { authorization: 'Bearer secret' } }))).status,
+      (await app.fetch(new Request('http://x/admin/table?table=nope', { headers: { authorization: 'Bearer secret' } }))).status,
     ).toBe(400);
   });
   it('can be disabled', async () => {

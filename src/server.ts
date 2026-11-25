@@ -258,18 +258,6 @@ export function createApp(
               ALL: async ({ request }: { request: Request }) =>
                 (await consoleApi.authenticate(request)) ? consoleApi.handleTable(request) : unauthorized(),
             },
-            '/admin/tables/:table': {
-              ALL: async ({ request, params }: { request: Request; params: Record<string, string> }) =>
-                (await consoleApi.authenticate(request))
-                  ? consoleApi.handleTable(request, params.table)
-                  : unauthorized(),
-            },
-            '/admin/tables/:table/:id': {
-              ALL: async ({ request, params }: { request: Request; params: Record<string, string> }) =>
-                (await consoleApi.authenticate(request))
-                  ? consoleApi.handleTable(request, params.table, params.id)
-                  : unauthorized(),
-            },
             '/admin/users': {
               POST: async ({ request }: { request: Request }) =>
                 (await consoleApi.authenticate(request)) ? consoleApi.manageUsers(request) : unauthorized(),

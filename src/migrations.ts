@@ -238,12 +238,6 @@ export async function runMigrations(
   const done = new Set(
     (await db.query<{ id: string }>('SELECT id FROM _lls_migrations')).map((r) => r.id),
   );
-  // Pre-release layout kept row payloads in _server_changes; replace it.
-  if (done.has('0001_sync_core')) {
-    await db.execute('DROP TABLE IF EXISTS _server_changes');
-    await db.execute("DELETE FROM _lls_migrations WHERE id = '0001_sync_core'");
-    done.delete('0001_sync_core');
-  }
   const applied: string[] = [];
   for (const m of MIGRATIONS) {
     if (done.has(m.id)) continue;

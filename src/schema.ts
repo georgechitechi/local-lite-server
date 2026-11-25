@@ -51,16 +51,7 @@ export function normalizeSchema(input: SchemaDictionary): SchemaDictionary {
   return out;
 }
 
-const CANDIDATES = [
-  'src/schema.ts',
-  'src/schema.mjs',
-  'src/schema.js',
-  'src/schema.json',
-  'schema.ts',
-  'schema.mjs',
-  'schema.js',
-  'schema.json',
-];
+const CANDIDATES = ['src/schema.ts', 'schema.ts'];
 
 export function resolveSchemaFile(explicit?: string, cwd = process.cwd()): string {
   if (explicit) {
@@ -71,7 +62,7 @@ export function resolveSchemaFile(explicit?: string, cwd = process.cwd()): strin
   // Inside the local-lite-server repo itself, src/schema.ts is the package's own loader.
   const isOwnRepo = fs.existsSync(path.resolve(cwd, 'src/cli.ts'));
   for (const name of CANDIDATES) {
-    if (isOwnRepo && name.startsWith('src/')) continue;
+    if (isOwnRepo && name === 'src/schema.ts') continue;
     const abs = path.resolve(cwd, name);
     if (fs.existsSync(abs)) return abs;
   }
@@ -82,13 +73,8 @@ export function resolveSchemaFile(explicit?: string, cwd = process.cwd()): strin
 }
 
 export async function loadSchemaFile(file: string): Promise<SchemaDictionary> {
-  let mod: unknown;
-  if (file.endsWith('.json')) {
-    mod = JSON.parse(fs.readFileSync(file, 'utf8'));
-  } else {
-    const loaded = await import(pathToFileURL(file).href);
-    mod = loaded.default ?? loaded.schema;
-  }
+  const loaded = await import(pathToFileURL(file).href);
+  const mod = loaded.default ?? loaded.schema;
   if (!mod || typeof mod !== 'object' || Array.isArray(mod)) {
     throw new Error(`${file} must export default an object of { table: { column: type } }.`);
   }
