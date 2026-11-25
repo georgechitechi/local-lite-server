@@ -21,8 +21,8 @@ Runs on **MySQL** or **PostgreSQL**, deploys to **cPanel (Node.js App / Passenge
 ### On a Fresh PC (`npx`)
 
 ```bash
-mkdir my-backend && cd my-backend
-npx local-lite-server init      # creates .env (with random keys), schema.ts, functions/notes.ts
+npx local-lite-server init my-backend   # or run `npx local-lite-server init` inside an existing folder
+cd my-backend
 # Edit .env with your MySQL or Postgres database credentials, then:
 npx local-lite-server start
 ```

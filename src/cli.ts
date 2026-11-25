@@ -15,8 +15,27 @@ if (fs.existsSync('.env')) {
 const cmd = process.argv[2] ?? 'start';
 const sub = process.argv[3];
 
-function runInit(force: boolean) {
-  const cwd = process.cwd();
+function resolveInitDir(targetDir: string | undefined, force: boolean): { cwd: string; relLabel?: string } {
+  if (targetDir) {
+    return { cwd: path.resolve(process.cwd(), targetDir), relLabel: targetDir };
+  }
+  const here = process.cwd();
+  const hasFiles = fs.readdirSync(here).some((f) => !f.startsWith('.'));
+  if (!hasFiles || force) {
+    return { cwd: here };
+  }
+  let name = 'local-lite-server';
+  let n = 2;
+  while (fs.existsSync(path.join(here, name))) {
+    name = `local-lite-server-${n++}`;
+  }
+  console.log(`Current directory is not empty; creating ./${name}/`);
+  return { cwd: path.join(here, name), relLabel: name };
+}
+
+function runInit(targetDir: string | undefined, force: boolean) {
+  const { cwd, relLabel } = resolveInitDir(targetDir, force);
+  fs.mkdirSync(cwd, { recursive: true });
   const apiKey = crypto.randomBytes(24).toString('hex');
   const appSecret = crypto.randomBytes(32).toString('hex');
 
@@ -79,13 +98,18 @@ export const create = {
     }
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     fs.writeFileSync(abs, content);
-    console.log(`write ${rel}`);
+    console.log(`write ${relLabel ? path.join(relLabel, rel) : rel}`);
   }
-  console.log('\nNext:\n  1. Edit .env with your MySQL/Postgres credentials\n  2. Run: npx local-lite-server start');
+  const cdStep = relLabel ? `  1. cd ${relLabel}\n` : '';
+  const n = relLabel ? 2 : 1;
+  console.log(
+    `\nNext:\n${cdStep}  ${n}. Edit .env with your MySQL/Postgres credentials\n  ${n + 1}. Run: npx local-lite-server start`,
+  );
 }
 
 if (cmd === 'init') {
-  runInit(process.argv.includes('--force'));
+  const dirArg = process.argv.slice(3).find((a) => !a.startsWith('-'));
+  runInit(dirArg, process.argv.includes('--force'));
 } else if (cmd === 'start') {
   await start();
 } else if (cmd === 'migrate') {
@@ -116,7 +140,7 @@ if (cmd === 'init') {
   console.log(pkg.version);
 } else {
   console.log(
-    'Usage: local-lite-server <init [--force] | start | migrate [status|diff] | --version>',
+    'Usage: local-lite-server <init [dir] [--force] | start | migrate [status|diff] | --version>',
   );
   process.exit(cmd === '-h' || cmd === '--help' || cmd === 'help' ? 0 : 1);
 }
