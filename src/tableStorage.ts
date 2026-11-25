@@ -198,12 +198,8 @@ export class TableSyncStorage implements ServerSyncStorage {
             if (!(await writeRule(auth, existing))) {
               throw new ForbiddenError(`Write denied on ${op.tableName}/${op.rowId}.`);
             }
-          } else if (op.operation === 'DELETE') {
-            if (!(await writeRule(auth, { id: op.rowId, ...payload }))) {
-              throw new ForbiddenError(`Delete denied on ${op.tableName}/${op.rowId}.`);
-            }
           }
-          if (op.operation !== 'DELETE') {
+          if (!existing || op.operation !== 'DELETE') {
             if (!(await writeRule(auth, { id: op.rowId, ...payload }))) {
               throw new ForbiddenError(`Write denied on ${op.tableName}/${op.rowId}.`);
             }

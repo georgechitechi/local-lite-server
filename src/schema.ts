@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { SqlExecutor } from 'local-lite/server';
@@ -9,6 +8,7 @@ import {
   type SchemaFieldType,
   type SqlSchemaState,
 } from 'local-lite/schema/migrations';
+import { resolveProjectFile } from './core/resolve.js';
 
 export type { SchemaDictionary, SchemaFieldType };
 
@@ -51,21 +51,9 @@ export function normalizeSchema(input: SchemaDictionary): SchemaDictionary {
   return out;
 }
 
-const CANDIDATES = ['src/schema.ts', 'schema.ts'];
-
 export function resolveSchemaFile(explicit?: string, cwd = process.cwd()): string {
-  if (explicit) {
-    const abs = path.resolve(cwd, explicit);
-    if (!fs.existsSync(abs)) throw new Error(`SCHEMA_PATH not found: ${abs}`);
-    return abs;
-  }
-  // Inside the local-lite-server repo itself, src/schema.ts is the package's own loader.
-  const isOwnRepo = fs.existsSync(path.resolve(cwd, 'src/cli.ts'));
-  for (const name of CANDIDATES) {
-    if (isOwnRepo && name === 'src/schema.ts') continue;
-    const abs = path.resolve(cwd, name);
-    if (fs.existsSync(abs)) return abs;
-  }
+  const found = resolveProjectFile(explicit, 'SCHEMA_PATH', ['src/schema.ts', 'schema.ts'], cwd);
+  if (found) return found;
   throw new Error(
     `No schema file found. Create src/schema.ts (or set SCHEMA_PATH):\n` +
       `  export default { notes: { id: 'string', title: 'string', body: 'string | null' } };`,
@@ -74,7 +62,7 @@ export function resolveSchemaFile(explicit?: string, cwd = process.cwd()): strin
 
 export async function loadSchemaFile(file: string): Promise<SchemaDictionary> {
   const loaded = await import(pathToFileURL(file).href);
-  const mod = loaded.default ?? loaded.schema;
+  const mod = loaded.default;
   if (!mod || typeof mod !== 'object' || Array.isArray(mod)) {
     throw new Error(`${file} must export default an object of { table: { column: type } }.`);
   }

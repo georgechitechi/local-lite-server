@@ -100,6 +100,14 @@ export function createApp(
     }
   };
   const unauthorized = () => Response.json({ error: 'Unauthorized' }, { status: 401 });
+  const rateLimited = async (request: Request): Promise<Response | null> => {
+    const limit = await authLimiter(clientIp(request));
+    if (limit.ok) return null;
+    return Response.json(
+      { error: 'Too many requests. Please try again shortly.' },
+      { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } },
+    );
+  };
 
   const events = createSyncEventsHandler({
     broker,
@@ -139,40 +147,13 @@ export function createApp(
         },
       },
       '/auth/google-token': {
-        POST: async ({ request }) => {
-          const limit = await authLimiter(clientIp(request));
-          if (!limit.ok) {
-            return Response.json(
-              { error: 'Too many requests. Please try again shortly.' },
-              { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } },
-            );
-          }
-          return handleOAuthTokenExchange(request);
-        },
+        POST: async ({ request }) => (await rateLimited(request)) ?? handleOAuthTokenExchange(request),
       },
       '/auth/github-token': {
-        POST: async ({ request }) => {
-          const limit = await authLimiter(clientIp(request));
-          if (!limit.ok) {
-            return Response.json(
-              { error: 'Too many requests. Please try again shortly.' },
-              { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } },
-            );
-          }
-          return handleOAuthTokenExchange(request);
-        },
+        POST: async ({ request }) => (await rateLimited(request)) ?? handleOAuthTokenExchange(request),
       },
       '/auth/*': {
-        POST: async ({ request }) => {
-          const limit = await authLimiter(clientIp(request));
-          if (!limit.ok) {
-            return Response.json(
-              { error: 'Too many requests. Please try again shortly.' },
-              { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } },
-            );
-          }
-          return auth.handler(request);
-        },
+        POST: async ({ request }) => (await rateLimited(request)) ?? auth.handler(request),
       },
       '/sync/events': {
         GET: ({ request }) => events(request),
@@ -279,16 +260,8 @@ export function createApp(
             '/admin': { GET: ({ request }: { request: Request }) => consoleApi.serveStatic(new URL(request.url).pathname) },
             '/admin/login': {
               GET: ({ request }: { request: Request }) => consoleApi.getLogin(request),
-              POST: async ({ request }: { request: Request }) => {
-                const limit = await authLimiter(clientIp(request));
-                if (!limit.ok) {
-                  return Response.json(
-                    { error: 'Too many requests. Please try again shortly.' },
-                    { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } },
-                  );
-                }
-                return consoleApi.postLogin(request);
-              },
+              POST: async ({ request }: { request: Request }) =>
+                (await rateLimited(request)) ?? consoleApi.postLogin(request),
             },
             '/admin/logout': {
               POST: async ({ request }: { request: Request }) =>

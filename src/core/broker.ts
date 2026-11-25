@@ -6,6 +6,7 @@ import {
   type SyncEventBroker,
 } from 'local-lite/server';
 import type { ServerSettings } from '../config.js';
+import { pgClientConfig } from '../db.js';
 
 export interface ManagedBroker extends SyncEventBroker {
   close(): Promise<void>;
@@ -28,14 +29,7 @@ export async function createClusterBroker(
 
   if (settings.dialect === 'postgres') {
     const pg = (await import('pg')).default;
-    const sub = new pg.Client({
-      host: settings.db.host,
-      port: settings.db.port,
-      user: settings.db.user,
-      password: settings.db.password,
-      database: settings.db.database,
-      ssl: settings.db.ssl ? { rejectUnauthorized: false } : undefined,
-    });
+    const sub = new pg.Client(pgClientConfig(settings));
     await sub.connect();
     sub.on('notification', (msg) => {
       if (msg.channel !== 'lls_sync_events' || !msg.payload) return;

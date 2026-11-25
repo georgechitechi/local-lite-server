@@ -1,5 +1,5 @@
 import { loadSettings, type ServerSettings } from './config.js';
-import { createDatabase, type Database } from './db.js';
+import { createDatabase, pgClientConfig, type Database } from './db.js';
 import { runMigrations } from './migrations.js';
 import { applySchema, loadSchemaFile, planSchema, resolveSchemaFile } from './schema.js';
 import type { SchemaDictionary } from './schema.js';
@@ -14,14 +14,7 @@ async function tryCreateDatabase(s: ServerSettings): Promise<boolean> {
   try {
     if (s.dialect === 'postgres') {
       const pg = (await import('pg')).default;
-      const client = new pg.Client({
-        host: s.db.host,
-        port: s.db.port,
-        user: s.db.user,
-        password: s.db.password,
-        database: 'postgres',
-        ssl: s.db.ssl ? { rejectUnauthorized: false } : undefined,
-      });
+      const client = new pg.Client(pgClientConfig(s, 'postgres'));
       await client.connect();
       try {
         await client.query(`CREATE DATABASE "${s.db.database.replace(/"/g, '')}"`);
