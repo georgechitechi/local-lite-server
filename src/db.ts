@@ -1,19 +1,17 @@
-import mysql from 'mysql2/promise';
-import pg from 'pg';
 import { createSqlExecutor, type SqlExecutor } from 'local-lite/server';
 import type { ServerSettings } from './config.js';
-
-// Parse Postgres BIGINT as number to match mysql2 (epoch-ms timestamps).
-pg.types.setTypeParser(20, (v: string) => Number(v));
 
 export interface Database {
   executor: SqlExecutor;
   close(): Promise<void>;
 }
 
-export function createDatabase(settings: ServerSettings): Database {
+export async function createDatabase(settings: ServerSettings): Promise<Database> {
   const { db, dialect } = settings;
   if (dialect === 'postgres') {
+    const pg = (await import('pg')).default;
+    // Parse Postgres BIGINT as number to match mysql2 (epoch-ms timestamps).
+    pg.types.setTypeParser(20, (v: string) => Number(v));
     const pool = new pg.Pool({
       host: db.host,
       port: db.port,
@@ -28,6 +26,7 @@ export function createDatabase(settings: ServerSettings): Database {
       close: () => pool.end(),
     };
   }
+  const mysql = (await import('mysql2/promise')).default;
   const pool = mysql.createPool({
     host: db.host,
     port: db.port,

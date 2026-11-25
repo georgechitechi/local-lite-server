@@ -80,7 +80,7 @@ if (cmd === 'init') {
 } else if (cmd === 'migrate') {
   const settings = loadSettings();
   const schema = await loadSchema(settings);
-  const db = createDatabase(settings);
+  const db = await createDatabase(settings);
   try {
     if (sub === 'status' || sub === 'diff') {
       console.log('core:', await coreMigrationStatus(db.executor));

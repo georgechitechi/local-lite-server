@@ -1,4 +1,3 @@
-import pg from 'pg';
 import {
   createSyncEventBroker,
   quoteIdent,
@@ -28,6 +27,7 @@ export async function createClusterBroker(
   }
 
   if (settings.dialect === 'postgres') {
+    const pg = (await import('pg')).default;
     const sub = new pg.Client({
       host: settings.db.host,
       port: settings.db.port,

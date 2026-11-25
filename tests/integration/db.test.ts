@@ -23,7 +23,7 @@ function parseDbUrl(dialect: 'mysql' | 'postgres', rawUrl: string) {
 
 async function runEngineSuite(dialect: 'mysql' | 'postgres', rawUrl: string) {
   const settings = parseDbUrl(dialect, rawUrl);
-  const database = createDatabase(settings);
+  const database = await createDatabase(settings);
   try {
     await runMigrations(database.executor);
     const schema = normalizeSchema({

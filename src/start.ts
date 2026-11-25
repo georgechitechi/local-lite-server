@@ -1,5 +1,3 @@
-import mysql from 'mysql2/promise';
-import pg from 'pg';
 import { loadSettings, type ServerSettings } from './config.js';
 import { createDatabase, type Database } from './db.js';
 import { runMigrations } from './migrations.js';
@@ -14,6 +12,7 @@ import { createApp, createHttpServer } from './server.js';
 async function tryCreateDatabase(s: ServerSettings): Promise<boolean> {
   try {
     if (s.dialect === 'postgres') {
+      const pg = (await import('pg')).default;
       const client = new pg.Client({
         host: s.db.host,
         port: s.db.port,
@@ -30,6 +29,7 @@ async function tryCreateDatabase(s: ServerSettings): Promise<boolean> {
       }
       return true;
     }
+    const mysql = (await import('mysql2/promise')).default;
     const conn = await mysql.createConnection({
       host: s.db.host,
       port: s.db.port,
@@ -103,7 +103,7 @@ export async function start() {
     console.warn('[local-lite-server] APP_SECRET is set without src/rules.ts; authenticated users can sync all tables.');
   }
   const functions = await loadFunctionsDir(settings.functionsDir);
-  const database = createDatabase(settings);
+  const database = await createDatabase(settings);
 
   try {
     if (settings.autoMigrate) {

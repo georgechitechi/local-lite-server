@@ -1,6 +1,6 @@
 # Deploying on cPanel
 
-No Docker, and no `npm install` on the server: `app.cjs` is a self-contained bundle.
+No Docker, and no `npm install` on the server: `dist/cpanel/` is a self-contained, code-split ESM bundle.
 
 ## 1. Create the database
 cPanel → **MySQL® Databases**
@@ -8,8 +8,8 @@ cPanel → **MySQL® Databases**
 2. Note the full names (cPanel prefixes them, e.g. `acct_mydb`, `acct_user`).
 
 ## 2. Upload
-Upload everything in this folder to a directory **outside** `public_html`, e.g. `~/local-lite-server/`:
-`app.cjs`, `schema.ts`, `.env.example`.
+Upload everything in `dist/cpanel/` to a directory **outside** `public_html`, e.g. `~/local-lite-server/`:
+`app.mjs`, `chunks/`, `admin-ui/`, `schema.ts`, `functions/`, `.env.example`.
 
 ## 3. Create the Node.js app
 cPanel → **Setup Node.js App** → **Create Application**
@@ -19,7 +19,7 @@ cPanel → **Setup Node.js App** → **Create Application**
 | Application mode | Production |
 | Application root | `local-lite-server` |
 | Application URL | e.g. `api.yourdomain.com` |
-| Application startup file | `app.cjs` |
+| Application startup file | `app.mjs` |
 
 ## 4. Environment variables
 Add these in the same screen (**Environment variables**):
