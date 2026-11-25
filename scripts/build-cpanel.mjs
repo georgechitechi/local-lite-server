@@ -34,4 +34,7 @@ await build({
 fs.copyFileSync('schema.ts', 'dist/cpanel/schema.ts');
 fs.copyFileSync('.env.example', 'dist/cpanel/.env.example');
 fs.copyFileSync('docs/cpanel.md', 'dist/cpanel/README-cpanel.md');
+if (fs.existsSync('functions')) {
+  fs.cpSync('functions', 'dist/cpanel/functions', { recursive: true });
+}
 console.log('\ncPanel package ready: dist/cpanel/ (app.cjs, schema.ts, .env.example, README-cpanel.md)');

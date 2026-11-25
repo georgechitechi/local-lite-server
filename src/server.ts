@@ -12,6 +12,12 @@ import { ClientError, TableSyncStorage } from './tableStorage.js';
 import { createAuthService } from './auth.js';
 import { createAdmin } from './admin.js';
 import { clientIp, createRateLimiter } from './rateLimit.js';
+import {
+  createFunctionRuntime,
+  FunctionError,
+  type FunctionAuth,
+  type FunctionRegistry,
+} from './functions.js';
 
 const MAX_BODY_BYTES = 6_000_000;
 
@@ -25,11 +31,13 @@ export function createApp(
   settings: ServerSettings,
   executor: SqlExecutor,
   schema: SchemaDictionary,
+  functions: FunctionRegistry = new Map(),
 ) {
   const broker = createSyncEventBroker();
   const storage = new TableSyncStorage(executor, { schema, broker });
   const auth = createAuthService(settings, executor);
   const admin = createAdmin(settings, executor, schema, auth);
+  const fnRuntime = createFunctionRuntime({ registry: functions, db: executor, schema, broker });
   const authLimiter = createRateLimiter(20, 60_000);
 
   const bearer = (request: Request): string => {
@@ -42,14 +50,17 @@ export function createApp(
     return token.length > 0 && safeEqual(token, settings.apiKey);
   };
   /** Admin key or a valid user token. */
-  const canSync = async (request: Request, allowQuery = false): Promise<boolean> => {
-    if (isAdmin(request)) return true;
+  const resolveAuth = async (request: Request, allowQuery = false): Promise<FunctionAuth | null> => {
+    if (isAdmin(request)) return { isAdmin: true };
     const token =
       bearer(request) || (allowQuery ? (new URL(request.url).searchParams.get('token') ?? '') : '');
-    if (!token) return false;
-    if (safeEqual(token, settings.apiKey)) return true;
-    return auth.verifyToken(token);
+    if (!token) return null;
+    if (safeEqual(token, settings.apiKey)) return { isAdmin: true };
+    const user = await auth.verifyUser(token);
+    return user ? { isAdmin: false, userId: user.id } : null;
   };
+  const canSync = async (request: Request, allowQuery = false): Promise<boolean> =>
+    Boolean(await resolveAuth(request, allowQuery));
 
   const guard = async (run: () => Promise<Response>): Promise<Response> => {
     try {
@@ -57,6 +68,15 @@ export function createApp(
     } catch (err) {
       if (err instanceof ClientError) {
         return Response.json({ error: err.message }, { status: 400 });
+      }
+      if (err instanceof FunctionError) {
+        return Response.json({ error: err.message }, { status: err.status });
+      }
+      if (err instanceof Error && typeof (err as any).status === 'number') {
+        const status = (err as any).status;
+        if (status >= 400 && status < 500) {
+          return Response.json({ error: err.message }, { status });
+        }
       }
       throw err;
     }
@@ -108,6 +128,54 @@ export function createApp(
       },
       '/sync/events': {
         GET: ({ request }) => events(request),
+      },
+      '/fn': {
+        GET: async ({ request }) => {
+          if (!(await canSync(request))) return unauthorized();
+          return Response.json({ functions: fnRuntime.list() });
+        },
+      },
+      '/fn/:module/:name': {
+        POST: async ({ request, params }) => {
+          const userAuth = await resolveAuth(request);
+          if (!userAuth) return unauthorized();
+          const raw = (await request.json().catch(() => ({}))) as Record<string, unknown> | null;
+          const args =
+            raw && typeof raw === 'object' && raw.args && typeof raw.args === 'object'
+              ? (raw.args as Record<string, unknown>)
+              : raw && typeof raw === 'object'
+                ? raw
+                : {};
+          return guard(async () => {
+            const { result } = await fnRuntime.run(
+              `${params.module}/${params.name}`,
+              args,
+              userAuth,
+            );
+            return Response.json({ success: true, result });
+          });
+        },
+      },
+      '/subscribe/:module/:name': {
+        GET: async ({ request, params }) => {
+          const userAuth = await resolveAuth(request, true);
+          if (!userAuth) return unauthorized();
+          const rawArgs = new URL(request.url).searchParams.get('args');
+          let args: Record<string, unknown> = {};
+          if (rawArgs) {
+            try {
+              const parsed = JSON.parse(rawArgs);
+              if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                args = parsed as Record<string, unknown>;
+              }
+            } catch {
+              return Response.json({ error: 'Invalid args JSON.' }, { status: 400 });
+            }
+          }
+          return guard(() =>
+            fnRuntime.subscribe(`${params.module}/${params.name}`, args, userAuth),
+          );
+        },
       },
       '/sync': {
         GET: async ({ request }) => {

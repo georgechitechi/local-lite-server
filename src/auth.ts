@@ -111,6 +111,7 @@ export interface AuthService {
   handler: (request: Request) => Promise<Response>;
   /** True when the bearer/query token is a valid, non-revoked user token. */
   verifyToken: (token: string) => Promise<boolean>;
+  verifyUser: (token: string) => Promise<{ id: string; email: string } | null>;
   userCount: () => Promise<number>;
 }
 
@@ -125,6 +126,7 @@ export function createAuthService(s: ServerSettings, db: SqlExecutor): AuthServi
       handler: async () =>
         Response.json({ error: 'Accounts are disabled: set APP_SECRET to enable /auth.' }, { status: 503 }),
       verifyToken: async () => false,
+      verifyUser: async () => null,
       userCount,
     };
   }
@@ -144,10 +146,15 @@ export function createAuthService(s: ServerSettings, db: SqlExecutor): AuthServi
       );
     },
   });
+  const verifyUser = async (token: string) => {
+    const user = await verifyAuthTokenWithStorage(token, secret, storage);
+    return user ? { id: user.id, email: user.email } : null;
+  };
   return {
     enabled: true,
     handler,
-    verifyToken: async (token) => Boolean(await verifyAuthTokenWithStorage(token, secret, storage)),
+    verifyToken: async (token) => Boolean(await verifyUser(token)),
+    verifyUser,
     userCount,
   };
 }

@@ -3,6 +3,7 @@ import { createDatabase, type Database } from './db.js';
 import { runMigrations } from './migrations.js';
 import { applySchema, loadSchemaFile, planSchema, resolveSchemaFile } from './schema.js';
 import type { SchemaDictionary } from './schema.js';
+import { loadFunctionsDir } from './functions.js';
 import { createApp, createHttpServer } from './server.js';
 
 function friendlyDbError(err: unknown, s: ServerSettings): unknown {
@@ -44,6 +45,7 @@ export async function migrate(
 export async function start() {
   const settings = loadSettings();
   const schema = await loadSchema(settings);
+  const functions = await loadFunctionsDir(settings.functionsDir);
   const database = createDatabase(settings);
 
   try {
@@ -60,10 +62,10 @@ export async function start() {
     throw friendlyDbError(err, settings);
   }
 
-  const server = createHttpServer(createApp(settings, database.executor, schema));
+  const server = createHttpServer(createApp(settings, database.executor, schema, functions));
   server.listen(settings.port, () =>
     console.log(
-      `[local-lite-server] listening on ${settings.port} (${settings.dialect}); tables: ${Object.keys(schema).join(', ') || '(none)'}`,
+      `[local-lite-server] listening on ${settings.port} (${settings.dialect}); tables: ${Object.keys(schema).join(', ') || '(none)'}; functions: ${functions.size}`,
     ),
   );
   const shutdown = () => {
