@@ -10,6 +10,7 @@ import type { SchemaDictionary } from './schema.js';
 import type { RulesDictionary } from './rules.js';
 import { ClientError, ForbiddenError, TableSyncStorage } from './tableStorage.js';
 import { createAuthService } from './auth.js';
+import { createApiKeyService } from './apiKeys.js';
 import { createAdminConsole } from './admin/index.js';
 import { createStorageHandler } from './storage.js';
 import { corsHeaders, createHttpServer, safeEqual } from './core/http.js';
@@ -34,6 +35,7 @@ export function createApp(
   const broker = brokerOverride ?? createSyncEventBroker();
   const storage = new TableSyncStorage(executor, { schema, rules, broker });
   const auth = createAuthService(settings, executor);
+  const apiKeys = createApiKeyService(executor);
   const fnRuntime = createFunctionRuntime({ registry: functions, db: executor, schema, broker });
   const consoleApi = createAdminConsole({ settings, db: executor, schema, broker, fnRuntime });
   const storageHandler = createStorageHandler(settings, executor, async (req) => {
@@ -46,18 +48,18 @@ export function createApp(
     const header = request.headers.get('authorization') ?? '';
     return header.startsWith('Bearer ') ? header.slice(7).trim() : '';
   };
-  /** Server admin key (full access). */
-  const isAdmin = (request: Request): boolean => {
-    const token = bearer(request);
-    return token.length > 0 && safeEqual(token, settings.apiKey);
-  };
-  /** Admin key, console cookie session, or a valid user token. */
+  const apiKeyHeader = (request: Request): string =>
+    request.headers.get('x-api-key')?.trim() ?? '';
+  /** Admin key, API key, console cookie session, or a valid user token. */
   const resolveAuth = async (request: Request, allowQuery = false): Promise<FunctionAuth | null> => {
-    if (isAdmin(request)) return { isAdmin: true };
     const token =
-      bearer(request) || (allowQuery ? (new URL(request.url).searchParams.get('token') ?? '') : '');
+      bearer(request) ||
+      apiKeyHeader(request) ||
+      (allowQuery ? (new URL(request.url).searchParams.get('token') ?? '') : '');
     if (token) {
       if (safeEqual(token, settings.apiKey)) return { isAdmin: true };
+      const keyAuth = await apiKeys.verifyKey(token);
+      if (keyAuth) return { isAdmin: keyAuth.isAdmin, userId: keyAuth.userId };
       const user = await auth.verifyUser(token);
       if (user) return { isAdmin: false, userId: user.id };
     }
@@ -302,6 +304,55 @@ export function createApp(
             '/admin/settings': {
               ALL: async ({ request }: { request: Request }) =>
                 (await consoleApi.authenticate(request)) ? consoleApi.handleSettings(request) : unauthorized(),
+            },
+            '/admin/api-keys': {
+              GET: async ({ request }: { request: Request }) => {
+                const s = await consoleApi.authenticate(request);
+                if (!s) return unauthorized();
+                return Response.json({ keys: await apiKeys.listKeys() });
+              },
+              POST: async ({ request }: { request: Request }) => {
+                const s = await consoleApi.authenticate(request);
+                if (!s) return unauthorized();
+                const body = (await request.json().catch(() => null)) as {
+                  name?: string;
+                  role?: 'admin' | 'user';
+                  userId?: string;
+                  expiresInDays?: number | null;
+                } | null;
+                const days = Number(body?.expiresInDays ?? 0);
+                const expiresAt = Number.isFinite(days) && days > 0 ? Date.now() + days * 86_400_000 : null;
+                try {
+                  const created = await apiKeys.createKey({
+                    name: String(body?.name ?? ''),
+                    role: body?.role === 'user' ? 'user' : 'admin',
+                    userId: body?.userId ?? null,
+                    createdBy: s.userId,
+                    expiresAt,
+                  });
+                  return Response.json(created, { status: 201 });
+                } catch (err) {
+                  return Response.json({ error: (err as Error).message }, { status: 400 });
+                }
+              },
+              PATCH: async ({ request }: { request: Request }) => {
+                const s = await consoleApi.authenticate(request);
+                if (!s) return unauthorized();
+                const body = (await request.json().catch(() => null)) as { id?: string; action?: string } | null;
+                if (!body?.id || body.action !== 'revoke') {
+                  return Response.json({ error: 'Provide id and action: "revoke".' }, { status: 400 });
+                }
+                const ok = await apiKeys.revokeKey(String(body.id));
+                return ok ? Response.json({ ok: true }) : Response.json({ error: 'Key not found or already revoked.' }, { status: 404 });
+              },
+              DELETE: async ({ request }: { request: Request }) => {
+                const s = await consoleApi.authenticate(request);
+                if (!s) return unauthorized();
+                const id = new URL(request.url).searchParams.get('id') ?? '';
+                if (!id) return Response.json({ error: 'Missing id.' }, { status: 400 });
+                const ok = await apiKeys.deleteKey(id);
+                return ok ? Response.json({ ok: true }) : Response.json({ error: 'Key not found.' }, { status: 404 });
+              },
             },
             '/admin/*': {
               GET: ({ request }: { request: Request }) => consoleApi.serveStatic(new URL(request.url).pathname),

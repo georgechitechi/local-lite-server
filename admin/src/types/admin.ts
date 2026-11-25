@@ -2,6 +2,7 @@ export type NavTab =
   | 'overview'
   | 'data'
   | 'auth'
+  | 'api_keys'
   | 'functions'
   | 'schedules'
   | 'backups'
@@ -9,6 +10,19 @@ export type NavTab =
   | 'logs'
   | 'env'
   | 'settings';
+
+export interface ApiKeyItem {
+  id: string;
+  name: string;
+  keyPrefix: string;
+  role: 'admin' | 'user';
+  userId: string | null;
+  createdBy: string | null;
+  lastUsedAt: number | null;
+  expiresAt: number | null;
+  revokedAt: number | null;
+  createdAt: number;
+}
 
 export interface LocalAuthAccount {
   id: string;
@@ -72,6 +86,7 @@ export const NAV_ITEMS: Array<{
   { id: 'overview', label: 'Overview' },
   { id: 'data', label: 'Data' },
   { id: 'auth', label: 'Auth & Users' },
+  { id: 'api_keys', label: 'API Keys' },
   { id: 'functions', label: 'Functions' },
   { id: 'schedules', label: 'Schedules' },
   { id: 'backups', label: 'Backups' },

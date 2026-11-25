@@ -16,7 +16,7 @@ export function corsHeaders(request: Request, s: ServerSettings): Record<string,
   const allowed = allowAll ? '*' : origin && s.corsOrigins.includes(origin) ? origin : '';
   const h: Record<string, string> = {
     'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Authorization,Content-Type',
+    'Access-Control-Allow-Headers': 'Authorization,Content-Type,X-API-Key',
     'Access-Control-Max-Age': '600',
   };
   if (allowed) h['Access-Control-Allow-Origin'] = allowed;

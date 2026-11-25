@@ -197,6 +197,39 @@ export const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    id: '0002_api_keys',
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS _lls_api_keys (
+        id VARCHAR(64) NOT NULL PRIMARY KEY,
+        name VARCHAR(128) NOT NULL,
+        key_prefix VARCHAR(24) NOT NULL,
+        key_hash VARCHAR(128) NOT NULL UNIQUE,
+        role VARCHAR(16) NOT NULL DEFAULT 'admin',
+        user_id VARCHAR(64) NULL,
+        created_by VARCHAR(64) NULL,
+        last_used_at BIGINT NULL,
+        expires_at BIGINT NULL,
+        revoked_at BIGINT NULL,
+        created_at BIGINT NOT NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+    ],
+    postgres: [
+      `CREATE TABLE IF NOT EXISTS _lls_api_keys (
+        id VARCHAR(64) NOT NULL PRIMARY KEY,
+        name VARCHAR(128) NOT NULL,
+        key_prefix VARCHAR(24) NOT NULL,
+        key_hash VARCHAR(128) NOT NULL UNIQUE,
+        role VARCHAR(16) NOT NULL DEFAULT 'admin',
+        user_id VARCHAR(64) NULL,
+        created_by VARCHAR(64) NULL,
+        last_used_at BIGINT NULL,
+        expires_at BIGINT NULL,
+        revoked_at BIGINT NULL,
+        created_at BIGINT NOT NULL
+      )`,
+    ],
+  },
 ];
 
 export async function runMigrations(db: SqlExecutor): Promise<{ applied: string[] }> {

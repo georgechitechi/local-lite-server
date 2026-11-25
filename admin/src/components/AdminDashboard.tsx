@@ -6,6 +6,7 @@ import {
   type ToastItem,
   type ToastType,
 } from '@/components/Toast';
+import { ApiKeysTab } from '@/components/tabs/ApiKeysTab';
 import { AuthUsersTab } from '@/components/tabs/AuthUsersTab';
 import { BackupsTab } from '@/components/tabs/BackupsTab';
 import { StorageTab } from '@/components/tabs/StorageTab';
@@ -260,6 +261,8 @@ export function AdminDashboard() {
               }}
             />
           )}
+
+          {activeTab === 'api_keys' && <ApiKeysTab onToast={showToast} />}
 
           {activeTab === 'data' && (
             <DataBrowserTab
