@@ -175,7 +175,14 @@ export function EnvVarsTab({
               in database and synced live
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <input
+              type="text"
+              placeholder="Filter by key or description..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ ...inputStyle, width: 240, height: 34 }}
+            />
             <button
               type="button"
               onClick={() => void loadEnvVars()}
@@ -193,14 +200,6 @@ export function EnvVarsTab({
             </button>
           </div>
         </div>
-
-        <input
-          type="text"
-          placeholder="Filter by key or description..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ ...inputStyle, marginBottom: 12 }}
-        />
 
         {filteredVars.length === 0 ? (
           <div style={{ fontSize: 13, color: 'var(--muted)', padding: 12 }}>

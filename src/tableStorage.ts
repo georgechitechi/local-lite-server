@@ -1,10 +1,10 @@
 import {
-  buildUpsertSql,
   quoteIdent,
   type ServerSyncStorage,
   type SqlExecutor,
   type SyncEventBroker,
 } from 'local-lite/server';
+import { recordChange, setRowDeleted, upsertTableRow } from './core/changes.js';
 import type { SchemaDictionary, SchemaFieldType } from './schema.js';
 
 type Op = {
@@ -20,7 +20,6 @@ type Op = {
 export class ClientError extends Error {}
 
 const MAX_BATCH = 1000;
-const SYSTEM_COLS = new Set(['id', 'updated_at', 'deleted']);
 
 const baseType = (t: SchemaFieldType) => t.replace(' | null', '');
 
@@ -121,65 +120,25 @@ export class TableSyncStorage implements ServerSyncStorage {
 
   async applyOperations(operations: Op[] | any[], _serverTime?: number) {
     if (operations.length > MAX_BATCH) throw new ClientError('Batch is too large.');
-    const dialect = this.db.dialect;
     const emitted: Array<{ scopeId: string; tableName: string; checkpoint: number }> = [];
     const successfulIds: string[] = [];
     let cursor = 0;
 
     await this.db.withTransaction(async (tx) => {
-      const clock = await tx.query<{ checkpoint: number }>(
-        `SELECT checkpoint FROM ${this.q(this.clock)} WHERE id = 1 FOR UPDATE`,
-      );
-      cursor = Number(clock[0]?.checkpoint ?? 0);
-
       for (const op of operations as Op[]) {
         if (!op || typeof op.rowId !== 'string' || !op.rowId || op.rowId.length > 128) {
           throw new ClientError('Each operation needs a rowId string (max 128 chars).');
         }
         const fields = this.fields(op.tableName);
-        cursor = Math.max(Date.now(), cursor + 1);
-        const table = this.q(op.tableName);
+        cursor = await recordChange(tx, op.tableName, op.rowId, this.changes, this.clock);
         const payload = op.payload && typeof op.payload === 'object' ? op.payload : {};
-        const del = dialect === 'postgres';
-        const deletedVal = (flag: boolean) => (del ? flag : flag ? 1 : 0);
 
         if (op.operation === 'DELETE') {
-          await tx.execute(
-            `UPDATE ${table} SET ${this.q('deleted')} = ?, ${this.q('updated_at')} = ? WHERE ${this.q('id')} = ?`,
-            [deletedVal(true), cursor, op.rowId],
-          );
+          await setRowDeleted(tx, op.tableName, op.rowId, true, cursor);
         } else {
-          const cols = Object.keys(fields).filter(
-            (c) => !SYSTEM_COLS.has(c) && c !== 'created_at' && Object.hasOwn(payload, c),
-          );
-          const insertCols = ['id', ...cols, 'updated_at', 'deleted'];
-          const params: unknown[] = [
-            op.rowId,
-            ...cols.map((c) => toDbValue(fields[c], payload[c], dialect)),
-            cursor,
-            deletedVal(Boolean(payload.deleted)),
-          ];
-          const updateCols = [...cols, 'updated_at', 'deleted'];
-          if (fields.created_at) {
-            insertCols.push('created_at');
-            params.push(payload.created_at != null ? toDbValue(fields.created_at, payload.created_at, dialect) : cursor);
-          }
-          await tx.execute(
-            buildUpsertSql({
-              table: op.tableName,
-              conflictCols: ['id'],
-              insertCols,
-              updateCols,
-              dialect,
-            }),
-            params,
-          );
+          await upsertTableRow(tx, op.tableName, fields, op.rowId, payload, cursor);
         }
 
-        await tx.execute(
-          `INSERT INTO ${this.q(this.changes)} (table_name, row_id, ${this.q('timestamp')}) VALUES (?, ?, ?)`,
-          [op.tableName, op.rowId, cursor],
-        );
         const scope = payload[this.scopeField];
         emitted.push({
           scopeId: typeof scope === 'string' && scope ? scope : 'default',
@@ -187,10 +146,6 @@ export class TableSyncStorage implements ServerSyncStorage {
           checkpoint: cursor,
         });
         successfulIds.push(op.id);
-      }
-
-      if (operations.length) {
-        await tx.execute(`UPDATE ${this.q(this.clock)} SET checkpoint = ? WHERE id = 1`, [cursor]);
       }
     });
 

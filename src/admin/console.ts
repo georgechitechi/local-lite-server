@@ -1,0 +1,194 @@
+import { quoteIdent, type SqlExecutor, type SyncEventBroker } from 'local-lite/server';
+import type { ServerSettings } from '../config.js';
+import type { FunctionRuntime } from '../functions.js';
+import type { SchemaDictionary } from '../schema.js';
+import { fromDbRow } from '../tableStorage.js';
+import { newRowId, patchTableRow, recordChange, setRowDeleted, upsertTableRow } from '../core/changes.js';
+import type { AdminSession } from './session.js';
+
+const int = (v: string | null, d: number, min: number, max: number) =>
+  Math.min(Math.max(Math.floor(Number(v ?? d)) || d, min), max);
+
+export function createAdminData(opts: {
+  settings: ServerSettings;
+  db: SqlExecutor;
+  schema: SchemaDictionary;
+  broker?: SyncEventBroker;
+  fnRuntime?: FunctionRuntime;
+}) {
+  const { settings, db, schema, broker, fnRuntime } = opts;
+  const q = (n: string) => quoteIdent(n, db.dialect);
+  const notDeleted = db.dialect === 'postgres' ? 'FALSE' : '0';
+
+  return {
+    async overview(session: AdminSession) {
+      let dbConnected = true;
+      let dbError: string | null = null;
+      const tableCounts: Array<{ table: string; count: number }> = [];
+      try {
+        for (const t of Object.keys(schema)) {
+          const r = await db.query<any>(`SELECT COUNT(*) AS n FROM ${q(t)}`);
+          tableCounts.push({ table: t, count: Number(r[0]?.n ?? 0) });
+        }
+      } catch (err) {
+        dbConnected = false;
+        dbError = err instanceof Error ? err.message : 'Database error';
+      }
+      const accounts = await db.query<any>(
+        'SELECT id, email, display_name, failed_login_attempts, locked_until, token_version, console_role, console_active, created_at FROM _local_auth_accounts ORDER BY created_at DESC LIMIT 200',
+      );
+      const backups = await db.query<any>(
+        'SELECT id, user_id, file_name, status, size_bytes, record_count, created_at FROM _lls_backups ORDER BY created_at DESC LIMIT 50',
+      );
+      const fns = (fnRuntime?.list() ?? []).map((f) => ({ method: f.kind.toUpperCase(), path: `/fn/${f.name}` }));
+      return Response.json({
+        health: { ok: dbConnected, dialect: settings.dialect, database: settings.db.database },
+        endpoints: {
+          endpoints: [
+            { method: 'GET', path: '/health' },
+            { method: 'GET', path: '/sync' },
+            { method: 'POST', path: '/sync' },
+            { method: 'GET', path: '/sync/events' },
+            ...fns,
+          ],
+        },
+        dbConnected,
+        dbError,
+        tableCounts,
+        localAccounts: accounts.map((a) => ({
+          id: String(a.id),
+          email: String(a.email),
+          displayName: a.display_name ?? null,
+          failedLoginAttempts: Number(a.failed_login_attempts ?? 0),
+          lockedUntil: a.locked_until != null ? Number(a.locked_until) : null,
+          tokenVersion: Number(a.token_version ?? 1),
+          consoleRole: a.console_role ?? null,
+          consoleActive: Boolean(a.console_active),
+          createdAt: Number(a.created_at),
+        })),
+        backups: backups.map((b) => ({
+          id: String(b.id),
+          userId: String(b.user_id),
+          fileName: String(b.file_name),
+          status: String(b.status),
+          sizeBytes: Number(b.size_bytes),
+          recordCount: Number(b.record_count),
+          createdAt: Number(b.created_at),
+        })),
+        consoleRole: session.consoleRole,
+      });
+    },
+
+    async handleTable(request: Request, tableOverride?: string, idOverride?: string) {
+      const url = new URL(request.url);
+      const method = request.method.toUpperCase();
+      if (method === 'GET') {
+        const table = tableOverride || url.searchParams.get('table') || '';
+        if (!Object.hasOwn(schema, table)) return Response.json({ error: 'Invalid table name.' }, { status: 400 });
+        const fields = schema[table];
+        const limit = int(url.searchParams.get('limit'), 30, 1, 500);
+        const offset = int(url.searchParams.get('offset'), 0, 0, 10_000_000);
+        const where = url.searchParams.get('includeDeleted') === '1' ? '' : `WHERE ${q('deleted')} = ${notDeleted}`;
+        const total = Number((await db.query<any>(`SELECT COUNT(*) AS n FROM ${q(table)} ${where}`))[0]?.n ?? 0);
+        const raw = await db.query<Record<string, any>>(
+          `SELECT * FROM ${q(table)} ${where} ORDER BY ${q('updated_at')} DESC LIMIT ${limit} OFFSET ${offset}`,
+        );
+        return Response.json({
+          table,
+          columns: [...Object.keys(fields), 'deleted', 'updated_at'],
+          total,
+          limit,
+          offset,
+          rows: raw.map((r) => ({ id: String(r.id), ...fromDbRow(fields, r) })),
+        });
+      }
+
+      const body = (await request.json().catch(() => null)) as Record<string, any> | null;
+      const table = tableOverride || url.searchParams.get('table') || String(body?.table ?? '');
+      if (!Object.hasOwn(schema, table)) return Response.json({ error: 'Invalid table name.' }, { status: 400 });
+      const fields = schema[table];
+      const rowData = body?.row && typeof body.row === 'object' ? body.row : body || {};
+
+      if (method === 'POST' || method === 'PATCH') {
+        const id = idOverride || newRowId(rowData.id);
+        const ts = await db.withTransaction(async (tx) => {
+          const checkpoint = await recordChange(tx, table, id);
+          if (method === 'PATCH') await patchTableRow(tx, table, fields, id, rowData, checkpoint);
+          else await upsertTableRow(tx, table, fields, id, rowData, checkpoint);
+          return checkpoint;
+        });
+        broker?.publish({ scopeId: 'default', tableName: table, checkpoint: ts });
+        return Response.json({ success: true, id, cursor: ts }, { status: method === 'POST' ? 201 : 200 });
+      }
+
+      if (method === 'DELETE') {
+        const id = idOverride || url.searchParams.get('id') || String(body?.id ?? '');
+        const restore = url.searchParams.get('restore') === '1';
+        const ts = await db.withTransaction(async (tx) => {
+          const checkpoint = await recordChange(tx, table, id);
+          await setRowDeleted(tx, table, id, !restore, checkpoint);
+          return checkpoint;
+        });
+        broker?.publish({ scopeId: 'default', tableName: table, checkpoint: ts });
+        return Response.json({ success: true, id, deleted: !restore, cursor: ts });
+      }
+      return Response.json({ error: 'Method Not Allowed' }, { status: 405 });
+    },
+
+    async manageUsers(request: Request) {
+      const body = (await request.json().catch(() => null)) as Record<string, any> | null;
+      const userId = String(body?.userId ?? '');
+      const action = String(body?.action ?? '');
+      if (!userId) return Response.json({ error: 'userId is required.' }, { status: 400 });
+      if (action === 'unlock') {
+        await db.execute(
+          'UPDATE _local_auth_accounts SET failed_login_attempts = 0, locked_until = NULL, updated_at = ? WHERE id = ?',
+          [Date.now(), userId],
+        );
+      } else if (action === 'revoke_sessions') {
+        await db.execute(
+          'UPDATE _local_auth_accounts SET token_version = COALESCE(token_version, 1) + 1, updated_at = ? WHERE id = ?',
+          [Date.now(), userId],
+        );
+      } else if (action === 'set_console_role') {
+        const role = body?.consoleRole === 'super_admin' || body?.consoleRole === 'admin' ? body.consoleRole : null;
+        const active = role !== null;
+        await db.execute(
+          'UPDATE _local_auth_accounts SET console_role = ?, console_active = ?, updated_at = ? WHERE id = ?',
+          [role, db.dialect === 'postgres' ? active : active ? 1 : 0, Date.now(), userId],
+        );
+      } else {
+        return Response.json({ error: 'Unsupported action.' }, { status: 400 });
+      }
+      return Response.json({ success: true });
+    },
+
+    async handleLogs(url: URL) {
+      const table = url.searchParams.get('table') || 'ALL';
+      const limit = int(url.searchParams.get('limit'), 30, 1, 200);
+      const offset = int(url.searchParams.get('offset'), 0, 0, 10_000_000);
+      const hasTable = table !== 'ALL' && Object.hasOwn(schema, table);
+      const where = hasTable ? 'WHERE table_name = ?' : '';
+      const params = hasTable ? [table] : [];
+      const total = Number(
+        (await db.query<any>(`SELECT COUNT(*) AS n FROM ${q('_server_changes')} ${where}`, params))[0]?.n ?? 0,
+      );
+      const raw = await db.query<any>(
+        `SELECT id, table_name, row_id, ${q('timestamp')} FROM ${q('_server_changes')} ${where} ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`,
+        params,
+      );
+      return Response.json({
+        total,
+        limit,
+        offset,
+        rows: raw.map((r) => ({
+          tableName: r.table_name,
+          rowId: r.row_id,
+          operation: 'UPSERT',
+          businessId: '',
+          updatedAt: Number(r.timestamp),
+        })),
+      });
+    },
+  };
+}

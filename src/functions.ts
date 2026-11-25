@@ -1,13 +1,18 @@
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
-  buildUpsertSql,
   quoteIdent,
   type SqlExecutor,
   type SyncEventBroker,
 } from 'local-lite/server';
+import {
+  newRowId,
+  patchTableRow,
+  recordChange,
+  setRowDeleted,
+  upsertTableRow,
+} from './core/changes.js';
 import type { SchemaDictionary, SchemaFieldType } from './schema.js';
 import { fromDbRow, toDbValue } from './tableStorage.js';
 
@@ -104,6 +109,7 @@ const EXTENSIONS = ['.ts', '.mts', '.mjs', '.js'];
 export async function loadFunctionsDir(
   dir?: string,
   cwd = process.cwd(),
+  bustCache = false,
 ): Promise<FunctionRegistry> {
   const registry: FunctionRegistry = new Map();
   const abs = path.resolve(cwd, dir || 'functions');
@@ -115,7 +121,8 @@ export async function loadFunctionsDir(
     const ext = EXTENSIONS.find((e) => entry.name.endsWith(e));
     if (!ext) continue;
     const modName = entry.name.slice(0, -ext.length);
-    const mod = await import(pathToFileURL(path.join(abs, entry.name)).href);
+    const url = pathToFileURL(path.join(abs, entry.name)).href + (bustCache ? `?t=${Date.now()}` : '');
+    const mod = await import(url);
     for (const [expName, val] of Object.entries(mod)) {
       if (
         val &&
@@ -130,7 +137,33 @@ export async function loadFunctionsDir(
   return registry;
 }
 
-const SYSTEM_COLS = new Set(['id', 'updated_at', 'deleted']);
+/** Hot-reloads `functions/` in place on file edits without dropping SSE connections. */
+export function watchFunctionsDir(
+  dir: string | undefined,
+  registry: FunctionRegistry,
+  cwd = process.cwd(),
+): () => void {
+  const abs = path.resolve(cwd, dir || 'functions');
+  if (!fs.existsSync(abs)) return () => {};
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const watcher = fs.watch(abs, () => {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      try {
+        const next = await loadFunctionsDir(dir, cwd, true);
+        registry.clear();
+        for (const [k, v] of next) registry.set(k, v);
+        console.log(`[local-lite-server] hot-reloaded ${registry.size} function(s)`);
+      } catch (err) {
+        console.error('[local-lite-server] function reload failed:', err);
+      }
+    }, 120);
+  });
+  return () => {
+    clearTimeout(timer);
+    watcher.close();
+  };
+}
 
 function createReader(
   db: SqlExecutor,
@@ -255,6 +288,7 @@ export function createFunctionRuntime(opts: {
     if (fn.__kind !== 'query') {
       throw new FunctionError(`"${name}" is a ${fn.__kind}, not a query.`, 400);
     }
+    const emitted: Array<{ scopeId: string; tableName: string; checkpoint: number }> = [];
     const readTables = new Set<string>();
     const reader = createReader(db, schema, readTables);
     const args = parseArgs(fn, rawArgs);
@@ -272,28 +306,13 @@ export function createFunctionRuntime(opts: {
       throw new FunctionError(`"${name}" is a ${fn.__kind}, not a mutation.`, 400);
     }
     const args = parseArgs(fn, rawArgs);
-    const dialect = db.dialect;
-    const q = (n: string) => quoteIdent(n, dialect);
     const emitted: Array<{ scopeId: string; tableName: string; checkpoint: number }> = [];
     const readTables = new Set<string>();
 
     const result = await db.withTransaction(async (tx) => {
       const reader = createReader(tx, schema, readTables);
-      const clockRows = await tx.query<{ checkpoint: number }>(
-        `SELECT checkpoint FROM ${q('_server_sync_clock')} WHERE id = 1 FOR UPDATE`,
-      );
-      let cursor = Number(clockRows[0]?.checkpoint ?? 0);
-      const nextCursor = () => {
-        cursor = Math.max(Date.now(), cursor + 1);
-        return cursor;
-      };
-      const recordChange = async (table: string, id: string, scopeVal: unknown) => {
-        const ts = nextCursor();
-        await tx.execute(
-          `INSERT INTO ${q('_server_changes')} (table_name, row_id, ${q('timestamp')}) VALUES (?, ?, ?)`,
-          [table, id, ts],
-        );
-        await tx.execute(`UPDATE ${q('_server_sync_clock')} SET checkpoint = ? WHERE id = 1`, [ts]);
+      const track = async (table: string, id: string, scopeVal: unknown) => {
+        const ts = await recordChange(tx, table, id);
         emitted.push({
           scopeId: typeof scopeVal === 'string' && scopeVal ? scopeVal : 'default',
           tableName: table,
@@ -307,34 +326,9 @@ export function createFunctionRuntime(opts: {
         async insert(table, data) {
           const fields = Object.hasOwn(schema, table) ? schema[table] : undefined;
           if (!fields) throw new FunctionError(`Unknown table "${table}".`, 400);
-          const id = typeof data.id === 'string' && data.id ? data.id : crypto.randomUUID();
-          const ts = await recordChange(table, id, data[scopeField]);
-          const cols = Object.keys(fields).filter(
-            (c) => !SYSTEM_COLS.has(c) && c !== 'created_at' && Object.hasOwn(data, c),
-          );
-          const insertCols = ['id', ...cols, 'updated_at', 'deleted'];
-          const params: unknown[] = [
-            id,
-            ...cols.map((c) => toDbValue(fields[c], data[c], dialect)),
-            ts,
-            dialect === 'postgres' ? false : 0,
-          ];
-          if (fields.created_at) {
-            insertCols.push('created_at');
-            params.push(
-              data.created_at != null ? toDbValue(fields.created_at, data.created_at, dialect) : ts,
-            );
-          }
-          await tx.execute(
-            buildUpsertSql({
-              table,
-              conflictCols: ['id'],
-              insertCols,
-              updateCols: [...cols, 'updated_at', 'deleted'],
-              dialect,
-            }),
-            params,
-          );
+          const id = newRowId(data.id);
+          const ts = await track(table, id, data[scopeField]);
+          await upsertTableRow(tx, table, fields, id, data, ts);
           return (await reader.get(table, id))!;
         },
 
@@ -343,16 +337,8 @@ export function createFunctionRuntime(opts: {
           if (!fields) throw new FunctionError(`Unknown table "${table}".`, 400);
           const existing = await reader.get(table, id);
           if (!existing) return null;
-          const cols = Object.keys(fields).filter(
-            (c) => !SYSTEM_COLS.has(c) && Object.hasOwn(patch, c),
-          );
-          const ts = await recordChange(table, id, patch[scopeField] ?? existing[scopeField]);
-          const sets = [...cols.map((c) => `${q(c)} = ?`), `${q('updated_at')} = ?`];
-          const params = [...cols.map((c) => toDbValue(fields[c], patch[c], dialect)), ts, id];
-          await tx.execute(
-            `UPDATE ${q(table)} SET ${sets.join(', ')} WHERE ${q('id')} = ?`,
-            params,
-          );
+          const ts = await track(table, id, patch[scopeField] ?? existing[scopeField]);
+          await patchTableRow(tx, table, fields, id, patch, ts);
           return reader.get(table, id);
         },
 
@@ -362,11 +348,8 @@ export function createFunctionRuntime(opts: {
           }
           const existing = await reader.get(table, id);
           if (!existing) return false;
-          const ts = await recordChange(table, id, existing[scopeField]);
-          await tx.execute(
-            `UPDATE ${q(table)} SET ${q('deleted')} = ?, ${q('updated_at')} = ? WHERE ${q('id')} = ?`,
-            [dialect === 'postgres' ? true : 1, ts, id],
-          );
+          const ts = await track(table, id, existing[scopeField]);
+          await setRowDeleted(tx, table, id, true, ts);
           return true;
         },
       };

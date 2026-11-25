@@ -22,6 +22,8 @@
     "build": "tsc -p tsconfig.json",
     "build:cpanel": "node scripts/build-cpanel.mjs",
     "prestart": "npm run build",
+    "dev": "node scripts/dev.mjs",
+    "dev:admin": "npm --prefix admin run dev",
     "start": "node --env-file-if-exists=.env dist/cli.js start",
     "migrate": "node --env-file-if-exists=.env dist/cli.js migrate",
     "test": "vitest run"

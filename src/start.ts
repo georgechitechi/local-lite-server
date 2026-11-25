@@ -3,7 +3,7 @@ import { createDatabase, type Database } from './db.js';
 import { runMigrations } from './migrations.js';
 import { applySchema, loadSchemaFile, planSchema, resolveSchemaFile } from './schema.js';
 import type { SchemaDictionary } from './schema.js';
-import { loadFunctionsDir } from './functions.js';
+import { loadFunctionsDir, watchFunctionsDir } from './functions.js';
 import { createApp, createHttpServer } from './server.js';
 
 function friendlyDbError(err: unknown, s: ServerSettings): unknown {
@@ -75,14 +75,17 @@ export async function start() {
   });
   server.listen(settings.port, () => {
     const addr = typeof settings.port === 'number' ? `http://localhost:${settings.port}` : settings.port;
-    console.log(
-      `[local-lite-server] listening on ${addr} (${settings.dialect}); tables: ${Object.keys(schema).join(', ') || '(none)'}; functions: ${functions.size}`,
-    );
+    console.log(`[local-lite-server] listening on ${addr} (${settings.dialect})`);
     if (settings.adminUi && typeof settings.port === 'number') {
       console.log(`[local-lite-server] admin console: ${addr}/admin`);
     }
   });
+  const stopWatch =
+    process.env.NODE_ENV === 'production'
+      ? () => {}
+      : watchFunctionsDir(settings.functionsDir, functions);
   const shutdown = () => {
+    stopWatch();
     server.close();
     void database.close().finally(() => process.exit(0));
   };
