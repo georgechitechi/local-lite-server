@@ -2,10 +2,18 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { build } from 'esbuild';
+import { resolveRoutesFile } from './routes.js';
 import { resolveRulesFile } from './rules.js';
 import { resolveSchemaFile } from './schema.js';
 
 const require = createRequire(import.meta.url);
+
+const EXTERNAL_PEERS = [
+  'react-native', 'react-native/*', '@react-native/*', '@react-native-community/*',
+  'expo', 'expo-*', 'expo-modules-core', 'react', 'react/*',
+  'better-sqlite3', '@libsql/*', 'op-sqlite', '@op-engineering/*',
+  'pg-native',
+];
 
 export async function buildCpanelBundle(cwd = process.cwd(), outDir = 'dist/cpanel') {
   const pkgRoot = path.resolve(import.meta.dirname, '..');
@@ -40,12 +48,7 @@ export async function buildCpanelBundle(cwd = process.cwd(), outDir = 'dist/cpan
     },
     minify: true,
     logLevel: 'info',
-    external: [
-      'react-native', 'react-native/*', '@react-native/*', '@react-native-community/*',
-      'expo', 'expo-*', 'expo-modules-core', 'react', 'react/*',
-      'better-sqlite3', '@libsql/*', 'op-sqlite', '@op-engineering/*',
-      'pg-native',
-    ],
+    external: EXTERNAL_PEERS,
   });
 
   try {
@@ -58,6 +61,23 @@ export async function buildCpanelBundle(cwd = process.cwd(), outDir = 'dist/cpan
   const rulesFile = resolveRulesFile(undefined, cwd);
   if (rulesFile) {
     fs.copyFileSync(rulesFile, path.join(absOut, 'rules.ts'));
+  }
+
+  const routesFile = resolveRoutesFile(undefined, cwd);
+  if (routesFile) {
+    await build({
+      entryPoints: [routesFile],
+      bundle: true,
+      platform: 'node',
+      target: 'node24',
+      format: 'esm',
+      treeShaking: true,
+      legalComments: 'none',
+      outfile: path.join(absOut, 'routes.mjs'),
+      minify: true,
+      logLevel: 'info',
+      external: EXTERNAL_PEERS,
+    });
   }
 
   const envExample = fs.existsSync(path.resolve(cwd, '.env.example'))

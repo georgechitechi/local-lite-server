@@ -15,6 +15,7 @@ import { createAdminConsole } from './admin/index.js';
 import { createStorageHandler } from './storage.js';
 import { corsHeaders, createHttpServer, safeEqual } from './core/http.js';
 import { clientIp, createDistributedRateLimiter } from './rateLimit.js';
+import type { CustomRoutesFactory, CustomRoutesMap } from './routes.js';
 import {
   createFunctionRuntime,
   FunctionError,
@@ -31,6 +32,7 @@ export function createApp(
   functions: FunctionRegistry = new Map(),
   rules: RulesDictionary = {},
   brokerOverride?: SyncEventBroker,
+  customRoutesInput?: CustomRoutesMap | CustomRoutesFactory,
 ) {
   const broker = brokerOverride ?? createSyncEventBroker();
   const storage = new TableSyncStorage(executor, { schema, rules, broker });
@@ -101,6 +103,11 @@ export function createApp(
     authenticate: (req) => canSync(req, true),
   });
 
+  const customRoutes =
+    typeof customRoutesInput === 'function'
+      ? customRoutesInput({ db: executor, settings, schema, broker, resolveAuth })
+      : (customRoutesInput ?? {});
+
   const api = createServer({
     config: {},
     middleware: [
@@ -117,6 +124,7 @@ export function createApp(
     ],
     onError: (error) => console.error('[local-lite-server]', error),
     endpoints: {
+      ...customRoutes,
       '/health': {
         GET: async () => {
           try {

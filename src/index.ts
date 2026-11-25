@@ -20,5 +20,7 @@ export type {
 } from './functions/index.js';
 export { TableSyncStorage, ClientError, ForbiddenError } from './tableStorage.js';
 export { createApp, createHttpServer } from './server.js';
+export { loadRoutesFile, resolveRoutesFile } from './routes.js';
+export type { CustomRoutesContext, CustomRoutesFactory, CustomRoutesMap } from './routes.js';
 export { loadSettings } from './config.js';
 export type { ServerSettings } from './config.js';

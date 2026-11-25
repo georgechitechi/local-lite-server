@@ -4,6 +4,7 @@ import { runMigrations } from './migrations.js';
 import { applySchema, loadSchemaFile, planSchema, resolveSchemaFile } from './schema.js';
 import type { SchemaDictionary } from './schema.js';
 import { loadRulesFile, resolveRulesFile, type RulesDictionary } from './rules.js';
+import { loadRoutesFile, resolveRoutesFile } from './routes.js';
 import { loadFunctionsDir, watchFunctionsDir } from './functions/index.js';
 import { createClusterBroker } from './core/broker.js';
 import { startCronScheduler } from './crons.js';
@@ -103,6 +104,8 @@ export async function start() {
     console.warn('[local-lite-server] APP_SECRET is set without src/rules.ts; authenticated users can sync all tables.');
   }
   const functions = await loadFunctionsDir(settings.functionsDir);
+  const routesFile = resolveRoutesFile();
+  const customRoutes = routesFile ? await loadRoutesFile(routesFile) : undefined;
   const database = await createDatabase(settings);
 
   try {
@@ -120,7 +123,7 @@ export async function start() {
   }
 
   const broker = await createClusterBroker(settings, database.executor);
-  const app = createApp(settings, database.executor, schema, functions, rules, broker);
+  const app = createApp(settings, database.executor, schema, functions, rules, broker, customRoutes);
   const server = createHttpServer(app);
   let activePort = settings.port;
   let attempts = 0;
