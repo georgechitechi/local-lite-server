@@ -5,7 +5,10 @@ import { createDatabase, type Database } from './db.js';
 import { runMigrations } from './migrations.js';
 import { applySchema, loadSchemaFile, planSchema, resolveSchemaFile } from './schema.js';
 import type { SchemaDictionary } from './schema.js';
+import { loadRulesFile, resolveRulesFile, type RulesDictionary } from './rules.js';
 import { loadFunctionsDir, watchFunctionsDir } from './functions/index.js';
+import { createClusterBroker } from './core/broker.js';
+import { startCronScheduler } from './crons.js';
 import { createApp, createHttpServer } from './server.js';
 
 async function tryCreateDatabase(s: ServerSettings): Promise<boolean> {
@@ -94,6 +97,11 @@ export async function migrate(
 export async function start() {
   const settings = loadSettings();
   const schema = await loadSchema(settings);
+  const rulesFile = resolveRulesFile(settings.rulesPath);
+  const rules: RulesDictionary = rulesFile ? await loadRulesFile(rulesFile) : {};
+  if (settings.appSecret && !rulesFile) {
+    console.warn('[local-lite-server] APP_SECRET is set without src/rules.ts; authenticated users can sync all tables.');
+  }
   const functions = await loadFunctionsDir(settings.functionsDir);
   const database = createDatabase(settings);
 
@@ -111,7 +119,9 @@ export async function start() {
     throw friendlyDbError(err, settings);
   }
 
-  const server = createHttpServer(createApp(settings, database.executor, schema, functions));
+  const broker = await createClusterBroker(settings, database.executor);
+  const app = createApp(settings, database.executor, schema, functions, rules, broker);
+  const server = createHttpServer(app);
   let activePort = settings.port;
   let attempts = 0;
 
@@ -144,10 +154,16 @@ export async function start() {
     process.env.NODE_ENV === 'production'
       ? () => {}
       : watchFunctionsDir(settings.functionsDir, functions);
+  const stopCrons = startCronScheduler({
+    settings,
+    db: database.executor,
+    fnRuntime: app.fnRuntime,
+  });
   const shutdown = () => {
     stopWatch();
+    stopCrons();
     server.close();
-    void database.close().finally(() => process.exit(0));
+    void broker.close().finally(() => void database.close().finally(() => process.exit(0)));
   };
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);

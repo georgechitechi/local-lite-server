@@ -208,6 +208,23 @@ export const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    id: '0005_rate_limits',
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS _lls_rate_limits (
+        rate_key VARCHAR(128) NOT NULL PRIMARY KEY,
+        hits INT NOT NULL DEFAULT 0,
+        reset_at BIGINT NOT NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+    ],
+    postgres: [
+      `CREATE TABLE IF NOT EXISTS _lls_rate_limits (
+        rate_key VARCHAR(128) NOT NULL PRIMARY KEY,
+        hits INT NOT NULL DEFAULT 0,
+        reset_at BIGINT NOT NULL
+      )`,
+    ],
+  },
 ];
 
 export async function runMigrations(

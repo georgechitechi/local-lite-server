@@ -5,6 +5,7 @@ import {
   type SyncEventBroker,
 } from 'local-lite/server';
 import { recordChange, setRowDeleted, upsertTableRow } from './core/changes.js';
+import type { RuleContext, RulesDictionary } from './rules.js';
 import type { SchemaDictionary, SchemaFieldType } from './schema.js';
 
 type Op = {
@@ -18,6 +19,9 @@ type Op = {
 
 /** Thrown for bad client input; the HTTP layer maps it to 400. */
 export class ClientError extends Error {}
+
+/** Thrown when a row-level access rule rejects the operation; mapped to 403. */
+export class ForbiddenError extends Error {}
 
 const MAX_BATCH = 1000;
 
@@ -80,6 +84,7 @@ export function fromDbRow(
 
 export interface TableSyncStorageOptions {
   schema: SchemaDictionary;
+  rules?: RulesDictionary;
   broker?: SyncEventBroker;
   changesTable?: string;
   clockTable?: string;
@@ -94,6 +99,7 @@ export interface TableSyncStorageOptions {
 export class TableSyncStorage implements ServerSyncStorage {
   private db: SqlExecutor;
   private schema: SchemaDictionary;
+  private rules: RulesDictionary;
   private broker?: SyncEventBroker;
   private changes: string;
   private clock: string;
@@ -102,6 +108,7 @@ export class TableSyncStorage implements ServerSyncStorage {
   constructor(db: SqlExecutor, opts: TableSyncStorageOptions) {
     this.db = db;
     this.schema = opts.schema;
+    this.rules = opts.rules ?? {};
     this.broker = opts.broker;
     this.changes = opts.changesTable ?? '_server_changes';
     this.clock = opts.clockTable ?? '_server_sync_clock';
@@ -120,7 +127,11 @@ export class TableSyncStorage implements ServerSyncStorage {
     return f;
   }
 
-  async applyOperations(operations: Op[] | any[], _serverTime?: number) {
+  async applyOperations(
+    operations: Op[] | any[],
+    _serverTime?: number,
+    auth: RuleContext = { isAdmin: true },
+  ) {
     if (operations.length > MAX_BATCH) throw new ClientError('Batch is too large.');
     const emitted: Array<{ scopeId: string; tableName: string; checkpoint: number }> = [];
     const successfulIds: string[] = [];
@@ -132,8 +143,31 @@ export class TableSyncStorage implements ServerSyncStorage {
           throw new ClientError('Each operation needs a rowId string (max 128 chars).');
         }
         const fields = this.fields(op.tableName);
-        cursor = await recordChange(tx, op.tableName, op.rowId, this.changes, this.clock);
         const payload = op.payload && typeof op.payload === 'object' ? op.payload : {};
+        const writeRule = !auth.isAdmin ? this.rules[op.tableName]?.write : undefined;
+        if (writeRule) {
+          const existingRows = await tx.query<Record<string, any>>(
+            `SELECT * FROM ${this.q(op.tableName)} WHERE ${this.q('id')} = ? LIMIT 1`,
+            [op.rowId],
+          );
+          if (existingRows[0]) {
+            const existing = { id: String(existingRows[0].id), ...fromDbRow(fields, existingRows[0]) };
+            if (!(await writeRule(auth, existing))) {
+              throw new ForbiddenError(`Write denied on ${op.tableName}/${op.rowId}.`);
+            }
+          } else if (op.operation === 'DELETE') {
+            if (!(await writeRule(auth, { id: op.rowId, ...payload }))) {
+              throw new ForbiddenError(`Delete denied on ${op.tableName}/${op.rowId}.`);
+            }
+          }
+          if (op.operation !== 'DELETE') {
+            if (!(await writeRule(auth, { id: op.rowId, ...payload }))) {
+              throw new ForbiddenError(`Write denied on ${op.tableName}/${op.rowId}.`);
+            }
+          }
+        }
+
+        cursor = await recordChange(tx, op.tableName, op.rowId, this.changes, this.clock);
 
         if (op.operation === 'DELETE') {
           await setRowDeleted(tx, op.tableName, op.rowId, true, cursor);
@@ -155,7 +189,12 @@ export class TableSyncStorage implements ServerSyncStorage {
     return { applied: successfulIds.length, successfulIds, serverTime: Date.now(), cursor };
   }
 
-  async getDeltas(tables: string[], since: number, limit = 500) {
+  async getDeltas(
+    tables: string[],
+    since: number,
+    limit = 500,
+    auth: RuleContext = { isAdmin: true },
+  ) {
     const names = tables.length ? tables : this.tables;
     for (const t of names) this.fields(t);
     const checkpoint = Number.isFinite(since) && since >= 0 ? Math.floor(since) : 0;
@@ -204,7 +243,7 @@ export class TableSyncStorage implements ServerSyncStorage {
       }
     }
 
-    const changes = [...latest.values()].map((e) => {
+    const allChanges = [...latest.values()].map((e) => {
       const row = rows.get(`${e.table}\u0000${e.id}`);
       const gone = !row || Boolean(row.deleted);
       return {
@@ -215,6 +254,17 @@ export class TableSyncStorage implements ServerSyncStorage {
         timestamp: e.ts,
       };
     });
+
+    const changes = [];
+    for (const c of allChanges) {
+      const readRule = !auth.isAdmin ? this.rules[c.tableName]?.read : undefined;
+      if (!readRule) {
+        changes.push(c);
+        continue;
+      }
+      const subject = { id: c.rowId, ...(c.payload ?? { deleted: true }) };
+      if (await readRule(auth, subject)) changes.push(c);
+    }
 
     const cursor = Number(page[page.length - 1].ts);
     return {

@@ -3,13 +3,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { buildUpsertSql, quoteIdent, type SqlExecutor } from 'local-lite/server';
 import type { ServerSettings } from '../config.js';
+import { runCronAction } from '../crons.js';
+import type { FunctionRuntime } from '../functions/index.js';
 import type { SchemaDictionary } from '../schema.js';
 import { fromDbRow } from '../tableStorage.js';
 
 const int = (v: string | null, d: number, min: number, max: number) =>
   Math.min(Math.max(Math.floor(Number(v ?? d)) || d, min), max);
 
-export function createAdminOps(settings: ServerSettings, db: SqlExecutor, schema: SchemaDictionary) {
+export function createAdminOps(
+  settings: ServerSettings,
+  db: SqlExecutor,
+  schema: SchemaDictionary,
+  fnRuntime?: FunctionRuntime,
+) {
   const q = (n: string) => quoteIdent(n, db.dialect);
 
   return {
@@ -175,6 +182,11 @@ export function createAdminOps(settings: ServerSettings, db: SqlExecutor, schema
         return Response.json({ jobs });
       }
       if (method === 'POST') {
+        const jobParam = new URL(request.url).searchParams.get('job');
+        if (jobParam === 'storage_orphan_prune') {
+          const summary = await runCronAction('storage_orphan_prune', null, { settings, db, fnRuntime });
+          return Response.json({ success: true, summary });
+        }
         const body = (await request.json().catch(() => null)) as any;
         const jobKey = String(body?.job_key ?? '').trim();
         if (body?.action === 'save') {
@@ -198,10 +210,22 @@ export function createAdminOps(settings: ServerSettings, db: SqlExecutor, schema
           );
           return Response.json({ success: true });
         }
-        await db.execute('UPDATE _lls_crons SET last_run_at = ?, last_status = ?, last_summary = ? WHERE job_key = ?', [
-          Date.now(), 'ok', 'Executed', jobKey,
-        ]);
-        return Response.json({ success: true });
+        const rows = await db.query<any>('SELECT * FROM _lls_crons WHERE job_key = ?', [jobKey]);
+        const job = rows[0];
+        if (!job) return Response.json({ error: 'Schedule not found.' }, { status: 404 });
+        try {
+          const summary = await runCronAction(job.action_type, job.config_json, { settings, db, fnRuntime });
+          await db.execute('UPDATE _lls_crons SET last_run_at = ?, last_status = ?, last_summary = ? WHERE job_key = ?', [
+            Date.now(), 'ok', summary, jobKey,
+          ]);
+          return Response.json({ success: true, summary });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Execution failed.';
+          await db.execute('UPDATE _lls_crons SET last_run_at = ?, last_status = ?, last_summary = ? WHERE job_key = ?', [
+            Date.now(), 'error', msg, jobKey,
+          ]);
+          return Response.json({ error: msg }, { status: 500 });
+        }
       }
       if (method === 'DELETE') {
         const jobKey = new URL(request.url).searchParams.get('job_key') || '';

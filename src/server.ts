@@ -3,14 +3,17 @@ import {
   createSyncEventBroker,
   createSyncEventsHandler,
   type SqlExecutor,
+  type SyncEventBroker,
 } from 'local-lite/server';
 import type { ServerSettings } from './config.js';
 import type { SchemaDictionary } from './schema.js';
-import { ClientError, TableSyncStorage } from './tableStorage.js';
+import type { RulesDictionary } from './rules.js';
+import { ClientError, ForbiddenError, TableSyncStorage } from './tableStorage.js';
 import { createAuthService } from './auth.js';
 import { createAdminConsole } from './admin/index.js';
+import { createStorageHandler } from './storage.js';
 import { corsHeaders, createHttpServer, safeEqual } from './core/http.js';
-import { clientIp, createRateLimiter } from './rateLimit.js';
+import { clientIp, createDistributedRateLimiter } from './rateLimit.js';
 import {
   createFunctionRuntime,
   FunctionError,
@@ -25,13 +28,19 @@ export function createApp(
   executor: SqlExecutor,
   schema: SchemaDictionary,
   functions: FunctionRegistry = new Map(),
+  rules: RulesDictionary = {},
+  brokerOverride?: SyncEventBroker,
 ) {
-  const broker = createSyncEventBroker();
-  const storage = new TableSyncStorage(executor, { schema, broker });
+  const broker = brokerOverride ?? createSyncEventBroker();
+  const storage = new TableSyncStorage(executor, { schema, rules, broker });
   const auth = createAuthService(settings, executor);
   const fnRuntime = createFunctionRuntime({ registry: functions, db: executor, schema, broker });
   const consoleApi = createAdminConsole({ settings, db: executor, schema, broker, fnRuntime });
-  const authLimiter = createRateLimiter(20, 60_000);
+  const storageHandler = createStorageHandler(settings, executor, async (req) => {
+    const a = await resolveAuth(req, true);
+    return a ? { userId: a.userId ?? 'admin', isAdmin: a.isAdmin } : null;
+  });
+  const authLimiter = createDistributedRateLimiter(executor, 20, 60_000, settings.multiInstance);
 
   const bearer = (request: Request): string => {
     const header = request.headers.get('authorization') ?? '';
@@ -67,6 +76,9 @@ export function createApp(
     } catch (err) {
       if (err instanceof ClientError) {
         return Response.json({ error: err.message }, { status: 400 });
+      }
+      if (err instanceof ForbiddenError) {
+        return Response.json({ error: err.message }, { status: 403 });
       }
       if (err instanceof FunctionError) {
         return Response.json({ error: err.message }, { status: err.status });
@@ -115,7 +127,7 @@ export function createApp(
       },
       '/auth/*': {
         POST: async ({ request }) => {
-          const limit = authLimiter(clientIp(request));
+          const limit = await authLimiter(clientIp(request));
           if (!limit.ok) {
             return Response.json(
               { error: 'Too many requests. Please try again shortly.' },
@@ -127,6 +139,16 @@ export function createApp(
       },
       '/sync/events': {
         GET: ({ request }) => events(request),
+      },
+      '/storage/*': {
+        ALL: ({ request }) => storageHandler(request),
+      },
+      '/public/files/*': {
+        GET: ({ request }) => {
+          const url = new URL(request.url);
+          url.pathname = url.pathname.replace(/^\/public\/files/, '/storage/files');
+          return storageHandler(new Request(url, request));
+        },
       },
       '/fn': {
         GET: async ({ request }) => {
@@ -178,7 +200,8 @@ export function createApp(
       },
       '/sync': {
         GET: async ({ request }) => {
-          if (!(await canSync(request))) return unauthorized();
+          const userAuth = await resolveAuth(request);
+          if (!userAuth) return unauthorized();
           const url = new URL(request.url);
           const tables = (url.searchParams.get('tables') ?? '')
             .split(',')
@@ -190,12 +213,14 @@ export function createApp(
               tables,
               Number(url.searchParams.get('since') || 0),
               limit,
+              userAuth,
             );
             return Response.json({ success: true, ...result });
           });
         },
         POST: async ({ request }) => {
-          if (!(await canSync(request))) return unauthorized();
+          const userAuth = await resolveAuth(request);
+          if (!userAuth) return unauthorized();
           const body = (await request.json().catch(() => null)) as {
             operations?: unknown;
           } | null;
@@ -203,7 +228,11 @@ export function createApp(
             return Response.json({ error: 'Operations must be an array.' }, { status: 400 });
           }
           return guard(async () => {
-            const result = await storage.applyOperations(body.operations as never[]);
+            const result = await storage.applyOperations(
+              body.operations as never[],
+              undefined,
+              userAuth,
+            );
             return Response.json({ success: true, processed: result.applied, ...result });
           });
         },
@@ -279,5 +308,5 @@ export function createApp(
     },
   });
 
-  return { fetch: (req: Request) => api.fetch(req), broker };
+  return { fetch: (req: Request) => api.fetch(req), broker, fnRuntime };
 }

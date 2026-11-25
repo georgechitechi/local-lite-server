@@ -15,7 +15,7 @@ export function createAdminConsole(opts: {
 }) {
   const session = createAdminSession(opts.settings, opts.db);
   const data = createAdminData(opts);
-  const ops = createAdminOps(opts.settings, opts.db, opts.schema);
+  const ops = createAdminOps(opts.settings, opts.db, opts.schema, opts.fnRuntime);
 
   return {
     ...session,

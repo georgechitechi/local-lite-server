@@ -7,6 +7,8 @@ import { createDatabase } from './db.js';
 import { coreMigrationStatus } from './migrations.js';
 import { planSchema } from './schema.js';
 import { loadSchema, migrate, start } from './start.js';
+import { loadFunctionsDir } from './functions/index.js';
+import { writeClientCode } from './codegen.js';
 
 if (fs.existsSync('.env')) {
   (process as { loadEnvFile?: (p?: string) => void }).loadEnvFile?.('.env');
@@ -96,6 +98,14 @@ if (cmd === 'init') {
   } finally {
     await db.close();
   }
+} else if (cmd === 'codegen') {
+  const outIdx = process.argv.indexOf('--out');
+  const outFile = outIdx !== -1 && process.argv[outIdx + 1] ? process.argv[outIdx + 1] : 'src/client.ts';
+  const settings = loadSettings();
+  const schema = await loadSchema(settings);
+  const functions = await loadFunctionsDir(settings.functionsDir);
+  const abs = writeClientCode(outFile, schema, functions);
+  console.log(`Generated typed client SDK: ${abs}`);
 } else if (cmd === '-v' || cmd === '--version') {
   const pkg = JSON.parse(
     fs.readFileSync(path.resolve(import.meta.dirname, '../package.json'), 'utf8'),
@@ -103,7 +113,7 @@ if (cmd === 'init') {
   console.log(pkg.version);
 } else {
   console.log(
-    'Usage: local-lite-server <init [dir] [--force] | start | migrate [status|diff] | --version>',
+    'Usage: local-lite-server <init [dir] [--force] | start | migrate [status|diff] | codegen [--out file] | --version>',
   );
   process.exit(cmd === '-h' || cmd === '--help' || cmd === 'help' ? 0 : 1);
 }

@@ -24,9 +24,12 @@ export interface ServerSettings {
   };
   autoMigrate: boolean;
   schemaPath?: string;
+  rulesPath?: string;
   functionsDir?: string;
   uploadDir: string;
   backupDir: string;
+  internalCrons: boolean;
+  multiInstance: boolean;
   apiKey: string;
   /** Signs user tokens. Enables /auth when set. */
   appSecret?: string;
@@ -61,9 +64,12 @@ export function loadSettings(env: NodeJS.ProcessEnv = process.env): ServerSettin
     },
     autoMigrate: env.AUTO_MIGRATE !== 'false',
     schemaPath: env.SCHEMA_PATH || undefined,
+    rulesPath: env.RULES_PATH || undefined,
     functionsDir: env.FUNCTIONS_DIR || undefined,
     uploadDir: env.UPLOAD_DIR || './uploads',
     backupDir: env.BACKUP_DIR || './backups',
+    internalCrons: env.ENABLE_INTERNAL_CRONS === 'true',
+    multiInstance: env.MULTI_INSTANCE === 'true',
     apiKey: env.SERVER_API_KEY!,
     appSecret: env.APP_SECRET?.trim() || undefined,
     appName: env.APP_NAME || 'local-lite-server',
