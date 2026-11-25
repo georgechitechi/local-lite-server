@@ -1,17 +1,11 @@
 import { useEffect, useState } from 'react';
+import { Card } from '@/components/Card';
+import { DataTable, type DataTableColumn } from '@/components/DataTable';
 import { PaginationBar } from '@/components/PaginationBar';
 import type { ToastType } from '@/components/Toast';
 import { adminFetch } from '@/lib/api';
 import { formatBytes, formatTime } from '@/lib/formatters';
-import {
-  cardStyle,
-  primaryBtnStyle,
-  secondaryBtnStyle,
-  sectionTitleStyle,
-  tableStyle,
-  tdStyle,
-  thStyle,
-} from '@/styles/adminStyles';
+import { primaryBtnStyle, secondaryBtnStyle } from '@/styles/adminStyles';
 import type { BackupArchiveRow } from '@/types/admin';
 
 const PAGE_SIZE = 30;
@@ -136,21 +130,64 @@ export function BackupsTab({
     }
   };
 
+  const columns: DataTableColumn<BackupArchiveRow>[] = [
+    {
+      header: 'File',
+      cellStyle: { fontFamily: 'monospace' },
+      render: (b) => b.fileName,
+    },
+    {
+      header: 'Status',
+      cellStyle: { color: 'var(--success)' },
+      render: (b) => b.status,
+    },
+    {
+      header: 'Size',
+      render: (b) => formatBytes(b.sizeBytes),
+    },
+    {
+      header: 'Modified',
+      cellStyle: { color: 'var(--muted)' },
+      render: (b) => formatTime(b.createdAt),
+    },
+    {
+      header: 'Actions',
+      align: 'right',
+      render: (b) => (
+        <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end' }}>
+          <button
+            type="button"
+            disabled={busyFile === b.fileName}
+            onClick={() => void handleView(b.fileName)}
+            style={secondaryBtnStyle}
+          >
+            View
+          </button>
+          <button
+            type="button"
+            disabled={busyFile === b.fileName}
+            onClick={() => void handleDownload(b.fileName)}
+            style={secondaryBtnStyle}
+          >
+            Download
+          </button>
+          <button
+            type="button"
+            disabled={busyFile === b.fileName}
+            onClick={() => void handleDelete(b.fileName)}
+            style={{ ...secondaryBtnStyle, color: 'var(--danger)' }}
+          >
+            Delete
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <section style={cardStyle}>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 14,
-          gap: 10,
-          flexWrap: 'wrap',
-        }}
-      >
-        <h2 style={{ ...sectionTitleStyle, margin: 0 }}>
-          Server Backup Archives
-        </h2>
+    <Card
+      title="Server Backup Archives"
+      actions={
         <button
           type="button"
           disabled={creating}
@@ -159,77 +196,14 @@ export function BackupsTab({
         >
           {creating ? 'Creating Backup...' : '+ Create Backup'}
         </button>
-      </div>
-
-      {pageRows.length ? (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={tableStyle}>
-            <thead>
-              <tr style={{ textAlign: 'left', color: 'var(--muted)' }}>
-                <th style={thStyle}>File</th>
-                <th style={thStyle}>Status</th>
-                <th style={thStyle}>Size</th>
-                <th style={thStyle}>Modified</th>
-                <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pageRows.map((b) => (
-                <tr key={b.id} style={{ borderTop: '1px solid var(--border)' }}>
-                  <td style={{ ...tdStyle, fontFamily: 'monospace' }}>
-                    {b.fileName}
-                  </td>
-                  <td style={{ ...tdStyle, color: 'var(--success)' }}>
-                    {b.status}
-                  </td>
-                  <td style={tdStyle}>{formatBytes(b.sizeBytes)}</td>
-                  <td style={{ ...tdStyle, color: 'var(--muted)' }}>
-                    {formatTime(b.createdAt)}
-                  </td>
-                  <td style={{ ...tdStyle, textAlign: 'right' }}>
-                    <div
-                      style={{
-                        display: 'inline-flex',
-                        gap: 6,
-                        justifyContent: 'flex-end',
-                      }}
-                    >
-                      <button
-                        type="button"
-                        disabled={busyFile === b.fileName}
-                        onClick={() => void handleView(b.fileName)}
-                        style={secondaryBtnStyle}
-                      >
-                        View
-                      </button>
-                      <button
-                        type="button"
-                        disabled={busyFile === b.fileName}
-                        onClick={() => void handleDownload(b.fileName)}
-                        style={secondaryBtnStyle}
-                      >
-                        Download
-                      </button>
-                      <button
-                        type="button"
-                        disabled={busyFile === b.fileName}
-                        onClick={() => void handleDelete(b.fileName)}
-                        style={{ ...secondaryBtnStyle, color: 'var(--danger)' }}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
-          No backup files stored in the server backups directory yet.
-        </p>
-      )}
+      }
+    >
+      <DataTable
+        columns={columns}
+        rows={pageRows}
+        getRowKey={(b) => b.id}
+        emptyMessage="No backup files stored in the server backups directory yet."
+      />
 
       <PaginationBar
         total={backups.length}
@@ -336,6 +310,6 @@ export function BackupsTab({
           </aside>
         </div>
       )}
-    </section>
+    </Card>
   );
 }

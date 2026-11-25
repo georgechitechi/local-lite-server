@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Card } from '@/components/Card';
+import { EmptyState } from '@/components/EmptyState';
 import {
   type CronJob,
   type DrawerMode,
@@ -8,10 +10,8 @@ import type { ToastType } from '@/components/Toast';
 import { adminFetch } from '@/lib/api';
 import { formatTime } from '@/lib/formatters';
 import {
-  cardStyle,
   primaryBtnStyle,
   secondaryBtnStyle,
-  sectionTitleStyle,
 } from '@/styles/adminStyles';
 
 export function SchedulesTab({
@@ -73,26 +73,11 @@ export function SchedulesTab({
   const hasEnabledJobs = jobs.some((j) => j.enabled);
 
   return (
-    <section style={cardStyle}>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 16,
-          gap: 12,
-          flexWrap: 'wrap',
-        }}
-      >
-        <div>
-          <h2 style={{ ...sectionTitleStyle, margin: 0 }}>
-            Scheduled Automations
-          </h2>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--muted)' }}>
-            Manage standing automations, cadence, and execution results.
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+    <Card
+      title="Scheduled Automations"
+      subtitle="Manage standing automations, cadence, and execution results."
+      actions={
+        <>
           <button
             type="button"
             onClick={() => void loadJobs()}
@@ -123,13 +108,27 @@ export function SchedulesTab({
           >
             {runningKey === 'all' ? 'Running All...' : 'Run All Enabled'}
           </button>
-        </div>
-      </div>
-
+        </>
+      }
+    >
       {loading && jobs.length === 0 ? (
         <div style={{ color: 'var(--muted)', fontSize: 13, padding: 12 }}>
           Loading schedules...
         </div>
+      ) : jobs.length === 0 ? (
+        <EmptyState
+          title="No scheduled automations yet."
+          description="Create a schedule to run recurring server tasks automatically."
+          action={
+            <button
+              type="button"
+              onClick={() => setDrawer({ kind: 'create' })}
+              style={primaryBtnStyle}
+            >
+              + New Schedule
+            </button>
+          }
+        />
       ) : (
         <div style={{ display: 'grid', gap: 12 }}>
           {jobs.map((job) => {
@@ -274,6 +273,6 @@ export function SchedulesTab({
         }
         onToast={onToast}
       />
-    </section>
+    </Card>
   );
 }

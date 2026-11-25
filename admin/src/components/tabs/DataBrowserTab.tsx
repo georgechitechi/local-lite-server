@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { EmptyState } from '@/components/EmptyState';
 import { PaginationBar } from '@/components/PaginationBar';
 import {
   TableRowDrawer,
@@ -229,9 +230,7 @@ export function DataBrowserTab({
             </table>
           </div>
         ) : (
-          <p style={{ color: 'var(--muted)', fontSize: 13 }}>
-            No rows in {selectedTable}.
-          </p>
+          <EmptyState title={`No rows in ${selectedTable}.`} />
         )}
 
         {tableData && (

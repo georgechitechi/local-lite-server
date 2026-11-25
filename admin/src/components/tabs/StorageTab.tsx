@@ -1,17 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Card } from '@/components/Card';
+import { DataTable, type DataTableColumn } from '@/components/DataTable';
 import { PaginationBar } from '@/components/PaginationBar';
 import { StorageBucketDrawer } from '@/components/StorageBucketDrawer';
 import type { ToastType } from '@/components/Toast';
 import { adminFetch, buildApiUrl } from '@/lib/api';
 import { formatBytes, formatTime } from '@/lib/formatters';
 import {
-  cardStyle,
   primaryBtnStyle,
   secondaryBtnStyle,
-  sectionTitleStyle,
-  tableStyle,
-  tdStyle,
-  thStyle,
 } from '@/styles/adminStyles';
 
 interface StorageFileRow {
@@ -168,26 +165,73 @@ export function StorageTab({
   const hasPrev = offset > 0;
   const hasNext = offset + files.length < totalFiles;
 
-  return (
-    <section style={cardStyle}>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 14,
-          gap: 10,
-          flexWrap: 'wrap',
-        }}
-      >
-        <div>
-          <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Server Storage</h2>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-            {totalFiles} file{totalFiles === 1 ? '' : 's'} •{' '}
-            {formatBytes(totalBytes)} total in <code>server/uploads/</code>
-          </div>
+  const columns: DataTableColumn<StorageFileRow>[] = [
+    {
+      header: 'Key',
+      cellStyle: {
+        fontFamily: 'monospace',
+        maxWidth: 220,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+      },
+      render: (row) => <span title={row.storage_key}>{row.storage_key}</span>,
+    },
+    { header: 'Bucket', render: (row) => row.bucket || 'public' },
+    { header: 'Source', render: (row) => row.source },
+    {
+      header: 'Type',
+      cellStyle: { color: 'var(--muted)' },
+      render: (row) => row.mime_type,
+    },
+    { header: 'Size', render: (row) => formatBytes(row.size_bytes) },
+    {
+      header: 'Uploaded',
+      cellStyle: { color: 'var(--muted)' },
+      render: (row) => formatTime(row.created_at),
+    },
+    {
+      header: 'Actions',
+      align: 'right',
+      render: (row) => (
+        <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end' }}>
+          <a
+            href={getFileUrl(row)}
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              ...secondaryBtnStyle,
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+            }}
+          >
+            View
+          </a>
+          <button
+            type="button"
+            disabled={busyKey === row.storage_key}
+            onClick={() => void handleDelete(row.storage_key)}
+            style={{ ...secondaryBtnStyle, color: 'var(--danger)' }}
+          >
+            Delete
+          </button>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      ),
+    },
+  ];
+
+  return (
+    <Card
+      title="Server Storage"
+      subtitle={
+        <>
+          {totalFiles} file{totalFiles === 1 ? '' : 's'} • {formatBytes(totalBytes)} total in{' '}
+          <code>server/uploads/</code>
+        </>
+      }
+      actions={
+        <>
           <button
             type="button"
             onClick={() => setShowCreateBucket(true)}
@@ -211,9 +255,9 @@ export function StorageTab({
           >
             {pruning ? 'Pruning...' : 'Prune Orphans'}
           </button>
-        </div>
-      </div>
-
+        </>
+      }
+    >
       <StorageBucketDrawer
         open={showCreateBucket}
         onClose={() => setShowCreateBucket(false)}
@@ -315,103 +359,29 @@ export function StorageTab({
         </div>
       )}
 
-      {files.length === 0 ? (
-        <div style={{ fontSize: 13, color: 'var(--muted)', padding: 12 }}>
-          {loading ? 'Loading storage files...' : 'No stored files yet.'}
-        </div>
+      {loading && files.length === 0 ? (
+        <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
+          Loading storage files...
+        </p>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={tableStyle}>
-            <thead>
-              <tr style={{ textAlign: 'left', color: 'var(--muted)' }}>
-                <th style={thStyle}>Key</th>
-                <th style={thStyle}>Bucket</th>
-                <th style={thStyle}>Source</th>
-                <th style={thStyle}>Type</th>
-                <th style={thStyle}>Size</th>
-                <th style={thStyle}>Uploaded</th>
-                <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {files.map((row) => (
-                <tr
-                  key={row.id}
-                  style={{ borderTop: '1px solid var(--border)' }}
-                >
-                  <td
-                    title={row.storage_key}
-                    style={{
-                      ...tdStyle,
-                      fontFamily: 'monospace',
-                      maxWidth: 220,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {row.storage_key}
-                  </td>
-                  <td style={tdStyle}>{row.bucket || 'public'}</td>
-                  <td style={tdStyle}>{row.source}</td>
-                  <td style={{ ...tdStyle, color: 'var(--muted)' }}>
-                    {row.mime_type}
-                  </td>
-                  <td style={tdStyle}>{formatBytes(row.size_bytes)}</td>
-                  <td style={{ ...tdStyle, color: 'var(--muted)' }}>
-                    {formatTime(row.created_at)}
-                  </td>
-                  <td style={{ ...tdStyle, textAlign: 'right' }}>
-                    <div
-                      style={{
-                        display: 'inline-flex',
-                        gap: 6,
-                        justifyContent: 'flex-end',
-                      }}
-                    >
-                      <a
-                        href={getFileUrl(row)}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{
-                          ...secondaryBtnStyle,
-                          textDecoration: 'none',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                        }}
-                      >
-                        View
-                      </a>
-                      <button
-                        type="button"
-                        disabled={busyKey === row.storage_key}
-                        onClick={() => void handleDelete(row.storage_key)}
-                        style={{
-                          ...secondaryBtnStyle,
-                          color: 'var(--danger)',
-                        }}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={columns}
+          rows={files}
+          getRowKey={(row) => row.id}
+          emptyMessage="No stored files yet."
+        />
       )}
 
       <PaginationBar
         offset={offset}
         count={files.length}
         total={totalFiles}
-        unit="files"
+        unit="file"
         hasPrev={hasPrev}
         hasNext={hasNext}
         onPrev={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
         onNext={() => setOffset(offset + PAGE_SIZE)}
       />
-    </section>
+    </Card>
   );
 }

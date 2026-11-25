@@ -1,21 +1,22 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Card } from '@/components/Card';
+import { DataTable, type DataTableColumn } from '@/components/DataTable';
 import {
   type EnvDrawerMode,
   EnvVarDrawer,
   type EnvVarItem,
 } from '@/components/EnvVarDrawer';
+import { PaginationBar } from '@/components/PaginationBar';
 import type { ToastType } from '@/components/Toast';
 import { adminFetch } from '@/lib/api';
 import {
-  cardStyle,
-  primaryBtnStyle,
   inputStyle,
+  primaryBtnStyle,
   secondaryBtnStyle,
-  sectionTitleStyle,
-  tableStyle,
-  tdStyle,
-  thStyle,
 } from '@/styles/adminStyles';
+
+const PAGE_SIZE = 30;
+type SourceFilter = 'all' | 'database' | 'env';
 
 export function EnvVarsTab({
   onToast,
@@ -24,7 +25,9 @@ export function EnvVarsTab({
 }) {
   const [vars, setVars] = useState<EnvVarItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [filter, setFilter] = useState<SourceFilter>('all');
   const [search, setSearch] = useState('');
+  const [offset, setOffset] = useState(0);
   const [revealedValues, setRevealedValues] = useState<Record<string, string>>(
     {},
   );
@@ -144,183 +147,173 @@ export function EnvVarsTab({
     void loadEnvVars();
   };
 
-  const query = search.trim().toUpperCase();
-  const filteredVars = query
-    ? vars.filter(
-        (v) =>
-          v.key.includes(query) ||
-          (v.description || '').toUpperCase().includes(query),
-      )
-    : vars;
+  const filteredVars = useMemo(() => {
+    const query = search.trim().toUpperCase();
+    return vars.filter((v) => {
+      if (filter !== 'all' && v.source !== filter) return false;
+      if (!query) return true;
+      return (
+        v.key.includes(query) ||
+        (v.description || '').toUpperCase().includes(query)
+      );
+    });
+  }, [vars, filter, search]);
+
+  const safeOffset = offset >= filteredVars.length ? 0 : offset;
+  const pageRows = filteredVars.slice(safeOffset, safeOffset + PAGE_SIZE);
+  const hasPrev = safeOffset > 0;
+  const hasNext = safeOffset + pageRows.length < filteredVars.length;
+
+  const columns: DataTableColumn<EnvVarItem>[] = [
+    {
+      header: 'Key',
+      cellStyle: { fontFamily: 'monospace', fontWeight: 600 },
+      render: (item) => item.key,
+    },
+    {
+      header: 'Value',
+      cellStyle: {
+        fontFamily: 'monospace',
+        color: 'var(--muted)',
+        maxWidth: 260,
+        wordBreak: 'break-all',
+      },
+      render: (item) =>
+        revealedValues[item.key] !== undefined ? revealedValues[item.key] : item.maskedValue,
+    },
+    {
+      header: 'Source',
+      render: (item) => (
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            padding: '2px 7px',
+            borderRadius: 999,
+            background: item.source === 'database' ? 'var(--success-soft)' : 'var(--surface-alt)',
+            color: item.source === 'database' ? 'var(--success)' : 'var(--muted)',
+          }}
+        >
+          {item.source === 'database' ? 'Database' : '.env'}
+        </span>
+      ),
+    },
+    {
+      header: 'Description',
+      cellStyle: { color: 'var(--muted)' },
+      render: (item) => item.description || '—',
+    },
+    {
+      header: 'Actions',
+      align: 'right',
+      render: (item) => {
+        const isRevealed = revealedValues[item.key] !== undefined;
+        return (
+          <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end' }}>
+            {item.revealable && (
+              <button type="button" onClick={() => void handleToggleReveal(item)} style={secondaryBtnStyle}>
+                {isRevealed ? 'Hide' : 'Reveal'}
+              </button>
+            )}
+            {!item.readonly && (
+              <button type="button" onClick={() => void handleEdit(item)} style={secondaryBtnStyle}>
+                Edit
+              </button>
+            )}
+            {item.source === 'database' && !item.readonly && (
+              <button
+                type="button"
+                onClick={() => void handleDelete(item.key)}
+                style={{ ...secondaryBtnStyle, color: 'var(--danger)' }}
+              >
+                Delete
+              </button>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
 
   return (
     <>
-      <section style={cardStyle}>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 14,
-            gap: 10,
-            flexWrap: 'wrap',
-          }}
-        >
-          <div>
-            <h2 style={{ ...sectionTitleStyle, margin: 0 }}>
-              Environment Variables
-            </h2>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-              {vars.length} variable{vars.length === 1 ? '' : 's'} • encrypted
-              in database and synced live
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <input
-              type="text"
-              placeholder="Filter by key or description..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ ...inputStyle, width: 240, height: 34 }}
-            />
-            <button
-              type="button"
-              onClick={() => void loadEnvVars()}
-              disabled={loading}
-              style={secondaryBtnStyle}
-            >
+      <Card
+        title="Environment Variables"
+        actions={
+          <>
+            <button type="button" onClick={() => void loadEnvVars()} disabled={loading} style={secondaryBtnStyle}>
               {loading ? 'Loading...' : 'Refresh'}
             </button>
-            <button
-              type="button"
-              onClick={() => setDrawer({ kind: 'create' })}
-              style={primaryBtnStyle}
-            >
-              Add Variable
+            <button type="button" onClick={() => setDrawer({ kind: 'create' })} style={primaryBtnStyle}>
+              + Add Variable
             </button>
-          </div>
-        </div>
-
-        {filteredVars.length === 0 ? (
-          <div style={{ fontSize: 13, color: 'var(--muted)', padding: 12 }}>
-            {loading
-              ? 'Loading environment variables...'
-              : 'No environment variables found.'}
-          </div>
+          </>
+        }
+        toolbar={
+          <>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {(
+                [
+                  ['all', 'All'],
+                  ['database', 'Database'],
+                  ['env', '.env'],
+                ] as Array<[SourceFilter, string]>
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    setFilter(key);
+                    setOffset(0);
+                  }}
+                  style={{
+                    ...secondaryBtnStyle,
+                    background: filter === key ? 'var(--accent-soft)' : 'transparent',
+                    color: filter === key ? 'var(--accent)' : 'var(--muted)',
+                    borderColor: filter === key ? 'var(--accent)' : 'var(--border)',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <input
+              type="text"
+              placeholder="Search key or description..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setOffset(0);
+              }}
+              style={{ ...inputStyle, maxWidth: 260, padding: '7px 12px' }}
+            />
+          </>
+        }
+      >
+        {loading && vars.length === 0 ? (
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
+            Loading environment variables...
+          </p>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={tableStyle}>
-              <thead>
-                <tr style={{ textAlign: 'left', color: 'var(--muted)' }}>
-                  <th style={thStyle}>Key</th>
-                  <th style={thStyle}>Value</th>
-                  <th style={thStyle}>Source</th>
-                  <th style={thStyle}>Description</th>
-                  <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredVars.map((item) => {
-                  const isRevealed = revealedValues[item.key] !== undefined;
-                  const displayValue = isRevealed
-                    ? revealedValues[item.key]
-                    : item.maskedValue;
-                  return (
-                    <tr
-                      key={item.key}
-                      style={{ borderTop: '1px solid var(--border)' }}
-                    >
-                      <td
-                        style={{
-                          ...tdStyle,
-                          fontFamily: 'monospace',
-                          fontWeight: 600,
-                        }}
-                      >
-                        {item.key}
-                      </td>
-                      <td
-                        style={{
-                          ...tdStyle,
-                          fontFamily: 'monospace',
-                          color: 'var(--muted)',
-                          maxWidth: 260,
-                          wordBreak: 'break-all',
-                        }}
-                      >
-                        {displayValue}
-                      </td>
-                      <td style={tdStyle}>
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 600,
-                            padding: '2px 7px',
-                            borderRadius: 999,
-                            background:
-                              item.source === 'database'
-                                ? 'var(--success-soft)'
-                                : 'var(--surface-alt)',
-                            color:
-                              item.source === 'database'
-                                ? 'var(--success)'
-                                : 'var(--muted)',
-                          }}
-                        >
-                          {item.source === 'database' ? 'Database' : '.env'}
-                        </span>
-                      </td>
-                      <td style={{ ...tdStyle, color: 'var(--muted)' }}>
-                        {item.description || '—'}
-                      </td>
-                      <td style={{ ...tdStyle, textAlign: 'right' }}>
-                        <div
-                          style={{
-                            display: 'inline-flex',
-                            gap: 6,
-                            justifyContent: 'flex-end',
-                          }}
-                        >
-                          {item.revealable && (
-                            <button
-                              type="button"
-                              onClick={() => void handleToggleReveal(item)}
-                              style={secondaryBtnStyle}
-                            >
-                              {isRevealed ? 'Hide' : 'Reveal'}
-                            </button>
-                          )}
-                          {!item.readonly && (
-                            <button
-                              type="button"
-                              onClick={() => void handleEdit(item)}
-                              style={secondaryBtnStyle}
-                            >
-                              Edit
-                            </button>
-                          )}
-                          {item.source === 'database' && !item.readonly && (
-                            <button
-                              type="button"
-                              onClick={() => void handleDelete(item.key)}
-                              style={{
-                                ...secondaryBtnStyle,
-                                color: 'var(--danger)',
-                              }}
-                            >
-                              Delete
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={columns}
+            rows={pageRows}
+            getRowKey={(item) => item.key}
+            emptyMessage="No environment variables found."
+          />
         )}
-      </section>
+
+        <PaginationBar
+          total={filteredVars.length}
+          offset={safeOffset}
+          count={pageRows.length}
+          unit="variable"
+          hasPrev={hasPrev}
+          hasNext={hasNext}
+          onPrev={() => setOffset(Math.max(0, safeOffset - PAGE_SIZE))}
+          onNext={() => setOffset(safeOffset + PAGE_SIZE)}
+        />
+      </Card>
 
       <EnvVarDrawer
         drawer={drawer}

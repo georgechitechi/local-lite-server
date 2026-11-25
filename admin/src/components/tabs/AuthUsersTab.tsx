@@ -1,16 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Card } from '@/components/Card';
+import { DataTable, type DataTableColumn } from '@/components/DataTable';
 import { PaginationBar } from '@/components/PaginationBar';
 import { PasswordInput } from '@/components/PasswordInput';
 import { formatTime } from '@/lib/formatters';
 import {
-  cardStyle,
   inputStyle,
   primaryBtnStyle,
   secondaryBtnStyle,
-  sectionTitleStyle,
-  tableStyle,
-  tdStyle,
-  thStyle,
 } from '@/styles/adminStyles';
 import type { LocalAuthAccount } from '@/types/admin';
 
@@ -119,172 +116,130 @@ export function AuthUsersTab({
     }
   };
 
+  const columns: DataTableColumn<LocalAuthAccount>[] = [
+    {
+      header: 'User',
+      render: (acc) => (
+        <>
+          <div style={{ fontWeight: 500 }}>{acc.email}</div>
+          {acc.displayName && (
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>{acc.displayName}</div>
+          )}
+        </>
+      ),
+    },
+    {
+      header: 'Access',
+      render: (acc) =>
+        acc.consoleActive ? (
+          <span
+            style={{
+              display: 'inline-block',
+              padding: '2px 8px',
+              borderRadius: 999,
+              fontSize: 11.5,
+              fontWeight: 600,
+              background: 'var(--accent-soft)',
+              color: 'var(--accent)',
+            }}
+          >
+            {acc.consoleRole === 'super_admin' ? 'Super Admin' : 'Console Admin'}
+          </span>
+        ) : (
+          <span style={{ color: 'var(--muted)', fontSize: 12 }}>App User</span>
+        ),
+    },
+    {
+      header: 'Status',
+      render: (acc) => {
+        const locked = acc.lockedUntil != null && acc.lockedUntil > Date.now();
+        return (
+          <span style={{ color: locked ? 'var(--danger)' : 'var(--success)' }}>
+            {locked ? 'Locked' : 'Active'}
+          </span>
+        );
+      },
+    },
+    {
+      header: 'Created',
+      cellStyle: { color: 'var(--muted)' },
+      render: (acc) => formatTime(acc.createdAt),
+    },
+    {
+      header: 'Manage',
+      align: 'right',
+      render: (acc) => (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setDrawer({ mode: 'manage', userId: acc.id });
+          }}
+          style={secondaryBtnStyle}
+        >
+          Manage
+        </button>
+      ),
+    },
+  ];
+
   return (
     <>
-      <section style={cardStyle}>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 14,
-            gap: 10,
-            flexWrap: 'wrap',
-          }}
-        >
-          <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Users & Access</h2>
-          <button
-            type="button"
-            onClick={openCreate}
-            style={primaryBtnStyle}
-          >
+      <Card
+        title="Users & Access"
+        actions={
+          <button type="button" onClick={openCreate} style={primaryBtnStyle}>
             + New Console Admin
           </button>
-        </div>
-
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 10,
-            marginBottom: 14,
-            flexWrap: 'wrap',
-          }}
-        >
-          <div style={{ display: 'flex', gap: 6 }}>
-            {(
-              [
-                ['all', 'All'],
-                ['console', 'Console Admins'],
-                ['app', 'App Users'],
-              ] as Array<[UserFilter, string]>
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => {
-                  setFilter(key);
-                  setOffset(0);
-                }}
-                style={{
-                  ...secondaryBtnStyle,
-                  background:
-                    filter === key ? 'var(--accent-soft)' : 'transparent',
-                  color: filter === key ? 'var(--accent)' : 'var(--muted)',
-                  borderColor:
-                    filter === key ? 'var(--accent)' : 'var(--border)',
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <input
-            type="text"
-            placeholder="Search email or name..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setOffset(0);
-            }}
-            style={{ ...inputStyle, maxWidth: 260, padding: '7px 12px' }}
-          />
-        </div>
-
-        {pageRows.length ? (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={tableStyle}>
-              <thead>
-                <tr style={{ textAlign: 'left', color: 'var(--muted)' }}>
-                  <th style={thStyle}>User</th>
-                  <th style={thStyle}>Access</th>
-                  <th style={thStyle}>Status</th>
-                  <th style={thStyle}>Created</th>
-                  <th style={{ ...thStyle, textAlign: 'right' }}>Manage</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pageRows.map((acc) => {
-                  const locked =
-                    acc.lockedUntil != null && acc.lockedUntil > Date.now();
-                  return (
-                    <tr
-                      key={acc.id}
-                      onClick={() =>
-                        setDrawer({ mode: 'manage', userId: acc.id })
-                      }
-                      style={{
-                        borderTop: '1px solid var(--border)',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <td style={tdStyle}>
-                        <div style={{ fontWeight: 500 }}>{acc.email}</div>
-                        {acc.displayName && (
-                          <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                            {acc.displayName}
-                          </div>
-                        )}
-                      </td>
-                      <td style={tdStyle}>
-                        {acc.consoleActive ? (
-                          <span
-                            style={{
-                              display: 'inline-block',
-                              padding: '2px 8px',
-                              borderRadius: 999,
-                              fontSize: 11.5,
-                              fontWeight: 600,
-                              background: 'var(--accent-soft)',
-                              color: 'var(--accent)',
-                            }}
-                          >
-                            {acc.consoleRole === 'super_admin'
-                              ? 'Super Admin'
-                              : 'Console Admin'}
-                          </span>
-                        ) : (
-                          <span style={{ color: 'var(--muted)', fontSize: 12 }}>
-                            App User
-                          </span>
-                        )}
-                      </td>
-                      <td style={tdStyle}>
-                        <span
-                          style={{
-                            color: locked ? 'var(--danger)' : 'var(--success)',
-                          }}
-                        >
-                          {locked ? 'Locked' : 'Active'}
-                        </span>
-                      </td>
-                      <td style={{ ...tdStyle, color: 'var(--muted)' }}>
-                        {formatTime(acc.createdAt)}
-                      </td>
-                      <td style={{ ...tdStyle, textAlign: 'right' }}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDrawer({ mode: 'manage', userId: acc.id });
-                          }}
-                          style={secondaryBtnStyle}
-                        >
-                          Manage
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
-            No matching accounts found.
-          </p>
-        )}
+        }
+        toolbar={
+          <>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {(
+                [
+                  ['all', 'All'],
+                  ['console', 'Console Admins'],
+                  ['app', 'App Users'],
+                ] as Array<[UserFilter, string]>
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    setFilter(key);
+                    setOffset(0);
+                  }}
+                  style={{
+                    ...secondaryBtnStyle,
+                    background: filter === key ? 'var(--accent-soft)' : 'transparent',
+                    color: filter === key ? 'var(--accent)' : 'var(--muted)',
+                    borderColor: filter === key ? 'var(--accent)' : 'var(--border)',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <input
+              type="text"
+              placeholder="Search email or name..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setOffset(0);
+              }}
+              style={{ ...inputStyle, maxWidth: 260, padding: '7px 12px' }}
+            />
+          </>
+        }
+      >
+        <DataTable
+          columns={columns}
+          rows={pageRows}
+          getRowKey={(acc) => acc.id}
+          onRowClick={(acc) => setDrawer({ mode: 'manage', userId: acc.id })}
+          emptyMessage="No matching accounts found."
+        />
 
         <PaginationBar
           total={filtered.length}
@@ -296,7 +251,7 @@ export function AuthUsersTab({
           onPrev={() => setOffset(Math.max(0, safeOffset - PAGE_SIZE))}
           onNext={() => setOffset(safeOffset + PAGE_SIZE)}
         />
-      </section>
+      </Card>
 
       {drawer.mode !== 'closed' && (
         <div
