@@ -125,17 +125,14 @@ export async function start() {
   const broker = await createClusterBroker(settings, database.executor);
   const app = createApp(settings, database.executor, schema, functions, rules, broker, customRoutes);
   const server = createHttpServer(app);
-  const host = process.env.SERVER_HOST || '0.0.0.0';
+  const host = process.env.SERVER_HOST || '127.0.0.1';
   let activePort = settings.port;
   let attempts = 0;
 
-  const listen = (onListening?: () => void) => {
-    if (typeof activePort === 'number') {
-      server.listen(activePort, host, onListening);
-    } else {
-      server.listen(activePort, onListening);
-    }
-  };
+  const listen = (onListening?: () => void) =>
+    typeof activePort === 'number'
+      ? server.listen(activePort, host, onListening)
+      : server.listen(activePort, onListening);
 
   server.on('error', (err: NodeJS.ErrnoException) => {
     if (err.code === 'EADDRINUSE' && typeof activePort === 'number' && !process.env.PORT && attempts < 20) {
@@ -156,8 +153,7 @@ export async function start() {
     void database.close().finally(() => process.exit(1));
   });
   listen(() => {
-    const displayHost = host === '0.0.0.0' ? '127.0.0.1' : host;
-    const addr = typeof activePort === 'number' ? `http://${displayHost}:${activePort}` : activePort;
+    const addr = typeof activePort === 'number' ? `http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${activePort}` : activePort;
     console.log(`[local-lite-server] listening on ${addr} (${settings.dialect})`);
     if (settings.adminUi && typeof activePort === 'number') {
       console.log(`[local-lite-server] admin console: ${addr}/admin`);
