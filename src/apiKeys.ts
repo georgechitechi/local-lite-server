@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { generateApiKey, hashApiKey, verifyApiKeyFormat } from 'local-lite/keys';
 import type { SqlExecutor } from 'local-lite/server';
 
 export type ApiKeyRole = 'admin' | 'user';
@@ -21,9 +22,6 @@ export interface VerifiedApiKey {
   isAdmin: boolean;
   userId?: string;
 }
-
-const hashKey = (raw: string): string =>
-  crypto.createHash('sha256').update(raw).digest('hex');
 
 const numOrNull = (v: unknown): number | null => (v == null ? null : Number(v));
 
@@ -66,9 +64,10 @@ export function createApiKeyService(db: SqlExecutor) {
       }
       const role: ApiKeyRole = input.role === 'user' ? 'user' : 'admin';
       const id = `key_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`;
-      const rawKey = `lls_${crypto.randomBytes(24).toString('base64url')}`;
-      const keyPrefix = rawKey.slice(0, 12);
-      const keyHash = hashKey(rawKey);
+      const generated = generateApiKey({ prefix: 'lls', name });
+      const rawKey = generated.key;
+      const keyPrefix = generated.display;
+      const keyHash = generated.keyHash;
       const now = Date.now();
       const userId = role === 'user' ? (input.userId?.trim() || `api_key:${id}`) : null;
       const expiresAt = input.expiresAt && input.expiresAt > now ? Math.floor(input.expiresAt) : null;
@@ -111,8 +110,8 @@ export function createApiKeyService(db: SqlExecutor) {
     },
 
     async verifyKey(rawKey: string): Promise<VerifiedApiKey | null> {
-      if (!rawKey.startsWith('lls_') || rawKey.length < 16) return null;
-      const keyHash = hashKey(rawKey);
+      if (!verifyApiKeyFormat(rawKey, 'lls')) return null;
+      const keyHash = hashApiKey(rawKey);
       const [row] = await db.query<any>(
         'SELECT id, role, user_id, last_used_at, expires_at, revoked_at FROM _lls_api_keys WHERE key_hash = ? LIMIT 1',
         [keyHash],

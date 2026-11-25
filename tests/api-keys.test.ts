@@ -77,7 +77,7 @@ describe('apiKeys', () => {
 
     const created = await svc.createKey({ name: 'Mobile App', role: 'admin' });
     expect(created.key).toMatch(/^lls_/);
-    expect(created.record.keyPrefix).toBe(created.key.slice(0, 12));
+    expect(created.record.keyPrefix).toContain('lls_');
 
     // Bearer header works
     const resBearer = await app.fetch(
