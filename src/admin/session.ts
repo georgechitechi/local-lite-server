@@ -108,8 +108,9 @@ export function createAdminSession(settings: ServerSettings, db: SqlExecutor) {
     },
 
     async getLogin(request: Request) {
+      const activeCond = db.dialect === 'postgres' ? 'console_active IS TRUE' : 'console_active != 0';
       const rows = await db.query<any>(
-        'SELECT COUNT(*) AS n FROM _local_auth_accounts WHERE console_role IS NOT NULL AND console_active != 0',
+        `SELECT COUNT(*) AS n FROM _local_auth_accounts WHERE console_role IS NOT NULL AND ${activeCond}`,
       );
       const session = await authenticate(request).catch(() => null);
       return Response.json({

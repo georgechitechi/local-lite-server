@@ -248,7 +248,24 @@ export async function runMigrations(db: SqlExecutor): Promise<{ applied: string[
     await db.execute('INSERT INTO _lls_migrations (id, applied_at) VALUES (?, ?)', [m.id, Date.now()]);
     applied.push(m.id);
   }
+  await ensureColumn(db, '_local_auth_accounts', 'console_role', 'VARCHAR(32) NULL');
+  await ensureColumn(
+    db,
+    '_local_auth_accounts',
+    'console_active',
+    db.dialect === 'postgres' ? 'BOOLEAN NOT NULL DEFAULT FALSE' : 'TINYINT(1) NOT NULL DEFAULT 0',
+  );
   return { applied };
+}
+
+async function ensureColumn(db: SqlExecutor, table: string, col: string, def: string) {
+  try {
+    await db.execute(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
+  } catch (err: any) {
+    // Ignore "duplicate column" (MySQL ER_DUP_FIELDNAME=1060, Postgres 42701).
+    if (err?.errno === 1060 || err?.code === 'ER_DUP_FIELDNAME' || err?.code === '42701') return;
+    throw err;
+  }
 }
 
 export async function coreMigrationStatus(db: SqlExecutor) {
