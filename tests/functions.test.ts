@@ -112,7 +112,7 @@ function buildRegistry(): FunctionRegistry {
   return reg;
 }
 
-describe('Convex-like functions (M3)', () => {
+describe('Server functions & reactive queries', () => {
   it('loads functions/notes.ts from disk', async () => {
     const reg = await loadFunctionsDir('functions');
     expect([...reg.keys()]).toEqual(

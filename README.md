@@ -9,7 +9,7 @@ Runs on **MySQL** or **PostgreSQL**, deploys to **cPanel (Node.js App / Passenge
 
 - **Real SQL Tables from `schema.ts`:** Generates and applies MySQL or PostgreSQL DDL automatically on boot (`AUTO_MIGRATE=true`) or via CLI.
 - **Slim Change Log:** `_server_changes` stores only `(table_name, row_id, timestamp)` for fast delta sync and live SSE invalidation.
-- **Convex-like Functions (`functions/`):** Write `query`, `mutation` (transactional), and `action` handlers in TypeScript with live SSE subscriptions (`GET /subscribe/:module/:name`).
+- **Server Functions (`functions/`):** Write `query`, `mutation` (transactional), and `action` handlers in TypeScript with live SSE subscriptions (`GET /subscribe/:module/:name`).
 - **Authentication & Email OTP:** `/auth/signin`, `/auth/signup`, `/auth/refresh`, `/auth/forgot-password`, and `/auth/reset-password` backed by SQL + SMTP.
 - **Admin Console (`/admin`):** Overview, Data Browser (row editor drawer), Auth & Users, Server Functions runner & live SSE subscriber, Schedules, Backups, Storage, Sync Logs, Environment variables, and Settings.
 - **Zero-Framework HTTP:** Built on `node:http` + Web `Request`/`Response` (no Express or Fastify).

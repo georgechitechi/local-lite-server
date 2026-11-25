@@ -75,4 +75,4 @@ All `/fn` and `/subscribe` endpoints accept `Authorization: Bearer <SERVER_API_K
   ```
   Whenever any mutation or `/sync` operation modifies a table that the query read, the server re-runs the query and pushes a new `event: data` frame if the JSON output changed.
 
-> **Caveat:** Unlike Convex's deterministic V8 isolate, reactive invalidation here is **table-level** and backed by standard SQL transactions.
+> **Note:** Reactive invalidation is **table-level** and backed by standard SQL transactions.
