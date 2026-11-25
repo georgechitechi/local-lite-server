@@ -1,6 +1,6 @@
 {
   "name": "local-lite-server",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Self-hostable local-lite sync server for MySQL or Postgres. Runs on cPanel Node.js apps or any VPS, no Docker.",
   "license": "MIT",
   "type": "module",
