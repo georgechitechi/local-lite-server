@@ -49,15 +49,21 @@ export function createApp(
     const token = bearer(request);
     return token.length > 0 && safeEqual(token, settings.apiKey);
   };
-  /** Admin key or a valid user token. */
+  /** Admin key, console cookie session, or a valid user token. */
   const resolveAuth = async (request: Request, allowQuery = false): Promise<FunctionAuth | null> => {
     if (isAdmin(request)) return { isAdmin: true };
     const token =
       bearer(request) || (allowQuery ? (new URL(request.url).searchParams.get('token') ?? '') : '');
-    if (!token) return null;
-    if (safeEqual(token, settings.apiKey)) return { isAdmin: true };
-    const user = await auth.verifyUser(token);
-    return user ? { isAdmin: false, userId: user.id } : null;
+    if (token) {
+      if (safeEqual(token, settings.apiKey)) return { isAdmin: true };
+      const user = await auth.verifyUser(token);
+      if (user) return { isAdmin: false, userId: user.id };
+    }
+    if (settings.adminUi) {
+      const adminSession = await consoleApi.authenticate(request);
+      if (adminSession) return { isAdmin: true, userId: adminSession.userId };
+    }
+    return null;
   };
   const canSync = async (request: Request, allowQuery = false): Promise<boolean> =>
     Boolean(await resolveAuth(request, allowQuery));

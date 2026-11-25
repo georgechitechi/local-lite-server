@@ -209,7 +209,7 @@ export function createAdminConsole(opts: {
           payload: { sub: userId, email, consoleRole: 'super_admin', tv },
         });
         return Response.json(
-          { success: true, consoleRole: 'super_admin' },
+          { ok: true, success: true, consoleRole: 'super_admin' },
           { headers: { 'Set-Cookie': makeCookie(request, token, SESSION_TTL_MS / 1000) } },
         );
       }
@@ -237,7 +237,7 @@ export function createAdminConsole(opts: {
         payload: { sub: String(user.id), email, consoleRole: role, tv: Number(user.token_version ?? 1) },
       });
       return Response.json(
-        { success: true, consoleRole: role },
+        { ok: true, success: true, consoleRole: role },
         { headers: { 'Set-Cookie': makeCookie(request, token, SESSION_TTL_MS / 1000) } },
       );
     },
