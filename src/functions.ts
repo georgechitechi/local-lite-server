@@ -150,7 +150,7 @@ export function watchFunctionsDir(
   cwd = process.cwd(),
 ): () => void {
   const abs = resolveFunctionsDir(dir, cwd);
-  if (!fs.existsSync(abs)) return () => {};
+  if (!fs.existsSync(abs)) return () => { };
   let timer: ReturnType<typeof setTimeout> | undefined;
   const watcher = fs.watch(abs, () => {
     clearTimeout(timer);

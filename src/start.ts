@@ -5,7 +5,7 @@ import { createDatabase, type Database } from './db.js';
 import { runMigrations } from './migrations.js';
 import { applySchema, loadSchemaFile, planSchema, resolveSchemaFile } from './schema.js';
 import type { SchemaDictionary } from './schema.js';
-import { loadFunctionsDir, watchFunctionsDir } from './functions.js';
+import { loadFunctionsDir, watchFunctionsDir } from './functions/index.js';
 import { createApp, createHttpServer } from './server.js';
 
 async function tryCreateDatabase(s: ServerSettings): Promise<boolean> {

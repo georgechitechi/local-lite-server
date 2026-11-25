@@ -1,6 +1,6 @@
 import type { SqlExecutor, SyncEventBroker } from 'local-lite/server';
 import type { ServerSettings } from '../config.js';
-import type { FunctionRuntime } from '../functions.js';
+import type { FunctionRuntime } from '../functions/index.js';
 import type { SchemaDictionary } from '../schema.js';
 import { createAdminData } from './console.js';
 import { createAdminOps } from './ops.js';

@@ -1,6 +1,6 @@
 import { quoteIdent, type SqlExecutor, type SyncEventBroker } from 'local-lite/server';
 import type { ServerSettings } from '../config.js';
-import type { FunctionRuntime } from '../functions.js';
+import type { FunctionRuntime } from '../functions/index.js';
 import type { SchemaDictionary } from '../schema.js';
 import { fromDbRow } from '../tableStorage.js';
 import { newRowId, patchTableRow, recordChange, setRowDeleted, upsertTableRow } from '../core/changes.js';

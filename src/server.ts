@@ -16,7 +16,7 @@ import {
   FunctionError,
   type FunctionAuth,
   type FunctionRegistry,
-} from './functions.js';
+} from './functions/index.js';
 
 export { createHttpServer };
 

@@ -130,15 +130,6 @@ export const MIGRATIONS: Migration[] = [
         is_secret TINYINT(1) NOT NULL DEFAULT 0,
         updated_at BIGINT NOT NULL
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
-      `CREATE TABLE IF NOT EXISTS _lls_schedules (
-        name VARCHAR(128) NOT NULL PRIMARY KEY,
-        fn_name VARCHAR(128) NOT NULL,
-        cron_expr VARCHAR(64) NOT NULL,
-        enabled TINYINT(1) NOT NULL DEFAULT 1,
-        last_run_at BIGINT NULL,
-        last_status VARCHAR(32) NULL,
-        last_error TEXT NULL
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
     ],
     postgres: [
       `CREATE TABLE IF NOT EXISTS _lls_storage_buckets (

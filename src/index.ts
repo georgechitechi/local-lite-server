@@ -5,7 +5,7 @@ export {
   defineMutation,
   defineAction,
   FunctionError,
-} from './functions.js';
+} from './functions/index.js';
 export type {
   QueryContext,
   MutationContext,
@@ -15,7 +15,7 @@ export type {
   FunctionAuth,
   FunctionKind,
   ListOptions,
-} from './functions.js';
+} from './functions/index.js';
 export { TableSyncStorage, ClientError } from './tableStorage.js';
 export { createApp, createHttpServer } from './server.js';
 export { loadSettings } from './config.js';

@@ -8,7 +8,7 @@ import {
   FunctionError,
   loadFunctionsDir,
   type FunctionRegistry,
-} from '../src/functions.js';
+} from '../src/functions/index.js';
 import { normalizeSchema } from '../src/schema.js';
 import { createApp } from '../src/server.js';
 
