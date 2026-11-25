@@ -155,7 +155,10 @@ export class TableSyncStorage implements ServerSyncStorage {
             throw new ClientError('Each operation needs a rowId string (max 128 chars).');
           }
           this.fields(op.tableName);
-          if (this.rules[op.tableName]?.write) {
+          const tableRule = this.rules[op.tableName];
+          const needsCheck =
+            op.operation === 'DELETE' ? (tableRule?.delete ?? tableRule?.write) : tableRule?.write;
+          if (needsCheck) {
             const set = idsByTable.get(op.tableName) ?? new Set<string>();
             set.add(op.rowId);
             idsByTable.set(op.tableName, set);
@@ -186,7 +189,9 @@ export class TableSyncStorage implements ServerSyncStorage {
         }
         const fields = this.fields(op.tableName);
         const payload = op.payload && typeof op.payload === 'object' ? op.payload : {};
-        const writeRule = !auth.isAdmin ? this.rules[op.tableName]?.write : undefined;
+        const tableRule = !auth.isAdmin ? this.rules[op.tableName] : undefined;
+        const writeRule =
+          op.operation === 'DELETE' ? (tableRule?.delete ?? tableRule?.write) : tableRule?.write;
         if (writeRule) {
           const existing = existingByKey.get(`${op.tableName}\u0000${op.rowId}`);
           if (existing) {

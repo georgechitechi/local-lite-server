@@ -153,4 +153,57 @@ describe('Row-Level Access Control (RLS)', () => {
     ).json()) as any;
     expect(adminPull.changes.changes.map((c: any) => c.rowId)).toEqual(['n-priv', 'n-pub']);
   });
+
+  it('supports a dedicated delete rule distinct from write', async () => {
+    const db = rlsDb();
+    const deleteRules = defineRules({
+      notes: {
+        write: ({ userId }, row) => row.user_id === userId,
+        delete: ({ isAdmin }) => isAdmin,
+      },
+    });
+    const app = createApp(loadSettings(env), db, schema, new Map(), deleteRules);
+    const u1 = await signup(app, 'u1@example.com');
+
+    // User can create their own note
+    const createRes = await app.fetch(
+      new Request('http://x/sync', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${u1.token}` },
+        body: JSON.stringify({
+          operations: [{
+            tableName: 'notes',
+            rowId: 'n-1',
+            operation: 'INSERT',
+            payload: { title: 'mine', user_id: u1.user.id, is_public: false },
+          }],
+        }),
+      }),
+    );
+    expect(createRes.status).toBe(200);
+
+    // User cannot delete it because delete rule requires admin
+    const delUser = await app.fetch(
+      new Request('http://x/sync', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${u1.token}` },
+        body: JSON.stringify({
+          operations: [{ tableName: 'notes', rowId: 'n-1', operation: 'DELETE', payload: {} }],
+        }),
+      }),
+    );
+    expect(delUser.status).toBe(403);
+
+    // Admin can delete it
+    const delAdmin = await app.fetch(
+      new Request('http://x/sync', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer admin-key' },
+        body: JSON.stringify({
+          operations: [{ tableName: 'notes', rowId: 'n-1', operation: 'DELETE', payload: {} }],
+        }),
+      }),
+    );
+    expect(delAdmin.status).toBe(200);
+  });
 });

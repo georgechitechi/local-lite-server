@@ -15,6 +15,7 @@ export type RowPredicate = (
 export interface TableRule {
   read?: RowPredicate;
   write?: RowPredicate;
+  delete?: RowPredicate;
 }
 
 export type RulesDictionary = Record<string, TableRule>;
