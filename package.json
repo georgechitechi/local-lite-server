@@ -28,7 +28,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "build:cpanel": "node scripts/build-cpanel.mjs",
+    "build:cpanel": "npm run build && node scripts/build-cpanel.mjs",
     "prestart": "npm run build",
     "dev": "node scripts/dev.mjs",
     "dev:admin": "npm --prefix admin run dev",
@@ -37,6 +37,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "esbuild": "^0.28.2",
     "local-lite": "^3.3.4",
     "mysql2": "^3.24.6",
     "nodemailer": "^10.6.1",
@@ -46,7 +47,6 @@
     "@types/node": "^26.6.10",
     "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.23.1",
-    "esbuild": "^0.28.2",
     "typescript": "^7.0.2",
     "vitest": "^5.1.2"
   },

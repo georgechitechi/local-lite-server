@@ -9,6 +9,7 @@ import { planSchema } from './schema.js';
 import { loadSchema, migrate, start } from './start.js';
 import { loadFunctionsDir } from './functions/index.js';
 import { writeClientCode } from './codegen.js';
+import { buildCpanelBundle } from './cpanel.js';
 
 if (fs.existsSync('.env')) {
   (process as { loadEnvFile?: (p?: string) => void }).loadEnvFile?.('.env');
@@ -106,6 +107,10 @@ if (cmd === 'init') {
   const functions = await loadFunctionsDir(settings.functionsDir);
   const abs = writeClientCode(outFile, schema, functions);
   console.log(`Generated typed client SDK: ${abs}`);
+} else if (cmd === 'build:cpanel') {
+  const outIdx = process.argv.indexOf('--out');
+  const outDir = outIdx !== -1 && process.argv[outIdx + 1] ? process.argv[outIdx + 1] : 'dist/cpanel';
+  await buildCpanelBundle(process.cwd(), outDir);
 } else if (cmd === '-v' || cmd === '--version') {
   const pkg = JSON.parse(
     fs.readFileSync(path.resolve(import.meta.dirname, '../package.json'), 'utf8'),
@@ -113,7 +118,7 @@ if (cmd === 'init') {
   console.log(pkg.version);
 } else {
   console.log(
-    'Usage: local-lite-server <init [dir] [--force] | start | migrate [status|diff] | codegen [--out file] | --version>',
+    'Usage: local-lite-server <init [dir] [--force] | start | migrate [status|diff] | codegen [--out file] | build:cpanel [--out dir] | --version>',
   );
   process.exit(cmd === '-h' || cmd === '--help' || cmd === 'help' ? 0 : 1);
 }
