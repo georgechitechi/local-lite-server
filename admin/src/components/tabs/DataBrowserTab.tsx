@@ -10,7 +10,6 @@ import {
   cardStyle,
   primaryBtnStyle,
   inputStyle,
-  secondaryBtnStyle,
   tableStyle,
   tdStyle,
   thStyle,
@@ -37,9 +36,6 @@ export function DataBrowserTab({
   const [tableFilter, setTableFilter] = useState('');
   const [tableData, setTableData] = useState<TableBrowserData | null>(null);
   const [tableLoading, setTableLoading] = useState(false);
-  const [selectedRow, setSelectedRow] = useState<Record<string, any> | null>(
-    null,
-  );
   const [rowDrawer, setRowDrawer] = useState<TableRowDrawerMode>({
     kind: 'closed',
   });
@@ -48,7 +44,7 @@ export function DataBrowserTab({
     async (table: string, offset = 0) => {
       if (!table) return;
       setTableLoading(true);
-      setSelectedRow(null);
+      setRowDrawer({ kind: 'closed' });
       try {
         const res = await adminFetch(
           `/admin/table?table=${encodeURIComponent(table)}&limit=${PAGE_SIZE}&offset=${offset}&includeDeleted=${showDeleted ? '1' : '0'}`,
@@ -183,12 +179,21 @@ export function DataBrowserTab({
                 {tableData.rows.map((row, idx) => (
                   <tr
                     key={String(row.id || idx)}
-                    onClick={() => setSelectedRow(row)}
+                    onClick={() =>
+                      setRowDrawer({
+                        kind: 'view',
+                        table: selectedTable,
+                        columns: tableData.columns,
+                        row,
+                      })
+                    }
                     style={{
                       borderTop: '1px solid var(--border)',
                       cursor: 'pointer',
                       background:
-                        selectedRow === row
+                        (rowDrawer.kind === 'view' ||
+                          rowDrawer.kind === 'edit') &&
+                        rowDrawer.row === row
                           ? 'var(--surface-alt)'
                           : 'transparent',
                     }}
@@ -229,72 +234,6 @@ export function DataBrowserTab({
           </p>
         )}
 
-        {selectedRow && (
-          <div
-            style={{
-              marginTop: 16,
-              padding: 14,
-              borderRadius: 10,
-              background: 'var(--bg)',
-              border: '1px solid var(--border)',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: 8,
-                fontSize: 12.5,
-                color: 'var(--muted)',
-                gap: 8,
-              }}
-            >
-              <span>Row JSON Inspector</span>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                {tableData && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setRowDrawer({
-                        kind: 'edit',
-                        table: selectedTable,
-                        columns: tableData.columns,
-                        row: selectedRow,
-                      })
-                    }
-                    style={secondaryBtnStyle}
-                  >
-                    Edit Row
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setSelectedRow(null)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--muted)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-            <pre
-              style={{
-                margin: 0,
-                fontSize: 12,
-                overflowX: 'auto',
-                lineHeight: 1.5,
-              }}
-            >
-              {JSON.stringify(selectedRow, null, 2)}
-            </pre>
-          </div>
-        )}
-
         {tableData && (
           <PaginationBar
             total={tableData.total}
@@ -318,8 +257,17 @@ export function DataBrowserTab({
       <TableRowDrawer
         drawer={rowDrawer}
         onClose={() => setRowDrawer({ kind: 'closed' })}
+        onEdit={() => {
+          if (rowDrawer.kind === 'view') {
+            setRowDrawer({
+              kind: 'edit',
+              table: rowDrawer.table,
+              columns: rowDrawer.columns,
+              row: rowDrawer.row,
+            });
+          }
+        }}
         onSaved={async () => {
-          setSelectedRow(null);
           await Promise.all([
             loadTable(selectedTable, tableData?.offset ?? 0),
             onRefreshOverview(),

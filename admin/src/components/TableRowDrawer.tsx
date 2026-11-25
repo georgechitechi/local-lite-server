@@ -13,6 +13,12 @@ export type TableRowDrawerMode =
   | { kind: 'closed' }
   | { kind: 'create'; table: string; columns: string[] }
   | {
+      kind: 'view';
+      table: string;
+      columns: string[];
+      row: Record<string, any>;
+    }
+  | {
       kind: 'edit';
       table: string;
       columns: string[];
@@ -67,11 +73,13 @@ function parseFieldValue(col: string, raw: string, original: unknown): unknown {
 export function TableRowDrawer({
   drawer,
   onClose,
+  onEdit,
   onSaved,
   onToast,
 }: {
   drawer: TableRowDrawerMode;
   onClose: () => void;
+  onEdit?: () => void;
   onSaved: () => Promise<void> | void;
   onToast: (msg: string, type?: ToastType) => void;
 }) {
@@ -79,6 +87,7 @@ export function TableRowDrawer({
   const [saving, setSaving] = useState(false);
 
   const open = drawer.kind !== 'closed';
+  const isView = drawer.kind === 'view';
   const isEdit = drawer.kind === 'edit';
 
   useEffect(() => {
@@ -198,7 +207,13 @@ export function TableRowDrawer({
       }}
     >
       <aside
-        aria-label={isEdit ? `Edit ${table} row` : `New ${table} row`}
+        aria-label={
+          isView
+            ? `Inspect ${table} row`
+            : isEdit
+              ? `Edit ${table} row`
+              : `New ${table} row`
+        }
         style={{
           width: 'min(540px, 100vw)',
           height: '100%',
@@ -223,10 +238,16 @@ export function TableRowDrawer({
         >
           <div>
             <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>
-              {isEdit ? `Edit ${table} row` : `New ${table} row`}
+              {isView
+                ? `${table} row`
+                : isEdit
+                  ? `Edit ${table} row`
+                  : `New ${table} row`}
             </h3>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-              Saves atomically &amp; broadcasts via SSE immediately
+              {isView
+                ? 'Row JSON Inspector'
+                : 'Saves atomically & broadcasts via SSE immediately'}
             </div>
           </div>
           {!saving && (
@@ -236,6 +257,46 @@ export function TableRowDrawer({
           )}
         </div>
 
+        {isView ? (
+          <>
+            <pre
+              style={{
+                margin: 0,
+                padding: 14,
+                borderRadius: 10,
+                background: 'var(--bg)',
+                border: '1px solid var(--border)',
+                fontSize: 12,
+                overflowX: 'auto',
+                lineHeight: 1.5,
+                flex: 1,
+              }}
+            >
+              {JSON.stringify(drawer.row, null, 2)}
+            </pre>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                alignItems: 'center',
+                gap: 8,
+                borderTop: '1px solid var(--border)',
+                paddingTop: 14,
+              }}
+            >
+              <button type="button" onClick={onClose} style={secondaryBtnStyle}>
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => onEdit?.()}
+                style={primaryBtnStyle}
+              >
+                Edit Row
+              </button>
+            </div>
+          </>
+        ) : (
         <form
           onSubmit={(e) => void handleSubmit(e)}
           style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
@@ -380,6 +441,7 @@ export function TableRowDrawer({
             )}
           </div>
         </form>
+        )}
       </aside>
     </div>
   );
