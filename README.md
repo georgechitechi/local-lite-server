@@ -52,6 +52,7 @@ npx local-lite-server start
 
 ## Documentation
 
+- [HTTP & SSE API Reference](./docs/api.md) — `/sync`, `/fn`, `/subscribe`, `/auth`, `/storage`, and `/admin` endpoints
 - [Schema & Migrations](./docs/schema-and-migrations.md) — `schema.ts`, supported types, `AUTO_MIGRATE`, and CLI commands
 - [Server Functions & Reactive Queries](./docs/functions.md) — `query`, `mutation`, `action`, and SSE `/subscribe`
 - [Client Usage & Auth](./docs/client-usage.md) — `SelfHostedRemoteAdapter`, `/auth/*`, and calling functions from apps
