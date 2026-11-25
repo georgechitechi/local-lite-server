@@ -20,6 +20,7 @@ export function corsHeaders(request: Request, s: ServerSettings): Record<string,
     'Access-Control-Max-Age': '600',
   };
   if (allowed) h['Access-Control-Allow-Origin'] = allowed;
+  if (allowed && allowed !== '*') h['Access-Control-Allow-Credentials'] = 'true';
   if (!allowAll) h['Vary'] = 'Origin';
   return h;
 }
