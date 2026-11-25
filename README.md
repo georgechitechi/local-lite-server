@@ -78,9 +78,13 @@ npx local-lite-server start
 | `APP_SECRET` | No | — | Enables `/auth/*` user accounts and signs JWTs + admin cookies |
 | `APP_NAME` | No | `local-lite-server` | Display name in emails and admin console |
 | `AUTO_MIGRATE` | No | `true` | Apply core & `schema.ts` migrations on boot |
-| `SCHEMA_PATH` | No | `./schema.ts` | Path to schema file (`.ts`, `.mjs`, `.js`, or `.json`) |
-| `FUNCTIONS_DIR` | No | `./functions` | Directory containing server function modules |
-| `UPLOAD_DIR` | No | `./uploads` | Directory for Admin Storage files |
+| `SCHEMA_PATH` | No | `src/schema.ts` | Path to schema file |
+| `RULES_PATH` | No | `src/rules.ts` | Path to per-table RLS rules (`read`/`write`) |
+| `FUNCTIONS_DIR` | No | `src/functions` | Directory containing server function modules |
+| `UPLOAD_DIR` | No | `./uploads` | Directory for uploaded storage files |
+| `BACKUP_DIR` | No | `./backups` | Directory for JSON backup snapshots |
+| `ENABLE_INTERNAL_CRONS` | No | `false` | Run `_lls_crons` schedules inside Node every 60s |
+| `MULTI_INSTANCE` | No | `false` | Postgres `LISTEN/NOTIFY` (or MySQL tailing) + DB rate limits |
 | `ADMIN_UI` | No | `true` | Set `false` to disable `/admin` routes |
 | `CORS_ORIGINS` | No | `*` | Comma-separated allowed origins, or `*` |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | No | — | SMTP settings for password-reset OTP emails |
@@ -95,5 +99,6 @@ npx local-lite-server start
 | `npm run dev:admin` | Vite HMR dev server for `admin/` on `http://localhost:5173/admin/` |
 | `npm run start` | Build `dist/` and run production server |
 | `npm run migrate` | Apply core + `schema.ts` migrations (`status` / `diff` subcommands supported) |
+| `npx local-lite-server codegen` | Generate typed client SDK (`--out src/client.ts`) |
 | `npm run build:cpanel` | Build self-contained `dist/cpanel/` bundle for cPanel |
 | `npm test` | Run Vitest suite |

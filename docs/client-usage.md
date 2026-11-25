@@ -61,7 +61,35 @@ Set `APP_SECRET` in `.env` to enable user accounts (rate-limited to 20 requests/
   1. `POST /auth/forgot-password` with `{ "email": "user@example.com" }`
   2. `POST /auth/reset-password` with `{ "email": "user@example.com", "otp": "123456", "newPassword": "newpassword" }`
 
-## 3. Calling Server Functions
+## 3. Typed Client SDK (`codegen`)
+
+Generate a zero-dependency TypeScript client from your `schema.ts` and `functions/` directly into your frontend or mobile app:
+
+```bash
+npx local-lite-server codegen --out ../my-frontend/src/api.ts
+```
+
+Then import and use `createClient`:
+
+```ts
+import { createClient, type NotesRow } from './api';
+
+const api = createClient({
+  url: 'https://api.yourdomain.com',
+  getToken: () => localStorage.getItem('token'),
+});
+
+// Query & mutation
+const notes = await api.notes.list<NotesRow[]>();
+await api.notes.create({ title: 'My Note', pinned: true });
+
+// Live SSE subscription
+const unsubscribe = api.notes.subscribeList<NotesRow[]>({}, (liveNotes) => {
+  console.log('Notes updated:', liveNotes);
+});
+```
+
+Or call `/fn/:module/:name` directly with `fetch`:
 
 ```ts
 const res = await fetch('https://api.yourdomain.com/fn/notes/create', {
