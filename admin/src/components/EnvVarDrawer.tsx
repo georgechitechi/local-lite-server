@@ -164,7 +164,7 @@ export function EnvVarDrawer({
             <label style={labelStyle}>Key</label>
             <input
               type="text"
-              placeholder="STRIPE_SECRET_KEY"
+              placeholder="MY_API_KEY"
               value={envKey}
               disabled={isEdit}
               onChange={(e) => setEnvKey(e.target.value.toUpperCase())}
@@ -221,7 +221,7 @@ export function EnvVarDrawer({
             <label style={labelStyle}>Description (optional)</label>
             <input
               type="text"
-              placeholder="Stripe API key"
+              placeholder="External API key"
               value={envDesc}
               onChange={(e) => setEnvDesc(e.target.value)}
               style={inputStyle}

@@ -50,7 +50,7 @@ export function createAdminSession(settings: ServerSettings, db: SqlExecutor) {
     for (const dir of [
       path.resolve(process.cwd(), 'admin/dist'),
       path.resolve(process.cwd(), 'admin-ui'),
-      path.resolve(import.meta.dirname, '../../admin/dist'),
+      ...(import.meta.dirname ? [path.resolve(import.meta.dirname, '../../admin/dist')] : []),
     ]) {
       if (fs.existsSync(path.join(dir, 'index.html'))) return dir;
     }

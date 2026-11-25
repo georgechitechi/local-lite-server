@@ -21,9 +21,6 @@ interface SettingsData {
     smtp: boolean;
     googleOAuth: boolean;
     githubOAuth: boolean;
-    daraja: boolean;
-    stripe: boolean;
-    paystack: boolean;
   };
 }
 
