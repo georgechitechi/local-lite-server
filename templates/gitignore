@@ -1,4 +1,29 @@
-node_modules
+# Dependencies
+node_modules/
+
+# Build & TypeScript
+dist/
+*.tsbuildinfo
+
+# Environment & Secrets
 .env
-uploads
-backups
+.env.*
+!.env.example
+
+# Runtime Data
+data/uploads/*
+!data/uploads/.gitkeep
+data/backups/*
+!data/backups/.gitkeep
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS & Editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp

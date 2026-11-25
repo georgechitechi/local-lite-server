@@ -4,6 +4,9 @@
   "type": "module",
   "scripts": {
     "start": "npx local-lite-server start",
-    "migrate": "npx local-lite-server migrate"
+    "migrate": "npx local-lite-server migrate",
+    "migrate:status": "npx local-lite-server migrate status",
+    "migrate:diff": "npx local-lite-server migrate diff",
+    "test": "node --test tests/*.test.ts"
   }
 }

@@ -60,7 +60,7 @@ export function createAdminOps(settings: ServerSettings, db: SqlExecutor, schema
     },
 
     async handleBackups(request: Request) {
-      const dir = path.resolve(process.cwd(), 'backups');
+      const dir = path.resolve(settings.backupDir);
       const url = new URL(request.url);
       const method = request.method.toUpperCase();
       if (method === 'GET') {

@@ -26,6 +26,7 @@ export interface ServerSettings {
   schemaPath?: string;
   functionsDir?: string;
   uploadDir: string;
+  backupDir: string;
   apiKey: string;
   /** Signs user tokens. Enables /auth when set. */
   appSecret?: string;
@@ -62,6 +63,7 @@ export function loadSettings(env: NodeJS.ProcessEnv = process.env): ServerSettin
     schemaPath: env.SCHEMA_PATH || undefined,
     functionsDir: env.FUNCTIONS_DIR || undefined,
     uploadDir: env.UPLOAD_DIR || './uploads',
+    backupDir: env.BACKUP_DIR || './backups',
     apiKey: env.SERVER_API_KEY!,
     appSecret: env.APP_SECRET?.trim() || undefined,
     appName: env.APP_NAME || 'local-lite-server',
