@@ -5,6 +5,43 @@ import { toDbValue } from '../tableStorage.js';
 
 const SYSTEM_COLS = new Set(['id', 'updated_at', 'deleted']);
 
+/** Locks and reads `_server_sync_clock` inside an active transaction. */
+export async function lockClock(
+  tx: SqlExecutor,
+  clockTable = '_server_sync_clock',
+): Promise<number> {
+  const q = (n: string) => quoteIdent(n, tx.dialect);
+  const clock = await tx.query<{ checkpoint: number }>(
+    `SELECT checkpoint FROM ${q(clockTable)} WHERE id = 1 FOR UPDATE`,
+  );
+  return Number(clock[0]?.checkpoint ?? 0);
+}
+
+/** Appends a row entry to `_server_changes` with an already-computed timestamp. */
+export async function appendChangeLog(
+  tx: SqlExecutor,
+  table: string,
+  rowId: string,
+  timestamp: number,
+  changesTable = '_server_changes',
+): Promise<void> {
+  const q = (n: string) => quoteIdent(n, tx.dialect);
+  await tx.execute(
+    `INSERT INTO ${q(changesTable)} (table_name, row_id, ${q('timestamp')}) VALUES (?, ?, ?)`,
+    [table, rowId, timestamp],
+  );
+}
+
+/** Updates `_server_sync_clock` to `timestamp`. */
+export async function commitClock(
+  tx: SqlExecutor,
+  timestamp: number,
+  clockTable = '_server_sync_clock',
+): Promise<void> {
+  const q = (n: string) => quoteIdent(n, tx.dialect);
+  await tx.execute(`UPDATE ${q(clockTable)} SET checkpoint = ? WHERE id = 1`, [timestamp]);
+}
+
 /** Advances `_server_sync_clock` inside an active transaction and logs to `_server_changes`. */
 export async function recordChange(
   tx: SqlExecutor,
@@ -13,16 +50,10 @@ export async function recordChange(
   changesTable = '_server_changes',
   clockTable = '_server_sync_clock',
 ): Promise<number> {
-  const q = (n: string) => quoteIdent(n, tx.dialect);
-  const clock = await tx.query<{ checkpoint: number }>(
-    `SELECT checkpoint FROM ${q(clockTable)} WHERE id = 1 FOR UPDATE`,
-  );
-  const ts = Math.max(Date.now(), Number(clock[0]?.checkpoint ?? 0) + 1);
-  await tx.execute(
-    `INSERT INTO ${q(changesTable)} (table_name, row_id, ${q('timestamp')}) VALUES (?, ?, ?)`,
-    [table, rowId, ts],
-  );
-  await tx.execute(`UPDATE ${q(clockTable)} SET checkpoint = ? WHERE id = 1`, [ts]);
+  const prev = await lockClock(tx, clockTable);
+  const ts = Math.max(Date.now(), prev + 1);
+  await appendChangeLog(tx, table, rowId, ts, changesTable);
+  await commitClock(tx, ts, clockTable);
   return ts;
 }
 

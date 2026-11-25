@@ -38,15 +38,15 @@ function rlsDb() {
         return u ? [u] : [];
       }
       if (sql.includes('FOR UPDATE')) return [{ checkpoint }];
-      if (sql.includes('FROM `notes` WHERE `id` = ?')) {
-        const r = notes.get(params[0]);
-        return r ? [r] : [];
-      }
       if (sql.includes('FROM `_server_changes`')) {
         return changes.filter((c) => c.ts > Number(params[0]));
       }
       if (sql.includes('FROM `notes` WHERE `id` IN')) {
         return params.map((id) => notes.get(id)).filter(Boolean);
+      }
+      if (sql.includes('FROM `notes` WHERE `id` = ?')) {
+        const r = notes.get(params[0]);
+        return r ? [r] : [];
       }
       return [];
     },

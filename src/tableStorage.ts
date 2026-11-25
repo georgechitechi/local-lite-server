@@ -4,7 +4,13 @@ import {
   type SqlExecutor,
   type SyncEventBroker,
 } from 'local-lite/server';
-import { recordChange, setRowDeleted, upsertTableRow } from './core/changes.js';
+import {
+  appendChangeLog,
+  commitClock,
+  lockClock,
+  setRowDeleted,
+  upsertTableRow,
+} from './core/changes.js';
 import type { RuleContext, RulesDictionary } from './rules.js';
 import type { SchemaDictionary, SchemaFieldType } from './schema.js';
 
@@ -138,6 +144,42 @@ export class TableSyncStorage implements ServerSyncStorage {
     let cursor = 0;
 
     await this.db.withTransaction(async (tx) => {
+      cursor = await lockClock(tx, this.clock);
+
+      // Prefetch existing rows in batches for any table with a write RLS rule.
+      const existingByKey = new Map<string, Record<string, any>>();
+      if (!auth.isAdmin) {
+        const idsByTable = new Map<string, Set<string>>();
+        for (const op of operations as Op[]) {
+          if (!op || typeof op.rowId !== 'string' || !op.rowId || op.rowId.length > 128) {
+            throw new ClientError('Each operation needs a rowId string (max 128 chars).');
+          }
+          this.fields(op.tableName);
+          if (this.rules[op.tableName]?.write) {
+            const set = idsByTable.get(op.tableName) ?? new Set<string>();
+            set.add(op.rowId);
+            idsByTable.set(op.tableName, set);
+          }
+        }
+        for (const [table, idSet] of idsByTable) {
+          const fields = this.fields(table);
+          const ids = [...idSet];
+          for (let i = 0; i < ids.length; i += 400) {
+            const chunk = ids.slice(i, i + 400);
+            const found = await tx.query<Record<string, any>>(
+              `SELECT * FROM ${this.q(table)} WHERE ${this.q('id')} IN (${chunk.map(() => '?').join(', ')})`,
+              chunk,
+            );
+            for (const r of found) {
+              existingByKey.set(`${table}\u0000${r.id}`, {
+                id: String(r.id),
+                ...fromDbRow(fields, r),
+              });
+            }
+          }
+        }
+      }
+
       for (const op of operations as Op[]) {
         if (!op || typeof op.rowId !== 'string' || !op.rowId || op.rowId.length > 128) {
           throw new ClientError('Each operation needs a rowId string (max 128 chars).');
@@ -146,12 +188,8 @@ export class TableSyncStorage implements ServerSyncStorage {
         const payload = op.payload && typeof op.payload === 'object' ? op.payload : {};
         const writeRule = !auth.isAdmin ? this.rules[op.tableName]?.write : undefined;
         if (writeRule) {
-          const existingRows = await tx.query<Record<string, any>>(
-            `SELECT * FROM ${this.q(op.tableName)} WHERE ${this.q('id')} = ? LIMIT 1`,
-            [op.rowId],
-          );
-          if (existingRows[0]) {
-            const existing = { id: String(existingRows[0].id), ...fromDbRow(fields, existingRows[0]) };
+          const existing = existingByKey.get(`${op.tableName}\u0000${op.rowId}`);
+          if (existing) {
             if (!(await writeRule(auth, existing))) {
               throw new ForbiddenError(`Write denied on ${op.tableName}/${op.rowId}.`);
             }
@@ -167,13 +205,14 @@ export class TableSyncStorage implements ServerSyncStorage {
           }
         }
 
-        cursor = await recordChange(tx, op.tableName, op.rowId, this.changes, this.clock);
-
+        cursor = Math.max(Date.now(), cursor + 1);
         if (op.operation === 'DELETE') {
           await setRowDeleted(tx, op.tableName, op.rowId, true, cursor);
         } else {
           await upsertTableRow(tx, op.tableName, fields, op.rowId, payload, cursor);
+          existingByKey.set(`${op.tableName}\u0000${op.rowId}`, { id: op.rowId, ...payload });
         }
+        await appendChangeLog(tx, op.tableName, op.rowId, cursor, this.changes);
 
         const scope = payload[this.scopeField];
         emitted.push({
@@ -182,6 +221,10 @@ export class TableSyncStorage implements ServerSyncStorage {
           checkpoint: cursor,
         });
         successfulIds.push(op.id);
+      }
+
+      if (operations.length > 0) {
+        await commitClock(tx, cursor, this.clock);
       }
     });
 

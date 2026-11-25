@@ -242,7 +242,16 @@ export function createApp(
             '/admin': { GET: ({ request }: { request: Request }) => consoleApi.serveStatic(new URL(request.url).pathname) },
             '/admin/login': {
               GET: ({ request }: { request: Request }) => consoleApi.getLogin(request),
-              POST: ({ request }: { request: Request }) => consoleApi.postLogin(request),
+              POST: async ({ request }: { request: Request }) => {
+                const limit = await authLimiter(clientIp(request));
+                if (!limit.ok) {
+                  return Response.json(
+                    { error: 'Too many requests. Please try again shortly.' },
+                    { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } },
+                  );
+                }
+                return consoleApi.postLogin(request);
+              },
             },
             '/admin/logout': {
               POST: async ({ request }: { request: Request }) =>

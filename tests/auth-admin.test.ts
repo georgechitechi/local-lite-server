@@ -137,6 +137,14 @@ describe('admin', () => {
     ).json() as any;
     expect(authed.authenticated).toBe(true);
   });
+
+  it('rate limits POST /admin/login', async () => {
+    let last = 0;
+    for (let i = 0; i < 25; i++) {
+      last = (await post(app, '/admin/login', { email: 'z@z.zz', password: 'p' }, { 'x-forwarded-for': '8.8.8.8' })).status;
+    }
+    expect(last).toBe(429);
+  });
 });
 
 describe('rate limiter', () => {

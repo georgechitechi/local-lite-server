@@ -12,6 +12,7 @@ export interface CronJobRecord {
   timezone: string;
   enabled: boolean | number;
   config_json?: string | null;
+  last_run_at?: number | null;
 }
 
 function matchField(expr: string, value: number): boolean {
@@ -69,6 +70,7 @@ export async function runCronAction(
       method: 'POST',
       headers: { 'content-type': 'application/json', ...(cfg.headers || {}) },
       body: cfg.body ? JSON.stringify(cfg.body) : JSON.stringify({ timestamp: Date.now() }),
+      signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) throw new Error(`Webhook returned HTTP ${res.status}`);
     return `HTTP ${res.status}`;
@@ -93,15 +95,14 @@ export async function runCronAction(
   }
 
   if (actionType === 'storage_orphan_prune') {
-    const rows = await deps.db.query<{ id: string; storage_key: string }>(
-      'SELECT id, storage_key FROM _lls_storage_files',
+    const rows = await deps.db.query<{ id: string; bucket?: string; storage_key: string }>(
+      'SELECT id, bucket, storage_key FROM _lls_storage_files',
     );
     let removedDbRows = 0;
-    const knownKeys = new Set<string>();
     for (const r of rows) {
-      knownKeys.add(r.storage_key);
-      const abs = path.resolve(deps.settings.uploadDir, r.storage_key);
-      if (!fs.existsSync(abs)) {
+      const inBucket = r.bucket ? path.resolve(deps.settings.uploadDir, r.bucket, r.storage_key) : '';
+      const direct = path.resolve(deps.settings.uploadDir, r.storage_key);
+      if ((!inBucket || !fs.existsSync(inBucket)) && !fs.existsSync(direct)) {
         await deps.db.execute('DELETE FROM _lls_storage_files WHERE id = ?', [r.id]);
         removedDbRows += 1;
       }
@@ -120,10 +121,14 @@ export function startCronScheduler(deps: {
   if (!deps.settings.internalCrons) return () => {};
   const timer = setInterval(async () => {
     const now = new Date();
+    const currentMinute = Math.floor(now.getTime() / 60_000);
     try {
       const jobs = await deps.db.query<CronJobRecord>('SELECT * FROM _lls_crons');
       for (const job of jobs) {
         if (!job.enabled || !matchesCron(job.cron_expr, now, job.timezone || 'UTC')) continue;
+        if (job.last_run_at && Math.floor(Number(job.last_run_at) / 60_000) === currentMinute) {
+          continue;
+        }
         try {
           const summary = await runCronAction(job.action_type, job.config_json, deps);
           await deps.db.execute(
