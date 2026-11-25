@@ -153,15 +153,6 @@ export const MIGRATIONS: Migration[] = [
         is_secret BOOLEAN NOT NULL DEFAULT FALSE,
         updated_at BIGINT NOT NULL
       )`,
-      `CREATE TABLE IF NOT EXISTS _lls_schedules (
-        name VARCHAR(128) NOT NULL PRIMARY KEY,
-        fn_name VARCHAR(128) NOT NULL,
-        cron_expr VARCHAR(64) NOT NULL,
-        enabled BOOLEAN NOT NULL DEFAULT TRUE,
-        last_run_at BIGINT NULL,
-        last_status VARCHAR(32) NULL,
-        last_error TEXT NULL
-      )`,
     ],
   },
   {

@@ -47,46 +47,6 @@ export async function adminFetch(
   return res;
 }
 
-export function getPublicApiBaseUrl(): string {
-  if (import.meta.env.DEV || isLocalhost()) return '/api';
-  const envBase = (
-    import.meta.env.VITE_API_BASE_URL as string | undefined
-  )?.trim();
-  return (envBase || '').replace(/\/+$/, '');
-}
-
-export function buildPublicApiUrl(path: string): string {
-  const base = getPublicApiBaseUrl();
-  const normalized = path.startsWith('/') ? path : `/${path}`;
-  return `${base}${normalized}`;
-}
-
-export async function publicApiFetch(
-  path: string,
-  init: RequestInit = {},
-): Promise<Response> {
-  const headers = new Headers(init.headers);
-  if (
-    init.body &&
-    typeof init.body === 'string' &&
-    !headers.has('Content-Type')
-  ) {
-    headers.set('Content-Type', 'application/json');
-  }
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
-  try {
-    return await fetch(buildPublicApiUrl(path), {
-      ...init,
-      credentials: 'include',
-      headers,
-      signal: init.signal || controller.signal,
-    });
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 export async function parseJsonOrThrow<T = any>(
   response: Response,
   fallbackMessage: string,

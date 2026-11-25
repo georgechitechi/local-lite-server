@@ -125,7 +125,7 @@ export function createAdminSession(settings: ServerSettings, db: SqlExecutor) {
       if (body?.action === 'bootstrap') {
         const sec = String(body.secret ?? '').trim();
         const validSecret =
-          (settings.appSecret && safeEqual(sec, settings.appSecret)) || safeEq(sec, settings.apiKey);
+          (settings.appSecret && safeEqual(sec, settings.appSecret)) || safeEqual(sec, settings.apiKey);
         if (!validSecret) return Response.json({ error: 'Invalid APP_SECRET / SERVER_API_KEY.' }, { status: 403 });
         if (password.length < 8) return Response.json({ error: 'Password must be at least 8 characters.' }, { status: 400 });
         const existing = await db.query<any>('SELECT id FROM _local_auth_accounts WHERE email = ? LIMIT 1', [email]);
@@ -190,5 +190,3 @@ export function createAdminSession(settings: ServerSettings, db: SqlExecutor) {
     },
   };
 }
-
-const safeEq = safeEqual;
