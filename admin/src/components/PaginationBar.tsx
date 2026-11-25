@@ -1,4 +1,4 @@
-import { secondaryBtnStyle } from '@/styles/adminStyles';
+import { paginationBtnStyle } from '@/styles/adminStyles';
 
 export function PaginationBar({
   total,
@@ -42,7 +42,7 @@ export function PaginationBar({
           disabled={!hasPrev}
           onClick={onPrev}
           style={{
-            ...secondaryBtnStyle,
+            ...paginationBtnStyle,
             opacity: hasPrev ? 1 : 0.4,
             cursor: hasPrev ? 'pointer' : 'not-allowed',
           }}
@@ -54,7 +54,7 @@ export function PaginationBar({
           disabled={!hasNext}
           onClick={onNext}
           style={{
-            ...secondaryBtnStyle,
+            ...paginationBtnStyle,
             opacity: hasNext ? 1 : 0.4,
             cursor: hasNext ? 'pointer' : 'not-allowed',
           }}

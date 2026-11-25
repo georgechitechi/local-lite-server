@@ -407,7 +407,7 @@ export function ScheduleDrawer({
               style={{
                 display: 'flex',
                 gap: 8,
-                justifyContent: 'flex-end',
+                justifyContent: 'space-between',
                 marginTop: 8,
               }}
             >

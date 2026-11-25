@@ -140,7 +140,7 @@ export function StorageBucketDrawer({
           <div
             style={{
               display: 'flex',
-              justifyContent: 'flex-end',
+              justifyContent: 'space-between',
               gap: 8,
               marginTop: 8,
               borderTop: '1px solid var(--border)',

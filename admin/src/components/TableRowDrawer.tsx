@@ -327,8 +327,8 @@ export function TableRowDrawer({
               paddingTop: 14,
             }}
           >
-            <div>
-              {isEdit && drawer.row.id && (
+            {isEdit && drawer.row.id ? (
+              <>
                 <button
                   type="button"
                   onClick={() => void handleDelete()}
@@ -341,25 +341,43 @@ export function TableRowDrawer({
                 >
                   Soft Delete
                 </button>
-              )}
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={saving}
-                style={secondaryBtnStyle}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                style={compactPrimaryBtnStyle}
-              >
-                {saving ? 'Saving...' : 'Save & Broadcast'}
-              </button>
-            </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    disabled={saving}
+                    style={secondaryBtnStyle}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    style={compactPrimaryBtnStyle}
+                  >
+                    {saving ? 'Saving...' : 'Save & Broadcast'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={saving}
+                  style={secondaryBtnStyle}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  style={compactPrimaryBtnStyle}
+                >
+                  {saving ? 'Saving...' : 'Save & Broadcast'}
+                </button>
+              </>
+            )}
           </div>
         </form>
       </aside>

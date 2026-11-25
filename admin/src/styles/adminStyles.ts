@@ -36,31 +36,41 @@ export const inputStyle: React.CSSProperties = {
   width: '100%',
 };
 
-export const primaryBtnStyle: React.CSSProperties = {
-  height: 42,
-  padding: '0 16px',
+const baseBtnStyle: React.CSSProperties = {
+  height: 36,
+  padding: '0 14px',
   borderRadius: 8,
+  fontSize: 13,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 6,
+  whiteSpace: 'nowrap',
+  cursor: 'pointer',
+};
+
+export const primaryBtnStyle: React.CSSProperties = {
+  ...baseBtnStyle,
   border: 'none',
   background: 'var(--accent)',
   color: '#fff',
   fontWeight: 600,
-  fontSize: 13.5,
-  cursor: 'pointer',
 };
 
 export const compactPrimaryBtnStyle: React.CSSProperties = {
-  padding: '7px 12px',
-  borderRadius: 8,
-  border: 'none',
-  background: 'var(--accent)',
-  color: '#fff',
-  fontSize: 12.5,
-  fontWeight: 600,
-  cursor: 'pointer',
+  ...primaryBtnStyle,
 };
 
 export const secondaryBtnStyle: React.CSSProperties = {
-  padding: '7px 12px',
+  ...baseBtnStyle,
+  border: '1px solid var(--border)',
+  background: 'var(--surface-alt)',
+  color: 'var(--text)',
+  fontWeight: 500,
+};
+
+export const paginationBtnStyle: React.CSSProperties = {
+  padding: '6px 12px',
   borderRadius: 8,
   border: '1px solid var(--border)',
   background: 'var(--surface-alt)',
