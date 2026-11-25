@@ -11,6 +11,7 @@ import type { RulesDictionary } from './rules.js';
 import { ClientError, ForbiddenError, TableSyncStorage } from './tableStorage.js';
 import { createAuthService } from './auth.js';
 import { createApiKeyService } from './apiKeys.js';
+import { handleOAuthTokenExchange, verifyOAuthToken } from './oauth.js';
 import { createAdminConsole } from './admin/index.js';
 import { createStorageHandler } from './storage.js';
 import { corsHeaders, createHttpServer, safeEqual } from './core/http.js';
@@ -64,6 +65,8 @@ export function createApp(
       if (keyAuth) return { isAdmin: keyAuth.isAdmin, userId: keyAuth.userId };
       const user = await auth.verifyUser(token);
       if (user) return { isAdmin: false, userId: user.id };
+      const oauthUser = await verifyOAuthToken(token);
+      if (oauthUser) return { isAdmin: false, userId: oauthUser.id };
     }
     if (settings.adminUi) {
       const adminSession = await consoleApi.authenticate(request);
@@ -133,6 +136,30 @@ export function createApp(
           } catch {
             return Response.json({ ok: false }, { status: 503 });
           }
+        },
+      },
+      '/auth/google-token': {
+        POST: async ({ request }) => {
+          const limit = await authLimiter(clientIp(request));
+          if (!limit.ok) {
+            return Response.json(
+              { error: 'Too many requests. Please try again shortly.' },
+              { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } },
+            );
+          }
+          return handleOAuthTokenExchange(request);
+        },
+      },
+      '/auth/github-token': {
+        POST: async ({ request }) => {
+          const limit = await authLimiter(clientIp(request));
+          if (!limit.ok) {
+            return Response.json(
+              { error: 'Too many requests. Please try again shortly.' },
+              { status: 429, headers: { 'Retry-After': String(limit.retryAfter) } },
+            );
+          }
+          return handleOAuthTokenExchange(request);
         },
       },
       '/auth/*': {
