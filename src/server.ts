@@ -132,9 +132,9 @@ export function createApp(
         GET: async () => {
           try {
             await executor.query('SELECT 1');
-            return Response.json({ ok: true, dialect: settings.dialect });
+            return Response.json({ ok: true, timestamp: new Date().toISOString() });
           } catch {
-            return Response.json({ ok: false }, { status: 503 });
+            return Response.json({ ok: false, timestamp: new Date().toISOString() }, { status: 503 });
           }
         },
       },
