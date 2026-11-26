@@ -14,7 +14,7 @@ export const MIGRATIONS: Migration[] = [
       `CREATE TABLE IF NOT EXISTS _server_sync_clock (
         id INT PRIMARY KEY,
         checkpoint BIGINT NOT NULL
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci`,
       `INSERT IGNORE INTO _server_sync_clock (id, checkpoint) VALUES (1, 0)`,
       `CREATE TABLE IF NOT EXISTS _server_changes (
         id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -23,11 +23,11 @@ export const MIGRATIONS: Migration[] = [
         \`timestamp\` BIGINT NOT NULL,
         INDEX idx_changes_ts (\`timestamp\`),
         INDEX idx_changes_table_row (table_name, row_id)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci`,
       `CREATE TABLE IF NOT EXISTS _lls_schema_state (
         id INT PRIMARY KEY,
         state LONGTEXT NOT NULL
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci`,
       `CREATE TABLE IF NOT EXISTS _local_auth_accounts (
         id VARCHAR(64) NOT NULL PRIMARY KEY,
         email VARCHAR(255) NOT NULL UNIQUE,
@@ -43,7 +43,7 @@ export const MIGRATIONS: Migration[] = [
         console_active TINYINT(1) NOT NULL DEFAULT 0,
         created_at BIGINT NOT NULL,
         updated_at BIGINT NOT NULL
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci`,
       `CREATE TABLE IF NOT EXISTS _local_auth_reset_otps (
         id VARCHAR(64) NOT NULL PRIMARY KEY,
         user_id VARCHAR(64) NOT NULL,
@@ -54,12 +54,12 @@ export const MIGRATIONS: Migration[] = [
         used_at BIGINT NULL,
         created_at BIGINT NOT NULL,
         INDEX idx_otps_email (email)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci`,
       `CREATE TABLE IF NOT EXISTS _lls_storage_buckets (
         name VARCHAR(128) NOT NULL PRIMARY KEY,
         visibility VARCHAR(16) NOT NULL DEFAULT 'private',
         created_at BIGINT NOT NULL
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci`,
       `CREATE TABLE IF NOT EXISTS _lls_storage_files (
         id VARCHAR(64) NOT NULL PRIMARY KEY,
         storage_key VARCHAR(255) NOT NULL UNIQUE,
@@ -69,13 +69,13 @@ export const MIGRATIONS: Migration[] = [
         size_bytes BIGINT NOT NULL,
         created_at BIGINT NOT NULL,
         INDEX idx_files_bucket (bucket)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci`,
       `CREATE TABLE IF NOT EXISTS _lls_env_vars (
         var_key VARCHAR(128) NOT NULL PRIMARY KEY,
         var_value TEXT NOT NULL,
         is_secret TINYINT(1) NOT NULL DEFAULT 0,
         updated_at BIGINT NOT NULL
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci`,
       `CREATE TABLE IF NOT EXISTS _lls_backups (
         id VARCHAR(64) NOT NULL PRIMARY KEY,
         user_id VARCHAR(64) NOT NULL,
@@ -84,7 +84,7 @@ export const MIGRATIONS: Migration[] = [
         size_bytes BIGINT NOT NULL,
         record_count INT NOT NULL,
         created_at BIGINT NOT NULL
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci`,
       `CREATE TABLE IF NOT EXISTS _lls_crons (
         job_key VARCHAR(128) NOT NULL PRIMARY KEY,
         label VARCHAR(255) NOT NULL,
@@ -96,12 +96,12 @@ export const MIGRATIONS: Migration[] = [
         last_run_at BIGINT NULL,
         last_status VARCHAR(32) NULL,
         last_summary TEXT NULL
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci`,
       `CREATE TABLE IF NOT EXISTS _lls_rate_limits (
         rate_key VARCHAR(128) NOT NULL PRIMARY KEY,
         hits INT NOT NULL DEFAULT 0,
         reset_at BIGINT NOT NULL
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci`,
     ],
     postgres: [
       `CREATE TABLE IF NOT EXISTS _server_sync_clock (
@@ -212,7 +212,7 @@ export const MIGRATIONS: Migration[] = [
         expires_at BIGINT NULL,
         revoked_at BIGINT NULL,
         created_at BIGINT NOT NULL
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci`,
     ],
     postgres: [
       `CREATE TABLE IF NOT EXISTS _lls_api_keys (
@@ -230,13 +230,32 @@ export const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    id: '0003_utf8mb4_general_ci',
+    mysql: [
+      '_lls_migrations',
+      '_server_sync_clock',
+      '_server_changes',
+      '_lls_schema_state',
+      '_local_auth_accounts',
+      '_local_auth_reset_otps',
+      '_lls_storage_buckets',
+      '_lls_storage_files',
+      '_lls_env_vars',
+      '_lls_backups',
+      '_lls_crons',
+      '_lls_rate_limits',
+      '_lls_api_keys',
+    ].map((t) => `ALTER TABLE ${t} CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci`),
+    postgres: [],
+  },
 ];
 
 export async function runMigrations(db: SqlExecutor): Promise<{ applied: string[] }> {
   await db.execute(
     db.dialect === 'postgres'
       ? `CREATE TABLE IF NOT EXISTS _lls_migrations (id VARCHAR(128) PRIMARY KEY, applied_at BIGINT NOT NULL)`
-      : `CREATE TABLE IF NOT EXISTS _lls_migrations (id VARCHAR(128) PRIMARY KEY, applied_at BIGINT NOT NULL) ENGINE=InnoDB`,
+      : `CREATE TABLE IF NOT EXISTS _lls_migrations (id VARCHAR(128) PRIMARY KEY, applied_at BIGINT NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci`,
   );
   const done = new Set(
     (await db.query<{ id: string }>('SELECT id FROM _lls_migrations')).map((r) => r.id),

@@ -87,7 +87,17 @@ export async function planSchema(
   const prev: SqlSchemaState | null = rows[0]?.state ? JSON.parse(rows[0].state) : null;
   const next = buildSqlTargetSchema(dictionary, [], { dialect });
   const diff = generateSqlDiff(prev, next, dialect);
-  return { up: diff.up, warnings: diff.warnings, next, first: prev === null };
+  const up =
+    dialect === 'mysql'
+      ? diff.up.map((stmt) => {
+          if (!/^\s*CREATE TABLE/i.test(stmt) || /COLLATE=/i.test(stmt)) return stmt;
+          if (/CHARSET=utf8mb4/i.test(stmt)) {
+            return stmt.replace(/CHARSET=utf8mb4/gi, 'CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci');
+          }
+          return `${stmt} ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci`;
+        })
+      : diff.up;
+  return { up, warnings: diff.warnings, next, first: prev === null };
 }
 
 /** Applies the schema diff and records the new state. Safe to call on every boot. */
