@@ -67,15 +67,29 @@ export async function upsertTableRow(
   timestamp: number,
 ): Promise<void> {
   const dialect = tx.dialect;
+  const autoCreatedAt =
+    Object.hasOwn(fields, 'created_at') && data.created_at == null;
   const cols = Object.keys(fields).filter(
-    (c) => !SYSTEM_COLS.has(c) && Object.hasOwn(data, c),
+    (c) =>
+      !SYSTEM_COLS.has(c) &&
+      Object.hasOwn(data, c) &&
+      !(autoCreatedAt && c === 'created_at'),
   );
-  const insertCols = ['id', ...cols, 'updated_at', 'deleted'];
+  const insertCols = [
+    'id',
+    ...cols,
+    'updated_at',
+    'deleted',
+    ...(autoCreatedAt ? ['created_at'] : []),
+  ];
   const params: unknown[] = [
     rowId,
     ...cols.map((c) => toDbValue(fields[c], data[c], dialect)),
     timestamp,
     dialect === 'postgres' ? Boolean(data.deleted) : data.deleted ? 1 : 0,
+    ...(autoCreatedAt
+      ? [fields.created_at.startsWith('number') ? timestamp : new Date(timestamp).toISOString()]
+      : []),
   ];
   await tx.execute(
     buildUpsertSql({
