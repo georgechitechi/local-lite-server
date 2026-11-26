@@ -13,18 +13,14 @@ import {
 export interface CronJob {
   job_key: string;
   label: string;
-  description: string;
+  action_type: string;
   cron: string;
-  timezone: string | null;
-  endpoint: string;
-  is_system: boolean;
+  timezone: string;
   enabled: boolean;
+  config_json: string | null;
   last_run_at: number | null;
-  next_run_at: number | null;
-  last_status: 'success' | 'error' | null;
+  last_status: 'ok' | 'error' | null;
   last_summary: string | null;
-  last_duration_ms: number | null;
-  consecutive_failures?: number;
 }
 
 export type DrawerMode =
@@ -94,7 +90,6 @@ export function ScheduleDrawer({
 }: ScheduleDrawerProps) {
   const [saving, setSaving] = useState(false);
   const [formLabel, setFormLabel] = useState('');
-  const [formDesc, setFormDesc] = useState('');
   const [formAction, setFormAction] = useState('http_webhook');
   const [formTarget, setFormTarget] = useState('');
   const [formCron, setFormCron] = useState('0 3 * * *');
@@ -104,7 +99,6 @@ export function ScheduleDrawer({
   useEffect(() => {
     if (drawer.kind === 'create') {
       setFormLabel('');
-      setFormDesc('');
       setFormAction('http_webhook');
       setFormTarget('');
       setFormCron('0 3 * * *');
@@ -112,9 +106,9 @@ export function ScheduleDrawer({
       setFormEnabled(true);
     } else if (drawer.kind === 'edit') {
       setFormLabel(drawer.job.label);
-      setFormDesc(drawer.job.description);
-      setFormCron(drawer.job.cron || '0 3 * * *');
-      setFormTimezone(drawer.job.timezone || 'Africa/Nairobi');
+      setFormAction(drawer.job.action_type);
+      setFormCron(drawer.job.cron);
+      setFormTimezone(drawer.job.timezone);
       setFormEnabled(drawer.job.enabled);
     }
   }, [drawer]);
@@ -124,61 +118,48 @@ export function ScheduleDrawer({
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (drawer.kind !== 'create' && drawer.kind !== 'edit') return;
-    if (!formLabel.trim()) {
+    const label = formLabel.trim();
+    const cron = formCron.trim();
+    const target = formTarget.trim();
+    if (!label) {
       onToast('Schedule name is required.', 'warning');
       return;
     }
-    if (!formCron.trim()) {
+    if (!cron) {
       onToast('Cron expression is required.', 'warning');
       return;
     }
     setSaving(true);
     try {
-      if (drawer.kind === 'create') {
-        const res = await adminFetch('/admin/crons', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            label: formLabel.trim(),
-            description: formDesc.trim(),
-            action_type: formAction,
-            action_target:
-              formAction === 'http_webhook' ? formTarget.trim() : null,
-            cron: formCron.trim(),
-            timezone: formTimezone || 'Africa/Nairobi',
-            enabled: formEnabled,
-          }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data.job) {
+      const isCreate = drawer.kind === 'create';
+      const res = await adminFetch('/admin/crons', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'save',
+          ...(isCreate ? {} : { job_key: drawer.job.job_key, config_json: drawer.job.config_json }),
+          label,
+          action_type: isCreate ? formAction : drawer.job.action_type,
+          ...(isCreate && formAction === 'http_webhook' && target
+            ? { config_json: { url: target } }
+            : {}),
+          cron,
+          timezone: formTimezone,
+          enabled: formEnabled,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.job) {
+        if (isCreate) {
           onCreated(data.job);
-          onClose();
           onToast('Schedule created.', 'info');
         } else {
-          onToast(data?.error || 'Failed to create schedule', 'error');
-        }
-      } else {
-        const job = drawer.job;
-        const res = await adminFetch('/admin/crons', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            job_key: job.job_key,
-            label: formLabel.trim(),
-            description: formDesc.trim(),
-            cron: formCron.trim(),
-            timezone: formTimezone || null,
-            enabled: formEnabled,
-          }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data.job) {
           onUpdated(data.job);
-          onClose();
           onToast('Schedule updated.', 'info');
-        } else {
-          onToast(data?.error || 'Failed to update schedule', 'error');
         }
+        onClose();
+      } else {
+        onToast(data?.error || 'Failed to save schedule', 'error');
       }
     } finally {
       setSaving(false);
@@ -264,16 +245,6 @@ export function ScheduleDrawer({
                 value={formLabel}
                 onChange={(e) => setFormLabel(e.target.value)}
                 placeholder="e.g. Nightly Backup"
-                style={inputStyle}
-              />
-            </div>
-
-            <div>
-              <div style={labelStyle}>Description</div>
-              <input
-                value={formDesc}
-                onChange={(e) => setFormDesc(e.target.value)}
-                placeholder="Optional description"
                 style={inputStyle}
               />
             </div>

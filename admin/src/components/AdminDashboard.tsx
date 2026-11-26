@@ -206,8 +206,7 @@ export function AdminDashboard() {
     return <LoginGate onSuccess={() => setAuthenticated(true)} />;
   }
 
-  const isApiHealthy =
-    overview?.health?.status === 'ok' || Boolean(overview?.health?.ok);
+  const isApiHealthy = Boolean(overview?.health?.ok);
 
   return (
     <div className="app-shell">

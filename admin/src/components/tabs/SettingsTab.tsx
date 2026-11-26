@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ToggleSlider } from '@/components/ToggleSlider';
 import type { ToastType } from '@/components/Toast';
-import { adminFetch, getApiBaseUrl } from '@/lib/api';
+import { adminFetch } from '@/lib/api';
 import {
   cardStyle,
   primaryBtnStyle,
@@ -210,7 +210,7 @@ export function SettingsTab({
           <div style={infoTileStyle}>
             <span style={{ color: 'var(--muted)' }}>API Base</span>
             <strong style={{ fontFamily: 'monospace', fontSize: 12 }}>
-              {getApiBaseUrl() || window.location.origin}
+              {window.location.origin}
             </strong>
           </div>
           <div style={infoTileStyle}>

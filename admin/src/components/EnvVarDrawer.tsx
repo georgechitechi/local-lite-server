@@ -58,7 +58,7 @@ export function EnvVarDrawer({
     } else if (drawer.kind === 'edit') {
       setEnvKey(drawer.item.key);
       setEnvValue(drawer.initialValue);
-      setEnvDesc(drawer.item.description || '');
+      setEnvDesc(drawer.item.description ?? '');
       setEnvSecret(drawer.item.isSecret);
       setShowValue(false);
     }

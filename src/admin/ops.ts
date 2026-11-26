@@ -8,9 +8,7 @@ import { runCronAction } from '../crons.js';
 import type { FunctionRuntime } from '../functions/index.js';
 import { applySchema, planSchema, type SchemaDictionary } from '../schema.js';
 import { fromDbRow } from '../tableStorage.js';
-
-const int = (v: string | null, d: number, min: number, max: number) =>
-  Math.min(Math.max(Math.floor(Number(v ?? d)) || d, min), max);
+import { clampInt } from './console.js';
 
 export function createAdminOps(
   settings: ServerSettings,
@@ -45,7 +43,7 @@ export function createAdminOps(
         const key = String(body?.key ?? '').trim();
         if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) return Response.json({ error: 'Invalid key.' }, { status: 400 });
         const val = String(body?.value ?? '');
-        const isSecret = Boolean(body?.isSecret ?? body?.secret);
+        const isSecret = Boolean(body?.isSecret);
         await db.execute(
           buildUpsertSql({
             table: '_lls_env_vars',
@@ -136,8 +134,8 @@ export function createAdminOps(
       const method = request.method.toUpperCase();
       if (method === 'GET') {
         const bucket = url.searchParams.get('bucket');
-        const limit = int(url.searchParams.get('limit'), 30, 1, 200);
-        const offset = int(url.searchParams.get('offset'), 0, 0, 10_000_000);
+        const limit = clampInt(url.searchParams.get('limit'), 30, 1, 200);
+        const offset = clampInt(url.searchParams.get('offset'), 0, 0, 10_000_000);
         const buckets = await db.query<any>('SELECT * FROM _lls_storage_buckets ORDER BY name ASC');
         const where = bucket ? 'WHERE bucket = ?' : '';
         const params = bucket ? [bucket] : [];
@@ -192,10 +190,23 @@ export function createAdminOps(
     },
 
     async handleCrons(request: Request) {
+      const normalizeCronRow = (r: any) => ({
+        job_key: r.job_key,
+        label: r.label,
+        action_type: r.action_type,
+        cron: r.cron_expr,
+        timezone: r.timezone,
+        enabled: Boolean(r.enabled),
+        config_json: r.config_json ?? null,
+        last_run_at: r.last_run_at ?? null,
+        last_status: r.last_status ?? null,
+        last_summary: r.last_summary ?? null,
+      });
+
       const method = request.method.toUpperCase();
       if (method === 'GET') {
-        const jobs = await db.query<any>('SELECT * FROM _lls_crons ORDER BY job_key ASC');
-        return Response.json({ jobs });
+        const rows = await db.query<any>('SELECT * FROM _lls_crons ORDER BY job_key ASC');
+        return Response.json({ jobs: rows.map(normalizeCronRow) });
       }
       if (method === 'POST') {
         const jobParam = new URL(request.url).searchParams.get('job');
@@ -204,8 +215,22 @@ export function createAdminOps(
           return Response.json({ success: true, summary });
         }
         const body = (await request.json().catch(() => null)) as any;
-        const jobKey = String(body?.job_key ?? '').trim();
         if (body?.action === 'save') {
+          const label = String(body.label ?? '').trim();
+          const cronExpr = String(body.cron ?? '').trim();
+          const rawKey = String(body.job_key ?? '').trim();
+          const jobKey =
+            rawKey ||
+            label
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '_')
+              .replace(/^_+|_+$/g, '');
+          if (!jobKey || !label || !cronExpr) {
+            return Response.json({ error: 'label and cron are required.' }, { status: 400 });
+          }
+          const actionType = String(body.action_type || 'http_webhook');
+          const timezone = String(body.timezone || 'UTC');
+          const configJson = body.config_json != null ? JSON.stringify(body.config_json) : null;
           await db.execute(
             buildUpsertSql({
               table: '_lls_crons',
@@ -216,14 +241,37 @@ export function createAdminOps(
             }),
             [
               jobKey,
-              String(body.label || jobKey),
-              String(body.action_type || 'http_webhook'),
-              String(body.cron_expr || '0 * * * *'),
-              String(body.timezone || 'UTC'),
+              label,
+              actionType,
+              cronExpr,
+              timezone,
               db.dialect === 'postgres' ? body.enabled !== false : body.enabled !== false ? 1 : 0,
-              body.config_json ? JSON.stringify(body.config_json) : null,
+              configJson,
             ],
           );
+          const [saved] = await db.query<any>('SELECT * FROM _lls_crons WHERE job_key = ?', [jobKey]);
+          return Response.json({ success: true, job: normalizeCronRow(saved) });
+        }
+        const jobKey = String(body?.job_key ?? '').trim();
+        if (jobKey === 'all') {
+          const enabledRows = await db.query<any>(
+            db.dialect === 'postgres'
+              ? 'SELECT * FROM _lls_crons WHERE enabled = TRUE'
+              : 'SELECT * FROM _lls_crons WHERE enabled = 1',
+          );
+          for (const job of enabledRows) {
+            try {
+              const summary = await runCronAction(job.action_type, job.config_json, { settings, db, fnRuntime });
+              await db.execute('UPDATE _lls_crons SET last_run_at = ?, last_status = ?, last_summary = ? WHERE job_key = ?', [
+                Date.now(), 'ok', summary, job.job_key,
+              ]);
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : 'Execution failed.';
+              await db.execute('UPDATE _lls_crons SET last_run_at = ?, last_status = ?, last_summary = ? WHERE job_key = ?', [
+                Date.now(), 'error', msg, job.job_key,
+              ]);
+            }
+          }
           return Response.json({ success: true });
         }
         const rows = await db.query<any>('SELECT * FROM _lls_crons WHERE job_key = ?', [jobKey]);

@@ -6,7 +6,7 @@ import { fromDbRow } from '../tableStorage.js';
 import { newRowId, patchTableRow, recordChange, setRowDeleted, upsertTableRow } from '../core/changes.js';
 import type { AdminSession } from './session.js';
 
-const int = (v: string | null, d: number, min: number, max: number) =>
+export const clampInt = (v: string | null, d: number, min: number, max: number) =>
   Math.min(Math.max(Math.floor(Number(v ?? d)) || d, min), max);
 
 export function createAdminData(opts: {
@@ -89,8 +89,8 @@ export function createAdminData(opts: {
         const table = tableOverride || url.searchParams.get('table') || '';
         if (!Object.hasOwn(schema, table)) return Response.json({ error: 'Invalid table name.' }, { status: 400 });
         const fields = schema[table];
-        const limit = int(url.searchParams.get('limit'), 30, 1, 500);
-        const offset = int(url.searchParams.get('offset'), 0, 0, 10_000_000);
+        const limit = clampInt(url.searchParams.get('limit'), 30, 1, 500);
+        const offset = clampInt(url.searchParams.get('offset'), 0, 0, 10_000_000);
         const where = url.searchParams.get('includeDeleted') === '1' ? '' : `WHERE ${q('deleted')} = ${notDeleted}`;
         const total = Number((await db.query<any>(`SELECT COUNT(*) AS n FROM ${q(table)} ${where}`))[0]?.n ?? 0);
         const raw = await db.query<Record<string, any>>(
@@ -168,8 +168,8 @@ export function createAdminData(opts: {
 
     async handleLogs(url: URL) {
       const table = url.searchParams.get('table') || 'ALL';
-      const limit = int(url.searchParams.get('limit'), 30, 1, 200);
-      const offset = int(url.searchParams.get('offset'), 0, 0, 10_000_000);
+      const limit = clampInt(url.searchParams.get('limit'), 30, 1, 200);
+      const offset = clampInt(url.searchParams.get('offset'), 0, 0, 10_000_000);
       const hasTable = table !== 'ALL' && Object.hasOwn(schema, table);
       const where = hasTable ? 'WHERE table_name = ?' : '';
       const params = hasTable ? [table] : [];

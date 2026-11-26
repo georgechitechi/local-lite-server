@@ -177,11 +177,11 @@ export function SchedulesTab({
                           padding: '2px 8px',
                           borderRadius: 999,
                           background:
-                            job.last_status === 'success'
+                            job.last_status === 'ok'
                               ? 'var(--success-soft)'
                               : 'var(--danger-soft)',
                           color:
-                            job.last_status === 'success'
+                            job.last_status === 'ok'
                               ? 'var(--success)'
                               : 'var(--danger)',
                           fontWeight: 600,
@@ -191,24 +191,11 @@ export function SchedulesTab({
                       </span>
                     )}
                   </div>
-                  <p
-                    style={{
-                      margin: '4px 0 8px',
-                      fontSize: 13,
-                      color: 'var(--muted)',
-                    }}
-                  >
-                    {job.description}
-                  </p>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
+                    Action: <code>{job.action_type}</code>
+                    {' · '}
                     Last run:{' '}
                     {job.last_run_at ? formatTime(job.last_run_at) : 'Never'}
-                    {job.last_duration_ms != null
-                      ? ` (${job.last_duration_ms}ms)`
-                      : ''}
-                    {' · '}
-                    Next run:{' '}
-                    {job.next_run_at ? formatTime(job.next_run_at) : 'Paused'}
                     {job.last_summary ? ` — ${job.last_summary}` : ''}
                   </div>
                 </div>
@@ -236,15 +223,13 @@ export function SchedulesTab({
                   >
                     {isRunning ? 'Running...' : 'Run Now'}
                   </button>
-                  {!job.is_system && (
-                    <button
-                      type="button"
-                      onClick={() => setDrawer({ kind: 'delete', job })}
-                      style={{ ...secondaryBtnStyle, color: 'var(--danger)' }}
-                    >
-                      Delete
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setDrawer({ kind: 'delete', job })}
+                    style={{ ...secondaryBtnStyle, color: 'var(--danger)' }}
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
             );

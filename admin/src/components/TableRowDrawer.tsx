@@ -44,26 +44,6 @@ function parseFieldValue(col: string, raw: string, original: unknown): unknown {
   ) {
     return JSON.parse(trimmed);
   }
-  if (
-    (col === 'metadata' ||
-      col === 'changes' ||
-      col === 'scopes' ||
-      col === 'roles' ||
-      col === 'amenities' ||
-      col === 'photos' ||
-      col === 'documents' ||
-      col === 'images' ||
-      col === 'affected_houses' ||
-      col === 'payment_period' ||
-      col === 'emails' ||
-      col === 'schedule' ||
-      col === 'setting_value' ||
-      col === 'next_of_kin' ||
-      col === 'raw_payload') &&
-    (trimmed.startsWith('{') || trimmed.startsWith('['))
-  ) {
-    return JSON.parse(trimmed);
-  }
   if (typeof original === 'number' && !Number.isNaN(Number(trimmed))) {
     return Number(trimmed);
   }
@@ -306,12 +286,7 @@ export function TableRowDrawer({
             const isMultiline =
               val.includes('\n') ||
               val.length > 80 ||
-              col === 'metadata' ||
-              col === 'changes' ||
-              col === 'raw_payload' ||
-              col === 'content' ||
-              col === 'remarks' ||
-              col === 'description';
+              col === 'metadata';
 
             if (col === 'deleted') {
               return (
