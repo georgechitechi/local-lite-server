@@ -199,32 +199,6 @@ export function ApiKeysTab({
         }
         toolbar={
           <>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {(
-                [
-                  ['all', 'All'],
-                  ['active', 'Active'],
-                  ['revoked', 'Revoked / Expired'],
-                ] as Array<[KeyFilter, string]>
-              ).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => {
-                    setFilter(key);
-                    setOffset(0);
-                  }}
-                  style={{
-                    ...secondaryBtnStyle,
-                    background: filter === key ? 'var(--accent-soft)' : 'transparent',
-                    color: filter === key ? 'var(--accent)' : 'var(--muted)',
-                    borderColor: filter === key ? 'var(--accent)' : 'var(--border)',
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
             <input
               type="text"
               placeholder="Search name or prefix..."
@@ -233,8 +207,21 @@ export function ApiKeysTab({
                 setSearch(e.target.value);
                 setOffset(0);
               }}
-              style={{ ...inputStyle, maxWidth: 260, padding: '7px 12px' }}
+              style={{ ...inputStyle, width: 210, padding: '7px 12px' }}
             />
+            <select
+              aria-label="Filter API keys"
+              value={filter}
+              onChange={(e) => {
+                setFilter(e.target.value as KeyFilter);
+                setOffset(0);
+              }}
+              style={{ ...inputStyle, width: 'auto', minWidth: 140, padding: '7px 10px' }}
+            >
+              <option value="all">All Keys</option>
+              <option value="active">Active</option>
+              <option value="revoked">Revoked / Expired</option>
+            </select>
           </>
         }
       >

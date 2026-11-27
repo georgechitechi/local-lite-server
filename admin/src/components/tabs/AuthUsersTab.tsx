@@ -194,32 +194,6 @@ export function AuthUsersTab({
         }
         toolbar={
           <>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {(
-                [
-                  ['all', 'All'],
-                  ['console', 'Console Admins'],
-                  ['app', 'App Users'],
-                ] as Array<[UserFilter, string]>
-              ).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => {
-                    setFilter(key);
-                    setOffset(0);
-                  }}
-                  style={{
-                    ...secondaryBtnStyle,
-                    background: filter === key ? 'var(--accent-soft)' : 'transparent',
-                    color: filter === key ? 'var(--accent)' : 'var(--muted)',
-                    borderColor: filter === key ? 'var(--accent)' : 'var(--border)',
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
             <input
               type="text"
               placeholder="Search email or name..."
@@ -228,8 +202,21 @@ export function AuthUsersTab({
                 setSearch(e.target.value);
                 setOffset(0);
               }}
-              style={{ ...inputStyle, maxWidth: 260, padding: '7px 12px' }}
+              style={{ ...inputStyle, width: 210, padding: '7px 12px' }}
             />
+            <select
+              aria-label="Filter users"
+              value={filter}
+              onChange={(e) => {
+                setFilter(e.target.value as UserFilter);
+                setOffset(0);
+              }}
+              style={{ ...inputStyle, width: 'auto', minWidth: 140, padding: '7px 10px' }}
+            >
+              <option value="all">All Users</option>
+              <option value="console">Console Admins</option>
+              <option value="app">App Users</option>
+            </select>
           </>
         }
       >
