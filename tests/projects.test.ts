@@ -371,17 +371,6 @@ describe('multi-project central server', () => {
     );
     const { project: p1 } = (await p1Res.json()) as any;
 
-    const p2Res = await app.fetch(
-      new Request('http://localhost/projects', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', cookie },
-        body: JSON.stringify({
-          name: 'App Two',
-          slug: 'app-two',
-          schema: { notes: { title: 'string' } },
-        }),
-      }),
-    );
     // Create project-scoped API key for App One
     const keyRes = await app.fetch(
       new Request('http://localhost/admin/api-keys', {

@@ -51,13 +51,11 @@ describe('OAuth token exchange and verification', () => {
 
   it('exchanges GitHub code when GITHUB_CLIENT_SECRET is set', async () => {
     process.env.GITHUB_CLIENT_SECRET = 'gh-secret';
-    globalThis.fetch = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(JSON.stringify({ access_token: 'gho_test_token_12345' }), {
-          status: 200,
-        }),
-      );
+    globalThis.fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ access_token: 'gho_test_token_12345' }), {
+        status: 200,
+      }),
+    );
     const app = createApp(loadSettings(base), db, schema);
     const res = await app.fetch(
       new Request('http://x/auth/github-token', {
