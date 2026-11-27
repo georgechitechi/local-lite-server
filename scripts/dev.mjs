@@ -4,9 +4,20 @@ import { execSync, spawn } from 'node:child_process';
 execSync('npx tsc -p tsconfig.json', { stdio: 'inherit' });
 
 const tsc = spawn('npx', ['tsc', '-p', 'tsconfig.json', '-w', '--preserveWatchOutput'], {
-  stdio: 'inherit',
+  stdio: ['ignore', 'pipe', 'pipe'],
   shell: true,
 });
+
+const pipeCompact = (stream, dest) => {
+  stream?.on('data', (chunk) => {
+    const lines = String(chunk)
+      .split(/\r?\n/)
+      .filter((line) => line.trim() !== '');
+    if (lines.length) dest.write(`${lines.join('\n')}\n`);
+  });
+};
+pipeCompact(tsc.stdout, process.stdout);
+pipeCompact(tsc.stderr, process.stderr);
 
 const srv = spawn('node', ['--watch', '--env-file-if-exists=.env', 'dist/cli.js', 'start'], {
   stdio: 'inherit',

@@ -8,41 +8,35 @@ import {
   type StoredFileMeta,
 } from 'local-lite/server';
 import type { ServerSettings } from '../config.js';
-
-export const bucketKey = (projectId: string | null, name: string) =>
-  projectId ? `${projectId}:${name}` : name;
-
-export const unscopeBucket = (projectId: string | null, raw: string) =>
-  projectId && raw.startsWith(`${projectId}:`) ? raw.slice(projectId.length + 1) : raw;
+import { projectScope } from './projects.js';
 
 export function createSqlStorageMetadata(
   db: SqlExecutor,
   projectId: string | null = null,
 ): StorageMetadataAdapter {
-  const scopeWhere = projectId ? 'project_id = ?' : 'project_id IS NULL';
-  const scopeParams = projectId ? [projectId] : [];
+  const scope = projectScope(projectId ? { id: projectId } : null);
 
   return {
     async getBucket(name) {
       const rows = await db.query<any>(
-        `SELECT * FROM _lls_storage_buckets WHERE name = ? AND ${scopeWhere} LIMIT 1`,
-        [bucketKey(projectId, name), ...scopeParams],
+        `SELECT * FROM _lls_storage_buckets WHERE name = ? AND ${scope.where} LIMIT 1`,
+        [scope.key(name), ...scope.params],
       );
       if (!rows[0]) return null;
       return {
-        id: unscopeBucket(projectId, String(rows[0].name)),
-        name: unscopeBucket(projectId, String(rows[0].name)),
+        id: scope.unkey(String(rows[0].name)),
+        name: scope.unkey(String(rows[0].name)),
         visibility: rows[0].visibility === 'public' ? 'public' : 'private',
         createdAt: Number(rows[0].created_at),
       };
     },
     async listBuckets() {
       const rows = await db.query<any>(
-        `SELECT * FROM _lls_storage_buckets WHERE ${scopeWhere} ORDER BY name ASC`,
-        scopeParams,
+        `SELECT * FROM _lls_storage_buckets WHERE ${scope.where} ORDER BY name ASC`,
+        scope.params,
       );
       return rows.map((r) => {
-        const logicalName = unscopeBucket(projectId, String(r.name));
+        const logicalName = scope.unkey(String(r.name));
         return {
           id: logicalName,
           name: logicalName,
@@ -60,19 +54,19 @@ export function createSqlStorageMetadata(
           updateCols: ['visibility', 'project_id'],
           dialect: db.dialect,
         }),
-        [bucketKey(projectId, bucket.name), bucket.visibility, projectId, bucket.createdAt ?? Date.now()],
+        [scope.key(bucket.name), bucket.visibility, projectId, bucket.createdAt ?? Date.now()],
       );
     },
     async deleteBucket(name) {
       await db.execute(
-        `DELETE FROM _lls_storage_buckets WHERE name = ? AND ${scopeWhere}`,
-        [bucketKey(projectId, name), ...scopeParams],
+        `DELETE FROM _lls_storage_buckets WHERE name = ? AND ${scope.where}`,
+        [scope.key(name), ...scope.params],
       );
     },
     async countFilesInBucket(bucket) {
       const rows = await db.query<any>(
-        `SELECT COUNT(*) AS n FROM _lls_storage_files WHERE bucket = ? AND ${scopeWhere}`,
-        [bucket, ...scopeParams],
+        `SELECT COUNT(*) AS n FROM _lls_storage_files WHERE bucket = ? AND ${scope.where}`,
+        [bucket, ...scope.params],
       );
       return Number(rows[0]?.n ?? 0);
     },
@@ -91,12 +85,12 @@ export function createSqlStorageMetadata(
     async getFile(storageKey, bucket) {
       const rows = bucket
         ? await db.query<any>(
-            `SELECT * FROM _lls_storage_files WHERE storage_key = ? AND bucket = ? AND ${scopeWhere} LIMIT 1`,
-            [storageKey, bucket, ...scopeParams],
+            `SELECT * FROM _lls_storage_files WHERE storage_key = ? AND bucket = ? AND ${scope.where} LIMIT 1`,
+            [storageKey, bucket, ...scope.params],
           )
         : await db.query<any>(
-            `SELECT * FROM _lls_storage_files WHERE storage_key = ? AND ${scopeWhere} LIMIT 1`,
-            [storageKey, ...scopeParams],
+            `SELECT * FROM _lls_storage_files WHERE storage_key = ? AND ${scope.where} LIMIT 1`,
+            [storageKey, ...scope.params],
           );
       const r = rows[0];
       if (!r) return null;
@@ -112,14 +106,14 @@ export function createSqlStorageMetadata(
     },
     async updateFileBucket(storageKey, toBucket) {
       await db.execute(
-        `UPDATE _lls_storage_files SET bucket = ? WHERE storage_key = ? AND ${scopeWhere}`,
-        [toBucket, storageKey, ...scopeParams],
+        `UPDATE _lls_storage_files SET bucket = ? WHERE storage_key = ? AND ${scope.where}`,
+        [toBucket, storageKey, ...scope.params],
       );
     },
     async deleteFile(storageKey) {
       await db.execute(
-        `DELETE FROM _lls_storage_files WHERE storage_key = ? AND ${scopeWhere}`,
-        [storageKey, ...scopeParams],
+        `DELETE FROM _lls_storage_files WHERE storage_key = ? AND ${scope.where}`,
+        [storageKey, ...scope.params],
       );
     },
   };

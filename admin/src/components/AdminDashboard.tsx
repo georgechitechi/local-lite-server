@@ -2,11 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { LoginGate } from '@/components/LoginGate';
 import { ProjectsDrawer } from '@/components/ProjectsDrawer';
 import { Sidebar } from '@/components/Sidebar';
-import {
-  ToastContainer,
-  type ToastItem,
-  type ToastType,
-} from '@/components/Toast';
+import { ToastContainer } from '@/components/Toast';
+import { useToasts } from '@/hooks/useToasts';
 import { ApiKeysTab } from '@/components/tabs/ApiKeysTab';
 import { AuthUsersTab } from '@/components/tabs/AuthUsersTab';
 import { BackupsTab } from '@/components/tabs/BackupsTab';
@@ -64,16 +61,7 @@ export function AdminDashboard() {
       localStorage.setItem('lls_show_deleted_rows', next ? '1' : '0');
     } catch {}
   }, []);
-  const [toasts, setToasts] = useState<ToastItem[]>([]);
-
-  const showToast = useCallback((message: string, type: ToastType = 'info') => {
-    const id = Date.now() + Math.floor(Math.random() * 1000);
-    setToasts((prev) => [...prev.slice(-3), { id, message, type }]);
-  }, []);
-
-  const dismissToast = useCallback((id: number) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
+  const { toasts, showToast, dismissToast } = useToasts();
 
   useEffect(() => {
     const onUnauthorized = () => {

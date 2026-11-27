@@ -2,7 +2,7 @@ import { quoteIdent, type SqlExecutor, type SyncEventBroker } from 'local-lite/s
 import type { ServerSettings } from '../config.js';
 import type { FunctionRuntime } from '../functions/index.js';
 import type { SchemaDictionary } from '../db/schema.js';
-import { toPhysicalTable, type ProjectRecord } from '../services/projects.js';
+import { projectScope, toPhysicalTable, type ProjectRecord } from '../services/projects.js';
 import { fromDbRow } from '../db/tableStorage.js';
 import { newRowId, patchTableRow, recordChange, setRowDeleted, upsertTableRow } from '../core/changes.js';
 import type { AdminSession } from './session.js';
@@ -73,13 +73,11 @@ export function createAdminData(opts: {
     },
 
     async listUsers(project?: ProjectRecord | null) {
-      const projectId = project?.id ?? null;
-      const where = projectId ? 'WHERE project_id = ?' : 'WHERE project_id IS NULL';
-      const params = projectId ? [projectId] : [];
+      const scope = projectScope(project);
       const accounts = await db.query<any>(
         `SELECT id, email, display_name, failed_login_attempts, locked_until, console_role, console_active, created_at
-         FROM _local_auth_accounts ${where} ORDER BY created_at DESC LIMIT 200`,
-        params,
+         FROM _local_auth_accounts WHERE ${scope.where} ORDER BY created_at DESC LIMIT 200`,
+        scope.params,
       );
       return Response.json({
         localAccounts: accounts.map((a) => ({
@@ -166,22 +164,20 @@ export function createAdminData(opts: {
       const userId = String(body?.userId ?? '');
       const action = String(body?.action ?? '');
       if (!userId) return Response.json({ error: 'userId is required.' }, { status: 400 });
-      const projectId = project?.id ?? null;
-      const scopeWhere = projectId ? 'AND project_id = ?' : 'AND project_id IS NULL';
-      const scopeParams = projectId ? [projectId] : [];
+      const scope = projectScope(project);
 
       if (action === 'unlock') {
         await db.execute(
-          `UPDATE _local_auth_accounts SET failed_login_attempts = 0, locked_until = NULL, updated_at = ? WHERE id = ? ${scopeWhere}`,
-          [Date.now(), userId, ...scopeParams],
+          `UPDATE _local_auth_accounts SET failed_login_attempts = 0, locked_until = NULL, updated_at = ? WHERE id = ? AND ${scope.where}`,
+          [Date.now(), userId, ...scope.params],
         );
       } else if (action === 'revoke_sessions') {
         await db.execute(
-          `UPDATE _local_auth_accounts SET token_version = COALESCE(token_version, 1) + 1, updated_at = ? WHERE id = ? ${scopeWhere}`,
-          [Date.now(), userId, ...scopeParams],
+          `UPDATE _local_auth_accounts SET token_version = COALESCE(token_version, 1) + 1, updated_at = ? WHERE id = ? AND ${scope.where}`,
+          [Date.now(), userId, ...scope.params],
         );
       } else if (action === 'set_console_role') {
-        if (session.consoleRole !== 'super_admin' || projectId) {
+        if (session.consoleRole !== 'super_admin' || scope.projectId) {
           return Response.json({ error: 'Super admin on root server required.' }, { status: 403 });
         }
         const role = body?.consoleRole === 'super_admin' || body?.consoleRole === 'admin' ? body.consoleRole : null;
