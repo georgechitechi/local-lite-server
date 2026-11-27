@@ -460,7 +460,7 @@ export function AdminDashboard() {
             />
           )}
 
-          {activeTab === 'env' && overview?.consoleRole === 'super_admin' && (
+          {activeTab === 'env' && (
             <EnvVarsTab onToast={showToast} refreshSignal={refreshTick} />
           )}
 

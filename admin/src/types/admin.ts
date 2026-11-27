@@ -103,5 +103,5 @@ export const NAV_ITEMS: Array<{
   { id: 'backups', label: 'Backups', superAdminOnly: true },
   { id: 'storage', label: 'Storage' },
   { id: 'logs', label: 'Sync Logs' },
-  { id: 'env', label: 'Environment', superAdminOnly: true },
+  { id: 'env', label: 'Environment' },
 ];

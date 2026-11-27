@@ -44,7 +44,9 @@ export function adminRoutes(deps: {
     '/admin/logs': {
       GET: authCtx.withAdminProject((req, _s, project) => consoleApi.handleLogs(new URL(req.url), project)),
     },
-    '/admin/env': { ALL: authCtx.withSuperAdmin((req) => consoleApi.handleEnv(req)) },
+    '/admin/env': {
+      ALL: authCtx.withAdminProject((req, _s, project) => consoleApi.handleEnv(req, project)),
+    },
     '/admin/backups': { ALL: authCtx.withSuperAdmin((req) => consoleApi.handleBackups(req)) },
     '/admin/storage': {
       ALL: authCtx.withAdminProject((req, _s, project) => consoleApi.handleStorage(req, project)),

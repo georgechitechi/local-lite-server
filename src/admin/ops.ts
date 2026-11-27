@@ -21,13 +21,20 @@ export function createAdminOps(
   const q = (n: string) => quoteIdent(n, db.dialect);
 
   return {
-    async handleEnv(request: Request) {
+    async handleEnv(request: Request, project?: ProjectRecord | null) {
       const method = request.method.toUpperCase();
+      const projectId = project?.id ?? null;
+      const scopeWhere = projectId ? 'project_id = ?' : 'project_id IS NULL';
+      const scopeParams: unknown[] = projectId ? [projectId] : [];
+
       if (method === 'GET') {
-        const rows = await db.query<any>('SELECT var_key, var_value, is_secret, updated_at FROM _lls_env_vars ORDER BY var_key ASC');
+        const rows = await db.query<any>(
+          `SELECT var_key, var_value, is_secret, updated_at FROM _lls_env_vars WHERE ${scopeWhere} ORDER BY var_key ASC`,
+          scopeParams,
+        );
         return Response.json({
           vars: rows.map((r) => ({
-            key: r.var_key,
+            key: unscopeBucket(projectId, String(r.var_key)),
             value: r.is_secret ? '••••••••' : r.var_value,
             masked: Boolean(r.is_secret),
             revealable: Boolean(r.is_secret),
@@ -39,7 +46,11 @@ export function createAdminOps(
       if (method === 'POST') {
         const body = (await request.json().catch(() => null)) as any;
         if (body?.action === 'reveal') {
-          const rows = await db.query<any>('SELECT var_value FROM _lls_env_vars WHERE var_key = ?', [String(body.key ?? '')]);
+          const rawKey = bucketKey(projectId, String(body.key ?? ''));
+          const rows = await db.query<any>(
+            `SELECT var_value FROM _lls_env_vars WHERE var_key = ? AND ${scopeWhere}`,
+            [rawKey, ...scopeParams],
+          );
           return Response.json({ value: rows[0]?.var_value ?? '' });
         }
         const key = String(body?.key ?? '').trim();
@@ -50,18 +61,21 @@ export function createAdminOps(
           buildUpsertSql({
             table: '_lls_env_vars',
             conflictCols: ['var_key'],
-            insertCols: ['var_key', 'var_value', 'is_secret', 'updated_at'],
-            updateCols: ['var_value', 'is_secret', 'updated_at'],
+            insertCols: ['var_key', 'project_id', 'var_value', 'is_secret', 'updated_at'],
+            updateCols: ['project_id', 'var_value', 'is_secret', 'updated_at'],
             dialect: db.dialect,
           }),
-          [key, val, db.dialect === 'postgres' ? isSecret : isSecret ? 1 : 0, Date.now()],
+          [bucketKey(projectId, key), projectId, val, db.dialect === 'postgres' ? isSecret : isSecret ? 1 : 0, Date.now()],
         );
-        process.env[key] = val;
+        if (!projectId) process.env[key] = val;
         return Response.json({ success: true });
       }
       if (method === 'DELETE') {
         const key = new URL(request.url).searchParams.get('key') || '';
-        await db.execute('DELETE FROM _lls_env_vars WHERE var_key = ?', [key]);
+        await db.execute(
+          `DELETE FROM _lls_env_vars WHERE var_key = ? AND ${scopeWhere}`,
+          [bucketKey(projectId, key), ...scopeParams],
+        );
         return Response.json({ success: true });
       }
       return Response.json({ error: 'Method Not Allowed' }, { status: 405 });
