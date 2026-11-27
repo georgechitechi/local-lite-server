@@ -66,33 +66,37 @@ export async function buildCpanelBundle(
     external: EXTERNAL_PEERS,
   });
 
-  try {
-    const schemaFile = resolveSchemaFile(undefined, cwd);
-    fs.copyFileSync(schemaFile, path.join(absOut, 'schema.ts'));
-  } catch {
-    // User may upload schema.ts separately
-  }
-
-  const rulesFile = resolveRulesFile(undefined, cwd);
-  if (rulesFile) {
-    fs.copyFileSync(rulesFile, path.join(absOut, 'rules.ts'));
-  }
-
-  const routesFile = resolveRoutesFile(undefined, cwd);
-  if (routesFile) {
+  const bundleSingle = async (entry: string, outfile: string) => {
     await build({
-      entryPoints: [routesFile],
+      entryPoints: [entry],
       bundle: true,
       platform: 'node',
       target: 'node24',
       format: 'esm',
       treeShaking: true,
       legalComments: 'none',
-      outfile: path.join(absOut, 'routes.mjs'),
+      outfile,
       minify: true,
       logLevel: 'info',
       external: EXTERNAL_PEERS,
     });
+  };
+
+  try {
+    const schemaFile = resolveSchemaFile(undefined, cwd);
+    await bundleSingle(schemaFile, path.join(absOut, 'schema.mjs'));
+  } catch {
+    // User may upload schema separately
+  }
+
+  const rulesFile = resolveRulesFile(undefined, cwd);
+  if (rulesFile) {
+    await bundleSingle(rulesFile, path.join(absOut, 'rules.mjs'));
+  }
+
+  const routesFile = resolveRoutesFile(undefined, cwd);
+  if (routesFile) {
+    await bundleSingle(routesFile, path.join(absOut, 'routes.mjs'));
   }
 
   const envExample = fs.existsSync(path.resolve(cwd, '.env.example'))
@@ -125,6 +129,6 @@ export async function buildCpanelBundle(
   }
 
   console.log(
-    `\ncPanel package ready: ${outDir}/ (app.mjs, chunks/, schema.ts, .env.example, README-cpanel.md)`,
+    `\ncPanel package ready: ${outDir}/ (app.mjs, chunks/, schema.mjs, rules.mjs, .env.example, README-cpanel.md)`,
   );
 }

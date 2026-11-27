@@ -69,7 +69,7 @@ export function resolveSchemaFile(
   const found = resolveProjectFile(
     explicit,
     'SCHEMA_PATH',
-    ['src/schema.ts', 'schema.ts'],
+    ['schema.mjs', 'src/schema.ts', 'schema.ts'],
     cwd,
   );
   if (found) return found;

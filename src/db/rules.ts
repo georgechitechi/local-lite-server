@@ -85,7 +85,7 @@ export function resolveRulesFile(
   return resolveProjectFile(
     explicit,
     'RULES_PATH',
-    ['src/rules.ts', 'rules.ts'],
+    ['rules.mjs', 'src/rules.ts', 'rules.ts'],
     cwd,
   );
 }
