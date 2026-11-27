@@ -445,7 +445,12 @@ export function AdminDashboard() {
             />
           )}
 
-          {activeTab === 'functions' && <FunctionsTab endpoints={endpoints} />}
+          {activeTab === 'functions' && (
+            <FunctionsTab
+              endpoints={endpoints}
+              activeProjectSlug={projects.find((p) => p.id === activeProjectId)?.slug ?? null}
+            />
+          )}
 
           {activeTab === 'schedules' && (
             <SchedulesTab onToast={showToast} refreshSignal={refreshTick} />
@@ -462,7 +467,11 @@ export function AdminDashboard() {
           )}
 
           {activeTab === 'storage' && (
-            <StorageTab onToast={showToast} refreshSignal={refreshTick} />
+            <StorageTab
+              activeProjectSlug={projects.find((p) => p.id === activeProjectId)?.slug ?? null}
+              onToast={showToast}
+              refreshSignal={refreshTick}
+            />
           )}
 
           {activeTab === 'logs' && (

@@ -48,6 +48,12 @@ export function LoginGate({ onSuccess }: { onSuccess: () => void }) {
         }
         if (typeof data.allowConsoleSignup === 'boolean') {
           setAllowConsoleSignup(data.allowConsoleSignup);
+          if (
+            data.allowConsoleSignup &&
+            new URLSearchParams(window.location.search).get('signup') === '1'
+          ) {
+            setView('signup');
+          }
         }
       } catch {
         // Ignore probe error

@@ -14,7 +14,13 @@ interface ServerFnItem {
   kind: 'query' | 'mutation' | 'action';
 }
 
-export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
+export function FunctionsTab({
+  endpoints,
+  activeProjectSlug = null,
+}: {
+  endpoints: EndpointItem[];
+  activeProjectSlug?: string | null;
+}) {
   const [serverFns, setServerFns] = useState<ServerFnItem[]>([]);
   const [selectedFn, setSelectedFn] = useState<string>('');
   const [fnArgs, setFnArgs] = useState('{\n  \n}');
@@ -57,7 +63,8 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
     setFnResult(null);
     try {
       const parsed = JSON.parse(fnArgs.trim() || '{}');
-      const res = await adminFetch(`/fn/${currentFn.name}`, {
+      const prefix = activeProjectSlug ? `/p/${activeProjectSlug}` : '';
+      const res = await adminFetch(`${prefix}/fn/${currentFn.name}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ args: parsed }),
@@ -83,8 +90,9 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
     if (!currentFn || currentFn.kind !== 'query') return;
     try {
       const parsed = JSON.parse(fnArgs.trim() || '{}');
+      const prefix = activeProjectSlug ? `/p/${activeProjectSlug}` : '';
       const url = buildApiUrl(
-        `/subscribe/${currentFn.name}?args=${encodeURIComponent(JSON.stringify(parsed))}`,
+        `${prefix}/subscribe/${currentFn.name}?args=${encodeURIComponent(JSON.stringify(parsed))}`,
       );
       const es = new EventSource(url, { withCredentials: true });
       setSubEvents([]);

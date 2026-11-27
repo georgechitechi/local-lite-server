@@ -36,9 +36,11 @@ interface StorageBucket {
 const PAGE_SIZE = 50;
 
 export function StorageTab({
+  activeProjectSlug = null,
   onToast,
   refreshSignal = 0,
 }: {
+  activeProjectSlug?: string | null;
   onToast: (msg: string, type?: ToastType) => void;
   refreshSignal?: number;
 }) {
@@ -153,15 +155,16 @@ export function StorageTab({
   };
 
   const getFileUrl = (row: StorageFileRow) => {
+    const prefix = activeProjectSlug ? `/p/${activeProjectSlug}` : '';
     if (row.source === 'public') {
-      return buildApiUrl(`/public/files/${encodeURI(row.storage_key)}`);
+      return buildApiUrl(`${prefix}/public/files/${encodeURI(row.storage_key)}`);
     }
     const bucket = row.bucket?.trim();
     const keyPath =
       bucket && !row.storage_key.startsWith(`${bucket}/`)
         ? `${bucket}/${row.storage_key}`
         : row.storage_key;
-    return buildApiUrl(`/storage/files/${encodeURI(keyPath)}`);
+    return buildApiUrl(`${prefix}/storage/files/${encodeURI(keyPath)}`);
   };
 
   const hasPrev = offset > 0;

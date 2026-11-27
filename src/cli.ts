@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { loadSettings } from './config.js';
 import { createDatabase } from './db/client.js';
@@ -132,6 +133,20 @@ if (cmd === 'init') {
   const outIdx = process.argv.indexOf('--out');
   const outDir = outIdx !== -1 && process.argv[outIdx + 1] ? process.argv[outIdx + 1] : 'dist/cpanel';
   await buildCpanelBundle(process.cwd(), outDir);
+} else if (cmd === 'install-skills') {
+  const dirIdx = process.argv.indexOf('--dir');
+  const isGlobal = process.argv.includes('--global');
+  const targetBase =
+    dirIdx !== -1 && process.argv[dirIdx + 1]
+      ? path.resolve(process.cwd(), process.argv[dirIdx + 1])
+      : path.join(isGlobal ? os.homedir() : process.cwd(), '.agents', 'skills');
+  const srcRoot = path.resolve(import.meta.dirname, '../skills');
+  for (const rel of collectTemplates(srcRoot)) {
+    const dest = path.join(targetBase, rel);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(path.join(srcRoot, rel), dest);
+    console.log(`installed ${path.relative(process.cwd(), dest) || dest}`);
+  }
 } else if (cmd === '-v' || cmd === '--version') {
   const pkg = JSON.parse(
     fs.readFileSync(path.resolve(import.meta.dirname, '../package.json'), 'utf8'),
@@ -139,7 +154,7 @@ if (cmd === 'init') {
   console.log(pkg.version);
 } else {
   console.log(
-    'Usage: local-lite-server <init [dir] [--force] | start | migrate [status|diff] | login [--signup] | logout | projects <list|create|delete> | push --project <slug> | codegen [--project <slug>] [--out file] | build:cpanel [--out dir] | --version>',
+    'Usage: local-lite-server <init [dir] [--force] | start | migrate [status|diff] | login [--signup] | logout | projects <list|create|delete> | push --project <slug> | codegen [--project <slug>] [--out file] | install-skills [--dir path] [--global] | build:cpanel [--out dir] | --version>',
   );
   process.exit(cmd === '-h' || cmd === '--help' || cmd === 'help' ? 0 : 1);
 }

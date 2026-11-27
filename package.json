@@ -22,6 +22,7 @@
     "dist",
     "!dist/cpanel/**",
     "admin/dist",
+    "skills",
     "templates",
     "docs",
     "README.md"
