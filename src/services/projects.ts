@@ -35,6 +35,18 @@ export function toPhysicalTable(projectId: string | null | undefined, logicalTab
   return `${projectTablePrefix(projectId)}${logicalTable}`;
 }
 
+export function projectScope(project?: { id: string } | null) {
+  const projectId = project?.id ?? null;
+  return {
+    projectId,
+    where: projectId ? 'project_id = ?' : 'project_id IS NULL',
+    params: (projectId ? [projectId] : []) as unknown[],
+    key: (name: string) => (projectId ? `${projectId}:${name}` : name),
+    unkey: (raw: string) =>
+      projectId && raw.startsWith(`${projectId}:`) ? raw.slice(projectId.length + 1) : raw,
+  };
+}
+
 function parseJsonOr<T>(raw: unknown, fallback: T): T {
   if (typeof raw !== 'string' || !raw.trim()) return fallback;
   try {
