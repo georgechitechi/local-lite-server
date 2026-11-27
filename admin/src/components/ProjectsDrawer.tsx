@@ -430,7 +430,7 @@ export function ProjectsDrawer({
                   </select>
 
                   {tbl.fields.map((f, fi) => (
-                    <div key={fi} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <div key={fi} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                       <input
                         value={f.name}
                         onChange={(e) => {
@@ -441,7 +441,7 @@ export function ProjectsDrawer({
                           setDrafts(next);
                         }}
                         placeholder="column_name"
-                        style={{ ...inputStyle, flex: 1 }}
+                        style={{ ...inputStyle, flex: '1 1 120px', minWidth: 0 }}
                       />
                       <select
                         value={f.type}
@@ -452,7 +452,7 @@ export function ProjectsDrawer({
                           next[ti] = { ...tbl, fields };
                           setDrafts(next);
                         }}
-                        style={{ ...inputStyle, width: 135 }}
+                        style={{ ...inputStyle, flex: '0 1 135px', minWidth: 110 }}
                       >
                         {FIELD_TYPES.map((t) => (
                           <option key={t} value={t}>

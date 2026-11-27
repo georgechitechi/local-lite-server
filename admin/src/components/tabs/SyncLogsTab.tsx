@@ -94,7 +94,7 @@ export function SyncLogsTab({
         <select
           value={logTableFilter}
           onChange={(e) => setLogTableFilter(e.target.value)}
-          style={{ ...inputStyle, width: 180, height: 36 }}
+          style={{ ...inputStyle, width: 'auto', minWidth: 140, maxWidth: 200, height: 36 }}
         >
           <option value="ALL">All tables</option>
           {tables.map((t) => (

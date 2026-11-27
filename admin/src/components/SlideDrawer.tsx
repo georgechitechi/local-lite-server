@@ -51,7 +51,7 @@ export function SlideDrawer({
           height: '100%',
           background: 'var(--surface)',
           borderLeft: '1px solid var(--border)',
-          padding: 24,
+          padding: 'clamp(14px, 4vw, 24px)',
           display: 'flex',
           flexDirection: 'column',
           gap: 16,
