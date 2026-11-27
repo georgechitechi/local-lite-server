@@ -229,6 +229,7 @@ export function AdminDashboard() {
     name: string;
     slug?: string;
     schema: Record<string, Record<string, string>>;
+    rules?: Record<string, any>;
   }): Promise<boolean> => {
     const res = await adminFetch('/projects', {
       method: 'POST',
@@ -250,11 +251,12 @@ export function AdminDashboard() {
   const handleApplyProjectSchema = async (
     projectId: string,
     schema: Record<string, Record<string, string>>,
+    rules?: Record<string, any>,
   ): Promise<boolean> => {
     const res = await adminFetch(`/projects/${projectId}/schema`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ schema }),
+      body: JSON.stringify({ schema, rules }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -265,6 +267,23 @@ export function AdminDashboard() {
     await Promise.all([loadProjects(overview?.consoleRole), loadOverview()]);
     setRefreshTick((n) => n + 1);
     return true;
+  };
+
+  const handleExportProject = (project: ProjectItem) => {
+    void (async () => {
+      const res = await adminFetch(`/projects/${project.id}/export`);
+      if (!res.ok) {
+        showToast('Failed to export project.', 'error');
+        return;
+      }
+      const blob = new Blob([await res.text()], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${project.slug}-export.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    })();
   };
 
   const handleDeleteProject = async (projectId: string): Promise<boolean> => {
@@ -368,7 +387,9 @@ export function AdminDashboard() {
           {activeTab === 'overview' && (
             <OverviewTab
               overview={overview}
+              activeProject={projects.find((p) => p.id === activeProjectId) ?? null}
               onOpenDataTab={() => setActiveTab('data')}
+              onOpenProjects={() => setProjectsDrawerOpen(true)}
               onOpenTable={(table) => {
                 setSelectedTable(table);
                 setActiveTab('data');
@@ -455,6 +476,7 @@ export function AdminDashboard() {
         }}
         onCreateProject={handleCreateProject}
         onApplySchema={handleApplyProjectSchema}
+        onExportProject={handleExportProject}
         onDeleteProject={handleDeleteProject}
       />
 

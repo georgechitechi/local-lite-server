@@ -8,6 +8,7 @@ import { runCronAction } from '../crons.js';
 import type { FunctionRuntime } from '../functions/index.js';
 import type { ProjectRecord } from '../projects.js';
 import { applySchema, planSchema, type SchemaDictionary } from '../schema.js';
+import { bucketKey, unscopeBucket } from '../storage.js';
 import { fromDbRow } from '../tableStorage.js';
 import { clampInt } from './console.js';
 
@@ -136,9 +137,6 @@ export function createAdminOps(
       const projectId = project?.id ?? null;
       const scopeWhere = projectId ? 'project_id = ?' : 'project_id IS NULL';
       const scopeParams: unknown[] = projectId ? [projectId] : [];
-      const bucketKey = (name: string) => (projectId ? `${projectId}:${name}` : name);
-      const unscopeBucket = (raw: string) =>
-        projectId && raw.startsWith(`${projectId}:`) ? raw.slice(projectId.length + 1) : raw;
 
       if (method === 'GET') {
         const bucket = url.searchParams.get('bucket');
@@ -148,7 +146,7 @@ export function createAdminOps(
           `SELECT * FROM _lls_storage_buckets WHERE ${scopeWhere} ORDER BY name ASC`,
           scopeParams,
         );
-        const buckets = rawBuckets.map((b) => ({ ...b, name: unscopeBucket(String(b.name)) }));
+        const buckets = rawBuckets.map((b) => ({ ...b, name: unscopeBucket(projectId, String(b.name)) }));
         const where = bucket ? `WHERE ${scopeWhere} AND bucket = ?` : `WHERE ${scopeWhere}`;
         const params = bucket ? [...scopeParams, bucket] : scopeParams;
         const files = await db.query<any>(
@@ -179,7 +177,7 @@ export function createAdminOps(
             updateCols: ['visibility', 'project_id'],
             dialect: db.dialect,
           }),
-          [bucketKey(name), vis, projectId, Date.now()],
+          [bucketKey(projectId, name), vis, projectId, Date.now()],
         );
         return Response.json({ success: true, name, visibility: vis }, { status: 201 });
       }
@@ -189,7 +187,7 @@ export function createAdminOps(
         if (bucket) {
           await db.execute(
             `DELETE FROM _lls_storage_buckets WHERE name = ? AND ${scopeWhere}`,
-            [bucketKey(bucket), ...scopeParams],
+            [bucketKey(projectId, bucket), ...scopeParams],
           );
           return Response.json({ success: true });
         }

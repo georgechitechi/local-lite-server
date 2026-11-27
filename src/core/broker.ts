@@ -12,6 +12,30 @@ export interface ManagedBroker extends SyncEventBroker {
   close(): Promise<void>;
 }
 
+/** Isolates pub/sub events per project (or root server when projectId is null). */
+export function scopeBroker(broker: SyncEventBroker, projectId: string | null): SyncEventBroker {
+  const prefix = projectId ? `prj:${projectId}:` : null;
+  return {
+    publish(event) {
+      broker.publish({
+        ...event,
+        scopeId: prefix ? `${prefix}${event.scopeId}` : event.scopeId,
+      });
+    },
+    subscribe(listener) {
+      return broker.subscribe((event) => {
+        if (prefix) {
+          if (!event.scopeId.startsWith(prefix)) return;
+          listener({ ...event, scopeId: event.scopeId.slice(prefix.length) });
+        } else {
+          if (event.scopeId.startsWith('prj:')) return;
+          listener(event);
+        }
+      });
+    },
+  };
+}
+
 /**
  * Single-node in-memory broker by default.
  * When `MULTI_INSTANCE=true`:

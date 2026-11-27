@@ -35,6 +35,7 @@ export interface ServerSettings {
   appName: string;
   adminUi: boolean;
   allowConsoleSignup: boolean;
+  maxProjectsPerUser: number;
   smtp?: SmtpSettings;
   corsOrigins: string[];
 }
@@ -75,6 +76,7 @@ export function loadSettings(env: NodeJS.ProcessEnv = process.env): ServerSettin
     appName: env.APP_NAME || 'local-lite-server',
     adminUi: env.ADMIN_UI !== 'false',
     allowConsoleSignup: env.ALLOW_CONSOLE_SIGNUP === 'true',
+    maxProjectsPerUser: Math.max(1, Number(env.MAX_PROJECTS_PER_USER || 20)),
     smtp: env.SMTP_HOST
       ? {
         host: env.SMTP_HOST,

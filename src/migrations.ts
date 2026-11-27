@@ -1,4 +1,5 @@
 import type { SqlExecutor } from 'local-lite/server';
+import { ensureIndex } from './core/sql.js';
 
 interface Migration {
   id: string;
@@ -306,6 +307,8 @@ export async function runMigrations(db: SqlExecutor): Promise<{ applied: string[
     db.dialect === 'postgres' ? 'BOOLEAN NOT NULL DEFAULT FALSE' : 'TINYINT(1) NOT NULL DEFAULT 0',
   );
   for (const t of [
+    '_local_auth_accounts',
+    '_local_auth_reset_otps',
     '_lls_api_keys',
     '_lls_storage_buckets',
     '_lls_storage_files',
@@ -314,6 +317,28 @@ export async function runMigrations(db: SqlExecutor): Promise<{ applied: string[
     '_server_changes',
   ]) {
     await ensureColumn(db, t, 'project_id', 'VARCHAR(64) NULL');
+  }
+  await ensureIndex(db, '_server_changes', 'idx_changes_project_ts', ['project_id', 'timestamp']);
+  await ensureIndex(db, '_lls_api_keys', 'idx_api_keys_project', ['project_id']);
+  await ensureIndex(db, '_local_auth_accounts', 'idx_auth_project_email', ['project_id', 'email']);
+  await ensureIndex(db, '_local_auth_reset_otps', 'idx_otp_project_email', ['project_id', 'email']);
+
+  // Allow the same email across different projects by dropping the legacy global unique constraint on email.
+  if (!done.has('0005_drop_global_email_unique')) {
+    try {
+      if (db.dialect === 'postgres') {
+        await db.execute('ALTER TABLE _local_auth_accounts DROP CONSTRAINT IF EXISTS _local_auth_accounts_email_key');
+      } else {
+        await db.execute('DROP INDEX email ON _local_auth_accounts');
+      }
+    } catch {
+      // Index/constraint already absent
+    }
+    await db.execute('INSERT INTO _lls_migrations (id, applied_at) VALUES (?, ?)', [
+      '0005_drop_global_email_unique',
+      Date.now(),
+    ]);
+    applied.push('0005_drop_global_email_unique');
   }
   return { applied };
 }

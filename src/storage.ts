@@ -9,26 +9,29 @@ import {
 } from 'local-lite/server';
 import type { ServerSettings } from './config.js';
 
+export const bucketKey = (projectId: string | null, name: string) =>
+  projectId ? `${projectId}:${name}` : name;
+
+export const unscopeBucket = (projectId: string | null, raw: string) =>
+  projectId && raw.startsWith(`${projectId}:`) ? raw.slice(projectId.length + 1) : raw;
+
 export function createSqlStorageMetadata(
   db: SqlExecutor,
   projectId: string | null = null,
 ): StorageMetadataAdapter {
   const scopeWhere = projectId ? 'project_id = ?' : 'project_id IS NULL';
   const scopeParams = projectId ? [projectId] : [];
-  const bucketKey = (name: string) => (projectId ? `${projectId}:${name}` : name);
-  const unscopeBucket = (raw: string) =>
-    projectId && raw.startsWith(`${projectId}:`) ? raw.slice(projectId.length + 1) : raw;
 
   return {
     async getBucket(name) {
       const rows = await db.query<any>(
         `SELECT * FROM _lls_storage_buckets WHERE name = ? AND ${scopeWhere} LIMIT 1`,
-        [bucketKey(name), ...scopeParams],
+        [bucketKey(projectId, name), ...scopeParams],
       );
       if (!rows[0]) return null;
       return {
-        id: unscopeBucket(String(rows[0].name)),
-        name: unscopeBucket(String(rows[0].name)),
+        id: unscopeBucket(projectId, String(rows[0].name)),
+        name: unscopeBucket(projectId, String(rows[0].name)),
         visibility: rows[0].visibility === 'public' ? 'public' : 'private',
         createdAt: Number(rows[0].created_at),
       };
@@ -39,7 +42,7 @@ export function createSqlStorageMetadata(
         scopeParams,
       );
       return rows.map((r) => {
-        const logicalName = unscopeBucket(String(r.name));
+        const logicalName = unscopeBucket(projectId, String(r.name));
         return {
           id: logicalName,
           name: logicalName,
@@ -57,13 +60,13 @@ export function createSqlStorageMetadata(
           updateCols: ['visibility', 'project_id'],
           dialect: db.dialect,
         }),
-        [bucketKey(bucket.name), bucket.visibility, projectId, bucket.createdAt ?? Date.now()],
+        [bucketKey(projectId, bucket.name), bucket.visibility, projectId, bucket.createdAt ?? Date.now()],
       );
     },
     async deleteBucket(name) {
       await db.execute(
         `DELETE FROM _lls_storage_buckets WHERE name = ? AND ${scopeWhere}`,
-        [bucketKey(name), ...scopeParams],
+        [bucketKey(projectId, name), ...scopeParams],
       );
     },
     async countFilesInBucket(bucket) {

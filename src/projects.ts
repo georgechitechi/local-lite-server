@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { quoteIdent, type SqlExecutor } from 'local-lite/server';
 import {
   buildSqlTargetSchema,
@@ -7,6 +9,7 @@ import {
 } from 'local-lite/schema/migrations';
 import { defineRules, type RulesDictionary } from './rules.js';
 import { normalizeSchema, type SchemaDictionary } from './schema.js';
+import { fromDbRow } from './tableStorage.js';
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,48}$/;
 
@@ -17,6 +20,7 @@ export interface ProjectRecord {
   ownerUserId: string | null;
   schema: SchemaDictionary;
   rules: RulesDictionary;
+  rulesRaw: Record<string, any>;
   createdAt: number;
   updatedAt: number;
 }
@@ -50,13 +54,25 @@ function toProjectRecord(row: any): ProjectRecord {
     ownerUserId: row.owner_user_id ?? null,
     schema: Object.keys(rawSchema).length ? normalizeSchema(rawSchema) : {},
     rules: Object.keys(rawRules).length ? defineRules(rawRules) : {},
+    rulesRaw: rawRules,
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),
   };
 }
 
-export function createProjectService(db: SqlExecutor) {
+export function createProjectService(db: SqlExecutor, opts?: { maxProjectsPerUser?: number; uploadDir?: string }) {
   const q = (n: string) => quoteIdent(n, db.dialect);
+  const cache = new Map<string, ProjectRecord>();
+  const cachePut = (p: ProjectRecord) => {
+    cache.set(p.id, p);
+    cache.set(p.slug, p);
+    return p;
+  };
+  const cacheEvict = (p: ProjectRecord | null | undefined) => {
+    if (!p) return;
+    cache.delete(p.id);
+    cache.delete(p.slug);
+  };
 
   return {
     async listProjects(ownerUserId?: string): Promise<ProjectRecord[]> {
@@ -66,15 +82,17 @@ export function createProjectService(db: SqlExecutor) {
             [ownerUserId],
           )
         : await db.query<any>('SELECT * FROM _lls_projects ORDER BY created_at DESC');
-      return rows.map(toProjectRecord);
+      return rows.map((r) => cachePut(toProjectRecord(r)));
     },
 
     async getProject(idOrSlug: string): Promise<ProjectRecord | null> {
+      const cached = cache.get(idOrSlug);
+      if (cached) return cached;
       const rows = await db.query<any>(
         'SELECT * FROM _lls_projects WHERE id = ? OR slug = ? LIMIT 1',
         [idOrSlug, idOrSlug],
       );
-      return rows[0] ? toProjectRecord(rows[0]) : null;
+      return rows[0] ? cachePut(toProjectRecord(rows[0])) : null;
     },
 
     async createProject(input: {
@@ -87,6 +105,12 @@ export function createProjectService(db: SqlExecutor) {
       const name = String(input.name ?? '').trim();
       if (!name || name.length > 128) {
         throw new Error('Project name is required (max 128 chars).');
+      }
+      if (input.ownerUserId && opts?.maxProjectsPerUser) {
+        const owned = await this.listProjects(input.ownerUserId);
+        if (owned.length >= opts.maxProjectsPerUser) {
+          throw new Error(`Project limit reached (max ${opts.maxProjectsPerUser} per user).`);
+        }
       }
       const slug = (
         input.slug?.trim() ||
@@ -174,6 +198,7 @@ export function createProjectService(db: SqlExecutor) {
         'UPDATE _lls_projects SET schema_json = ?, schema_state_json = ?, rules_json = ?, updated_at = ? WHERE id = ?',
         [JSON.stringify(schema), JSON.stringify(next), nextRulesJson, Date.now(), projectId],
       );
+      cacheEvict(cache.get(projectId));
 
       return {
         applied: stmts.length,
@@ -182,15 +207,39 @@ export function createProjectService(db: SqlExecutor) {
       };
     },
 
+    async exportProject(projectId: string): Promise<{
+      project: { id: string; slug: string; name: string; schema: SchemaDictionary };
+      exportedAt: number;
+      tables: Record<string, unknown[]>;
+    } | null> {
+      const project = await this.getProject(projectId);
+      if (!project) return null;
+      const tables: Record<string, unknown[]> = {};
+      for (const [logical, fields] of Object.entries(project.schema)) {
+        const rows = await db.query<Record<string, any>>(
+          `SELECT * FROM ${q(toPhysicalTable(project.id, logical))}`,
+        );
+        tables[logical] = rows.map((r) => ({ id: String(r.id), ...fromDbRow(fields, r) }));
+      }
+      return {
+        project: { id: project.id, slug: project.slug, name: project.name, schema: project.schema },
+        exportedAt: Date.now(),
+        tables,
+      };
+    },
+
     async deleteProject(projectId: string): Promise<boolean> {
       const project = await this.getProject(projectId);
       if (!project) return false;
+      cacheEvict(project);
 
       for (const logical of Object.keys(project.schema)) {
         const phys = toPhysicalTable(project.id, logical);
         await db.execute(`DROP TABLE IF EXISTS ${q(phys)}`);
       }
       for (const t of [
+        '_local_auth_accounts',
+        '_local_auth_reset_otps',
         '_lls_api_keys',
         '_lls_storage_buckets',
         '_lls_storage_files',
@@ -200,8 +249,14 @@ export function createProjectService(db: SqlExecutor) {
       ]) {
         await db.execute(`DELETE FROM ${q(t)} WHERE project_id = ?`, [project.id]);
       }
+      if (opts?.uploadDir) {
+        const dir = path.join(opts.uploadDir, 'projects', project.id);
+        if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
+      }
       await db.execute('DELETE FROM _lls_projects WHERE id = ?', [project.id]);
       return true;
     },
   };
 }
+
+export type ProjectService = ReturnType<typeof createProjectService>;

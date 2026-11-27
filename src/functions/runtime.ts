@@ -6,6 +6,7 @@ import {
   setRowDeleted,
   upsertTableRow,
 } from '../core/changes.js';
+import { toPhysicalTable } from '../projects.js';
 import type { SchemaDictionary, SchemaFieldType } from '../schema.js';
 import { fromDbRow, toDbValue } from '../tableStorage.js';
 import {
@@ -19,8 +20,14 @@ import {
   type FunctionRegistry,
 } from './types.js';
 
-function createReader(db: SqlExecutor, schema: SchemaDictionary, readTables: Set<string>): DbReader {
+function createReader(
+  db: SqlExecutor,
+  schema: SchemaDictionary,
+  readTables: Set<string>,
+  projectId: string | null = null,
+): DbReader {
   const q = (n: string) => quoteIdent(n, db.dialect);
+  const phys = (table: string) => toPhysicalTable(projectId, table);
   const fieldsOf = (table: string): Record<string, SchemaFieldType> => {
     const f = Object.hasOwn(schema, table) ? schema[table] : undefined;
     if (!f) throw new FunctionError(`Unknown table "${table}".`, 400);
@@ -33,7 +40,7 @@ function createReader(db: SqlExecutor, schema: SchemaDictionary, readTables: Set
       const fields = fieldsOf(table);
       readTables.add(table);
       const rows = await db.query<Record<string, any>>(
-        `SELECT * FROM ${q(table)} WHERE ${q('id')} = ? AND ${q('deleted')} = ${notDeleted} LIMIT 1`,
+        `SELECT * FROM ${q(phys(table))} WHERE ${q('id')} = ? AND ${q('deleted')} = ${notDeleted} LIMIT 1`,
         [id],
       );
       return rows[0] ? { id: String(rows[0].id), ...fromDbRow(fields, rows[0]) } : null;
@@ -61,7 +68,7 @@ function createReader(db: SqlExecutor, schema: SchemaDictionary, readTables: Set
       const limit = Math.min(Math.max(Math.floor(opts.limit ?? 100), 1), 1000);
       const offset = Math.max(Math.floor(opts.offset ?? 0), 0);
       const rows = await db.query<Record<string, any>>(
-        `SELECT * FROM ${q(table)} ${whereSql} ORDER BY ${q(orderCol)} ${dir} LIMIT ${limit} OFFSET ${offset}`,
+        `SELECT * FROM ${q(phys(table))} ${whereSql} ORDER BY ${q(orderCol)} ${dir} LIMIT ${limit} OFFSET ${offset}`,
         params,
       );
       return rows.map((r) => ({ id: String(r.id), ...fromDbRow(fields, r) }));
@@ -92,9 +99,12 @@ export function createFunctionRuntime(opts: {
   schema: SchemaDictionary;
   broker: SyncEventBroker;
   scopeField?: string;
+  projectId?: string | null;
 }): FunctionRuntime {
   const { registry, db, schema, broker } = opts;
   const scopeField = opts.scopeField ?? 'scope_id';
+  const projectId = opts.projectId ?? null;
+  const phys = (table: string) => toPhysicalTable(projectId, table);
 
   const getFn = (name: string) => {
     const fn = registry.get(name);
@@ -115,7 +125,7 @@ export function createFunctionRuntime(opts: {
     const fn = getFn(name);
     if (fn.__kind !== 'query') throw new FunctionError(`"${name}" is a ${fn.__kind}, not a query.`, 400);
     const readTables = new Set<string>();
-    const result = await fn.handler({ db: createReader(db, schema, readTables), auth }, parseArgs(fn, rawArgs));
+    const result = await fn.handler({ db: createReader(db, schema, readTables, projectId), auth }, parseArgs(fn, rawArgs));
     return { result, readTables };
   };
 
@@ -127,9 +137,9 @@ export function createFunctionRuntime(opts: {
     const readTables = new Set<string>();
 
     const result = await db.withTransaction(async (tx) => {
-      const reader = createReader(tx, schema, readTables);
+      const reader = createReader(tx, schema, readTables, projectId);
       const track = async (table: string, id: string, scopeVal: unknown) => {
-        const ts = await recordChange(tx, table, id);
+        const ts = await recordChange(tx, table, id, '_server_changes', '_server_sync_clock', projectId);
         emitted.push({
           scopeId: typeof scopeVal === 'string' && scopeVal ? scopeVal : 'default',
           tableName: table,
@@ -144,7 +154,7 @@ export function createFunctionRuntime(opts: {
           if (!fields) throw new FunctionError(`Unknown table "${table}".`, 400);
           const id = newRowId(data.id);
           const ts = await track(table, id, data[scopeField]);
-          await upsertTableRow(tx, table, fields, id, data, ts);
+          await upsertTableRow(tx, phys(table), fields, id, data, ts);
           return (await reader.get(table, id))!;
         },
         async patch(table, id, patch) {
@@ -153,7 +163,7 @@ export function createFunctionRuntime(opts: {
           const existing = await reader.get(table, id);
           if (!existing) return null;
           const ts = await track(table, id, patch[scopeField] ?? existing[scopeField]);
-          await patchTableRow(tx, table, fields, id, patch, ts);
+          await patchTableRow(tx, phys(table), fields, id, patch, ts);
           return reader.get(table, id);
         },
         async remove(table, id) {
@@ -161,7 +171,7 @@ export function createFunctionRuntime(opts: {
           const existing = await reader.get(table, id);
           if (!existing) return false;
           const ts = await track(table, id, existing[scopeField]);
-          await setRowDeleted(tx, table, id, true, ts);
+          await setRowDeleted(tx, phys(table), id, true, ts);
           return true;
         },
       };

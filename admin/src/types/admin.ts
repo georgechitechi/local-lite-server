@@ -84,6 +84,7 @@ export interface ProjectItem {
   name: string;
   ownerUserId: string | null;
   schema: Record<string, Record<string, string>>;
+  rulesRaw?: Record<string, any>;
   createdAt: number;
   updatedAt: number;
 }
@@ -95,7 +96,7 @@ export const NAV_ITEMS: Array<{
 }> = [
   { id: 'overview', label: 'Overview' },
   { id: 'data', label: 'Data' },
-  { id: 'auth', label: 'Auth & Users', superAdminOnly: true },
+  { id: 'auth', label: 'Auth & Users' },
   { id: 'api_keys', label: 'API Keys' },
   { id: 'functions', label: 'Functions' },
   { id: 'schedules', label: 'Schedules', superAdminOnly: true },
