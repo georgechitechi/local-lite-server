@@ -10,6 +10,13 @@ import { loadSchema, migrate, start } from './start.js';
 import { loadFunctionsDir } from './functions/index.js';
 import { writeClientCode } from './services/codegen.js';
 import { buildCpanelBundle } from './services/cpanel.js';
+import {
+  runCliLogin,
+  runCliLogout,
+  runCliProjects,
+  runCliPush,
+  runCliRemoteCodegen,
+} from './cli/remote.js';
 
 if (fs.existsSync('.env')) {
   (process as { loadEnvFile?: (p?: string) => void }).loadEnvFile?.('.env');
@@ -99,14 +106,28 @@ if (cmd === 'init') {
   } finally {
     await db.close();
   }
+} else if (cmd === 'login') {
+  await runCliLogin(process.argv.slice(3));
+} else if (cmd === 'logout') {
+  runCliLogout();
+} else if (cmd === 'projects') {
+  await runCliProjects(sub, process.argv.slice(4));
+} else if (cmd === 'push') {
+  await runCliPush(process.argv.slice(3));
 } else if (cmd === 'codegen') {
   const outIdx = process.argv.indexOf('--out');
   const outFile = outIdx !== -1 && process.argv[outIdx + 1] ? process.argv[outIdx + 1] : 'src/client.ts';
-  const settings = loadSettings();
-  const schema = await loadSchema(settings);
-  const functions = await loadFunctionsDir(settings.functionsDir);
-  const abs = writeClientCode(outFile, schema, functions);
-  console.log(`Generated typed client SDK: ${abs}`);
+  const projIdx = process.argv.indexOf('--project');
+  const projectRef = projIdx !== -1 ? process.argv[projIdx + 1] : undefined;
+  if (projectRef) {
+    await runCliRemoteCodegen(process.argv.slice(3), projectRef, outFile);
+  } else {
+    const settings = loadSettings();
+    const schema = await loadSchema(settings);
+    const functions = await loadFunctionsDir(settings.functionsDir);
+    const abs = writeClientCode(outFile, schema, functions);
+    console.log(`Generated typed client SDK: ${abs}`);
+  }
 } else if (cmd === 'build:cpanel') {
   const outIdx = process.argv.indexOf('--out');
   const outDir = outIdx !== -1 && process.argv[outIdx + 1] ? process.argv[outIdx + 1] : 'dist/cpanel';
@@ -118,7 +139,7 @@ if (cmd === 'init') {
   console.log(pkg.version);
 } else {
   console.log(
-    'Usage: local-lite-server <init [dir] [--force] | start | migrate [status|diff] | codegen [--out file] | build:cpanel [--out dir] | --version>',
+    'Usage: local-lite-server <init [dir] [--force] | start | migrate [status|diff] | login [--signup] | logout | projects <list|create|delete> | push --project <slug> | codegen [--project <slug>] [--out file] | build:cpanel [--out dir] | --version>',
   );
   process.exit(cmd === '-h' || cmd === '--help' || cmd === 'help' ? 0 : 1);
 }

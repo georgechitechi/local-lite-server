@@ -22,6 +22,17 @@ export function adminRoutes(deps: {
       POST: async ({ request }: { request: Request }) =>
         consoleApi.postLogout(request, await consoleApi.authenticate(request)),
     },
+    '/admin/cli-token': {
+      POST: authCtx.withAdmin(async (request, s) => {
+        const cookieHeader = request.headers.get('cookie') ?? '';
+        const match = cookieHeader.match(/(?:^|;\s*)lls_admin_session=([^;]+)/);
+        if (!match?.[1]) return authCtx.unauthorized();
+        return Response.json({
+          token: decodeURIComponent(match[1]),
+          email: (s as AdminSession).email ?? 'admin',
+        });
+      }),
+    },
     '/admin/overview': {
       GET: authCtx.withAdmin(async (req, s) => {
         const { project, error } = await authCtx.resolveAdminProject(req, s, true);

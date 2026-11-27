@@ -136,7 +136,10 @@ export function createAdminSession(settings: ServerSettings, db: SqlExecutor) {
         if (password.length < 8) {
           return Response.json({ error: 'Password must be at least 8 characters.' }, { status: 400 });
         }
-        const existing = await db.query<any>('SELECT id FROM _local_auth_accounts WHERE email = ? LIMIT 1', [email]);
+        const existing = await db.query<any>(
+          'SELECT id FROM _local_auth_accounts WHERE email = ? AND project_id IS NULL LIMIT 1',
+          [email],
+        );
         if (existing[0]) {
           return Response.json({ error: 'An account with this email already exists.' }, { status: 409 });
         }
@@ -169,7 +172,10 @@ export function createAdminSession(settings: ServerSettings, db: SqlExecutor) {
           (settings.appSecret && safeEqual(sec, settings.appSecret)) || safeEqual(sec, settings.apiKey);
         if (!validSecret) return Response.json({ error: 'Invalid APP_SECRET / SERVER_API_KEY.' }, { status: 403 });
         if (password.length < 8) return Response.json({ error: 'Password must be at least 8 characters.' }, { status: 400 });
-        const existing = await db.query<any>('SELECT id FROM _local_auth_accounts WHERE email = ? LIMIT 1', [email]);
+        const existing = await db.query<any>(
+          'SELECT id FROM _local_auth_accounts WHERE email = ? AND project_id IS NULL LIMIT 1',
+          [email],
+        );
         const now = Date.now();
         let userId: string;
         if (existing[0]) {

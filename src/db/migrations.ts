@@ -11,7 +11,7 @@ const MYSQL_OPTS = 'ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_genera
 /** Framework tables. App tables come from schema.ts or per-project schemas. */
 export const MIGRATIONS: Migration[] = [
   {
-    id: '0001_init',
+    id: '20261127081945_core_schema',
     mysql: [
       `CREATE TABLE IF NOT EXISTS _server_sync_clock (
         id INT PRIMARY KEY,

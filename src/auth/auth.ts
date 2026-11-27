@@ -11,7 +11,7 @@ import { sendSmtpMail } from '../core/mailer.js';
 
 const num = (v: unknown) => (v == null ? null : Number(v));
 
-/** SQL-backed accounts + reset OTPs (tables created by migration 0002_auth). */
+/** SQL-backed accounts + reset OTPs (tables created by migration 20261127081945_core_schema). */
 export function createAuthStorage(db: SqlExecutor, projectId: string | null = null): ServerAuthStorage {
   const scopeWhere = projectId ? 'project_id = ?' : 'project_id IS NULL';
   const scopeParams = projectId ? [projectId] : [];

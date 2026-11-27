@@ -165,6 +165,29 @@ export function AdminDashboard() {
       return;
     }
     if (authenticated) {
+      const params = new URLSearchParams(window.location.search);
+      const cliRedirect = params.get('cli_redirect');
+      const cliState = params.get('cli_state') ?? '';
+      if (
+        cliRedirect &&
+        /^http:\/\/(127\.0\.0\.1|localhost):\d+\/callback$/.test(cliRedirect)
+      ) {
+        void (async () => {
+          const res = await adminFetch('/admin/cli-token', { method: 'POST' });
+          const d = (await res.json().catch(() => ({}))) as {
+            token?: string;
+            email?: string;
+          };
+          if (res.ok && d.token) {
+            const target = new URL(cliRedirect);
+            target.searchParams.set('token', d.token);
+            if (d.email) target.searchParams.set('email', d.email);
+            if (cliState) target.searchParams.set('state', cliState);
+            window.location.replace(target.toString());
+          }
+        })();
+        return;
+      }
       void loadOverview();
     }
   }, [authenticated, loadOverview]);
