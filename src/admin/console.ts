@@ -1,9 +1,9 @@
 import { quoteIdent, type SqlExecutor, type SyncEventBroker } from 'local-lite/server';
 import type { ServerSettings } from '../config.js';
 import type { FunctionRuntime } from '../functions/index.js';
-import type { SchemaDictionary } from '../schema.js';
-import { toPhysicalTable, type ProjectRecord } from '../projects.js';
-import { fromDbRow } from '../tableStorage.js';
+import type { SchemaDictionary } from '../db/schema.js';
+import { toPhysicalTable, type ProjectRecord } from '../services/projects.js';
+import { fromDbRow } from '../db/tableStorage.js';
 import { newRowId, patchTableRow, recordChange, setRowDeleted, upsertTableRow } from '../core/changes.js';
 import type { AdminSession } from './session.js';
 

@@ -3,13 +3,13 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadSettings } from './config.js';
-import { createDatabase } from './db.js';
-import { coreMigrationStatus } from './migrations.js';
-import { planSchema } from './schema.js';
+import { createDatabase } from './db/client.js';
+import { coreMigrationStatus } from './db/migrations.js';
+import { planSchema } from './db/schema.js';
 import { loadSchema, migrate, start } from './start.js';
 import { loadFunctionsDir } from './functions/index.js';
-import { writeClientCode } from './codegen.js';
-import { buildCpanelBundle } from './cpanel.js';
+import { writeClientCode } from './services/codegen.js';
+import { buildCpanelBundle } from './services/cpanel.js';
 
 if (fs.existsSync('.env')) {
   (process as { loadEnvFile?: (p?: string) => void }).loadEnvFile?.('.env');

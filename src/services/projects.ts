@@ -7,9 +7,9 @@ import {
   generateSqlDiff,
   type SqlSchemaState,
 } from 'local-lite/schema/migrations';
-import { defineRules, type RulesDictionary } from './rules.js';
-import { normalizeSchema, type SchemaDictionary } from './schema.js';
-import { fromDbRow } from './tableStorage.js';
+import { defineRules, type RulesDictionary } from '../db/rules.js';
+import { normalizeSchema, type SchemaDictionary } from '../db/schema.js';
+import { fromDbRow } from '../db/tableStorage.js';
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,48}$/;
 

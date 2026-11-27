@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { loadSettings } from '../src/config.js';
-import { normalizeSchema } from '../src/schema.js';
+import { normalizeSchema } from '../src/db/schema.js';
 import { createApp } from '../src/server.js';
-import { defineRules } from '../src/rules.js';
+import { defineRules } from '../src/db/rules.js';
 
 const env = {
   DB_DIALECT: 'mysql',

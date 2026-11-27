@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { loadSettings } from '../../src/config.js';
-import { createDatabase } from '../../src/db.js';
+import { createDatabase } from '../../src/db/client.js';
 import { defineMutation, defineQuery, type FunctionRegistry } from '../../src/functions/index.js';
-import { runMigrations } from '../../src/migrations.js';
-import { defineRules } from '../../src/rules.js';
-import { applySchema, normalizeSchema } from '../../src/schema.js';
+import { runMigrations } from '../../src/db/migrations.js';
+import { defineRules } from '../../src/db/rules.js';
+import { applySchema, normalizeSchema } from '../../src/db/schema.js';
 import { createApp } from '../../src/server.js';
 
 function parseDbUrl(dialect: 'mysql' | 'postgres', rawUrl: string) {

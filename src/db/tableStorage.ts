@@ -10,8 +10,8 @@ import {
   lockClock,
   setRowDeleted,
   upsertTableRow,
-} from './core/changes.js';
-import { toPhysicalTable } from './projects.js';
+} from '../core/changes.js';
+import { toPhysicalTable } from '../services/projects.js';
 import type { RuleContext, RulesDictionary } from './rules.js';
 import type { SchemaDictionary, SchemaFieldType } from './schema.js';
 

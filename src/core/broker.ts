@@ -6,7 +6,7 @@ import {
   type SyncEventBroker,
 } from 'local-lite/server';
 import type { ServerSettings } from '../config.js';
-import { pgClientConfig } from '../db.js';
+import { pgClientConfig } from '../db/client.js';
 
 export interface ManagedBroker extends SyncEventBroker {
   close(): Promise<void>;

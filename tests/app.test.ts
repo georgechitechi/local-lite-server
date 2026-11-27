@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { loadSettings } from '../src/config.js';
 import { createApp } from '../src/server.js';
-import { normalizeSchema, resolveSchemaFile } from '../src/schema.js';
-import { ClientError, TableSyncStorage, fromDbRow, toDbValue } from '../src/tableStorage.js';
+import { normalizeSchema, resolveSchemaFile } from '../src/db/schema.js';
+import { ClientError, TableSyncStorage, fromDbRow, toDbValue } from '../src/db/tableStorage.js';
 
 const env = {
   DB_DIALECT: 'mysql',

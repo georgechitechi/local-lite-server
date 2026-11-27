@@ -1,13 +1,13 @@
 import { loadSettings, type ServerSettings } from './config.js';
-import { createDatabase, pgClientConfig, type Database } from './db.js';
-import { runMigrations } from './migrations.js';
-import { applySchema, loadSchemaFile, planSchema, resolveSchemaFile } from './schema.js';
-import type { SchemaDictionary } from './schema.js';
-import { loadRulesFile, resolveRulesFile, type RulesDictionary } from './rules.js';
-import { loadRoutesFile, resolveRoutesFile } from './routes.js';
+import { createDatabase, pgClientConfig, type Database } from './db/client.js';
+import { runMigrations } from './db/migrations.js';
+import { applySchema, loadSchemaFile, planSchema, resolveSchemaFile } from './db/schema.js';
+import type { SchemaDictionary } from './db/schema.js';
+import { loadRulesFile, resolveRulesFile, type RulesDictionary } from './db/rules.js';
+import { loadRoutesFile, resolveRoutesFile } from './services/routes.js';
 import { loadFunctionsDir, watchFunctionsDir } from './functions/index.js';
 import { createClusterBroker } from './core/broker.js';
-import { startCronScheduler } from './crons.js';
+import { startCronScheduler } from './services/crons.js';
 import { createApp, createHttpServer } from './server.js';
 
 async function tryCreateDatabase(s: ServerSettings): Promise<boolean> {

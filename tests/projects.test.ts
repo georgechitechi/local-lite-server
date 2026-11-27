@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { loadSettings } from '../src/config.js';
-import { createProjectService, toPhysicalTable } from '../src/projects.js';
-import { normalizeSchema } from '../src/schema.js';
+import { createProjectService, toPhysicalTable } from '../src/services/projects.js';
+import { normalizeSchema } from '../src/db/schema.js';
 import { createApp } from '../src/server.js';
-import { TableSyncStorage } from '../src/tableStorage.js';
+import { TableSyncStorage } from '../src/db/tableStorage.js';
 
 const baseEnv = {
   DB_DIALECT: 'mysql',

@@ -1,7 +1,7 @@
 import { createSyncEventsHandler, type SyncEventBroker } from 'local-lite/server';
 import type { FunctionRuntime } from '../../functions/index.js';
-import type { ProjectRecord, ProjectService } from '../../projects.js';
-import type { TableSyncStorage } from '../../tableStorage.js';
+import type { ProjectRecord, ProjectService } from '../../services/projects.js';
+import type { TableSyncStorage } from '../../db/tableStorage.js';
 import type { AuthContext, ResolvedAuth } from '../authContext.js';
 import type { ProjectRuntimeCache } from '../projectRuntime.js';
 

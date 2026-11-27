@@ -3,8 +3,8 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { build } from 'esbuild';
 import { resolveRoutesFile } from './routes.js';
-import { resolveRulesFile } from './rules.js';
-import { resolveSchemaFile } from './schema.js';
+import { resolveRulesFile } from '../db/rules.js';
+import { resolveSchemaFile } from '../db/schema.js';
 
 const require = createRequire(import.meta.url);
 

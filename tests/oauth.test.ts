@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadSettings } from '../src/config.js';
-import { clearOAuthCacheForTests } from '../src/oauth.js';
-import { normalizeSchema } from '../src/schema.js';
+import { clearOAuthCacheForTests } from '../src/auth/oauth.js';
+import { normalizeSchema } from '../src/db/schema.js';
 import { createApp } from '../src/server.js';
 
 const base = {

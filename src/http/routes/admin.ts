@@ -1,4 +1,4 @@
-import type { ApiKeyService } from '../../apiKeys.js';
+import type { ApiKeyService } from '../../auth/apiKeys.js';
 import type { AdminSession } from '../../admin/session.js';
 import type { AuthContext } from '../authContext.js';
 

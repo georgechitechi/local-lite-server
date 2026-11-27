@@ -1,13 +1,13 @@
-import type { ApiKeyService } from '../apiKeys.js';
-import type { AuthService } from '../auth.js';
+import type { ApiKeyService } from '../auth/apiKeys.js';
+import type { AuthService } from '../auth/auth.js';
 import type { ServerSettings } from '../config.js';
 import { HttpError } from '../core/errors.js';
 import { safeEqual } from '../core/http.js';
 import { FunctionError, type FunctionAuth } from '../functions/index.js';
-import { verifyOAuthToken } from '../oauth.js';
-import type { ProjectRecord, ProjectService } from '../projects.js';
-import { clientIp } from '../rateLimit.js';
-import { ClientError, ForbiddenError } from '../tableStorage.js';
+import { verifyOAuthToken } from '../auth/oauth.js';
+import type { ProjectRecord, ProjectService } from '../services/projects.js';
+import { clientIp } from '../auth/rateLimit.js';
+import { ClientError, ForbiddenError } from '../db/tableStorage.js';
 
 export type ResolvedAuth = FunctionAuth & {
   projectId?: string | null;

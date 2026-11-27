@@ -5,8 +5,8 @@ import {
   type SyncEventBroker,
 } from 'local-lite/server';
 import { createAdminConsole } from './admin/index.js';
-import { createApiKeyService } from './apiKeys.js';
-import { createAuthService } from './auth.js';
+import { createApiKeyService } from './auth/apiKeys.js';
+import { createAuthService } from './auth/auth.js';
 import type { ServerSettings } from './config.js';
 import { scopeBroker } from './core/broker.js';
 import { corsHeaders, createHttpServer } from './core/http.js';
@@ -16,14 +16,14 @@ import { createProjectRuntimeCache } from './http/projectRuntime.js';
 import { adminRoutes } from './http/routes/admin.js';
 import { projectRoutes } from './http/routes/projects.js';
 import { syncAndProjectRoutes } from './http/routes/sync.js';
-import { handleOAuthTokenExchange } from './oauth.js';
-import { createProjectService } from './projects.js';
-import { createDistributedRateLimiter } from './rateLimit.js';
-import type { CustomRoutesFactory, CustomRoutesMap } from './routes.js';
-import type { RulesDictionary } from './rules.js';
-import type { SchemaDictionary } from './schema.js';
-import { createStorageHandler } from './storage.js';
-import { TableSyncStorage } from './tableStorage.js';
+import { handleOAuthTokenExchange } from './auth/oauth.js';
+import { createProjectService } from './services/projects.js';
+import { createDistributedRateLimiter } from './auth/rateLimit.js';
+import type { CustomRoutesFactory, CustomRoutesMap } from './services/routes.js';
+import type { RulesDictionary } from './db/rules.js';
+import type { SchemaDictionary } from './db/schema.js';
+import { createStorageHandler } from './services/storage.js';
+import { TableSyncStorage } from './db/tableStorage.js';
 
 export { createHttpServer };
 

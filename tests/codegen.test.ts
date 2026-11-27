@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { generateClientCode } from '../src/codegen.js';
+import { generateClientCode } from '../src/services/codegen.js';
 import { defineMutation, defineQuery, type FunctionRegistry } from '../src/functions/index.js';
-import { normalizeSchema } from '../src/schema.js';
+import { normalizeSchema } from '../src/db/schema.js';
 
 describe('Client SDK codegen', () => {
   it('emits typed row interfaces, function callers, and SSE subscribers', () => {

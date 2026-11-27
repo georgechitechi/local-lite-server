@@ -1,5 +1,5 @@
 import { pathToFileURL } from 'node:url';
-import { resolveProjectFile } from './core/resolve.js';
+import { resolveProjectFile } from '../core/resolve.js';
 
 export interface RuleContext {
   isAdmin: boolean;

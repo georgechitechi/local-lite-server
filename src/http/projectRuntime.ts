@@ -1,5 +1,5 @@
 import type { SqlExecutor, SyncEventBroker } from 'local-lite/server';
-import { createAuthService, type AuthService } from '../auth.js';
+import { createAuthService, type AuthService } from '../auth/auth.js';
 import type { ServerSettings } from '../config.js';
 import { scopeBroker } from '../core/broker.js';
 import {
@@ -7,10 +7,10 @@ import {
   type FunctionRegistry,
   type FunctionRuntime,
 } from '../functions/index.js';
-import type { ProjectRecord } from '../projects.js';
-import type { RulesDictionary } from '../rules.js';
-import { createStorageHandler } from '../storage.js';
-import { TableSyncStorage } from '../tableStorage.js';
+import type { ProjectRecord } from '../services/projects.js';
+import type { RulesDictionary } from '../db/rules.js';
+import { createStorageHandler } from '../services/storage.js';
+import { TableSyncStorage } from '../db/tableStorage.js';
 import type { ResolvedAuth } from './authContext.js';
 
 export interface ProjectRuntimeBundle {

@@ -1,5 +1,5 @@
-import type { ProjectRecord, ProjectService } from '../../projects.js';
-import type { SchemaDictionary } from '../../schema.js';
+import type { ProjectRecord, ProjectService } from '../../services/projects.js';
+import type { SchemaDictionary } from '../../db/schema.js';
 import type { AuthContext, ProjectCaller } from '../authContext.js';
 import type { ProjectRuntimeCache } from '../projectRuntime.js';
 

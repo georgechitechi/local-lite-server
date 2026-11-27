@@ -8,7 +8,7 @@ import {
   type SchemaFieldType,
   type SqlSchemaState,
 } from 'local-lite/schema/migrations';
-import { resolveProjectFile } from './core/resolve.js';
+import { resolveProjectFile } from '../core/resolve.js';
 
 export type { SchemaDictionary, SchemaFieldType };
 

@@ -9,7 +9,7 @@ import {
   loadFunctionsDir,
   type FunctionRegistry,
 } from '../src/functions/index.js';
-import { normalizeSchema } from '../src/schema.js';
+import { normalizeSchema } from '../src/db/schema.js';
 import { createApp } from '../src/server.js';
 
 const env = {

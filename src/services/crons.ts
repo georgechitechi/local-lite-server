@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { quoteIdent, type SqlExecutor } from 'local-lite/server';
-import type { ServerSettings } from './config.js';
-import type { FunctionRuntime } from './functions/index.js';
+import type { ServerSettings } from '../config.js';
+import type { FunctionRuntime } from '../functions/index.js';
 
 export interface CronJobRecord {
   job_key: string;

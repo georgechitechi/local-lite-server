@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { loadSettings } from '../src/config.js';
 import { createClusterBroker } from '../src/core/broker.js';
-import { createDistributedRateLimiter } from '../src/rateLimit.js';
+import { createDistributedRateLimiter } from '../src/auth/rateLimit.js';
 
 describe('Multi-instance broker & distributed rate limiter', () => {
   it('uses in-memory broker when MULTI_INSTANCE is false', async () => {

@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { buildUpsertSql, quoteIdent, type SqlExecutor } from 'local-lite/server';
-import type { SchemaFieldType } from '../schema.js';
-import { toDbValue } from '../tableStorage.js';
+import type { SchemaFieldType } from '../db/schema.js';
+import { toDbValue } from '../db/tableStorage.js';
 
 const SYSTEM_COLS = new Set(['id', 'updated_at', 'deleted']);
 

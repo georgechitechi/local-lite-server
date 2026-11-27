@@ -4,12 +4,12 @@ import path from 'node:path';
 import { buildUpsertSql, quoteIdent, type SqlExecutor } from 'local-lite/server';
 import type { ServerSettings } from '../config.js';
 import { sendSmtpMail } from '../core/mailer.js';
-import { runCronAction } from '../crons.js';
+import { runCronAction } from '../services/crons.js';
 import type { FunctionRuntime } from '../functions/index.js';
-import type { ProjectRecord } from '../projects.js';
-import { applySchema, planSchema, type SchemaDictionary } from '../schema.js';
-import { bucketKey, unscopeBucket } from '../storage.js';
-import { fromDbRow } from '../tableStorage.js';
+import type { ProjectRecord } from '../services/projects.js';
+import { applySchema, planSchema, type SchemaDictionary } from '../db/schema.js';
+import { bucketKey, unscopeBucket } from '../services/storage.js';
+import { fromDbRow } from '../db/tableStorage.js';
 import { clampInt } from './console.js';
 
 export function createAdminOps(

@@ -6,8 +6,8 @@ import {
   type ServerAuthUserRecord,
   type SqlExecutor,
 } from 'local-lite/server';
-import type { ServerSettings } from './config.js';
-import { sendSmtpMail } from './core/mailer.js';
+import type { ServerSettings } from '../config.js';
+import { sendSmtpMail } from '../core/mailer.js';
 
 const num = (v: unknown) => (v == null ? null : Number(v));
 

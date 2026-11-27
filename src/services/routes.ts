@@ -1,9 +1,9 @@
 import { pathToFileURL } from 'node:url';
 import type { SqlExecutor, SyncEventBroker } from 'local-lite/server';
-import type { ServerSettings } from './config.js';
-import { resolveProjectFile } from './core/resolve.js';
-import type { FunctionAuth } from './functions/index.js';
-import type { SchemaDictionary } from './schema.js';
+import type { ServerSettings } from '../config.js';
+import { resolveProjectFile } from '../core/resolve.js';
+import type { FunctionAuth } from '../functions/index.js';
+import type { SchemaDictionary } from '../db/schema.js';
 
 export interface CustomRoutesContext {
   db: SqlExecutor;

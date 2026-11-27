@@ -1,5 +1,5 @@
 import { createSqlExecutor, type SqlExecutor } from 'local-lite/server';
-import type { ServerSettings } from './config.js';
+import type { ServerSettings } from '../config.js';
 
 export interface Database {
   executor: SqlExecutor;

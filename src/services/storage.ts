@@ -7,7 +7,7 @@ import {
   type StorageMetadataAdapter,
   type StoredFileMeta,
 } from 'local-lite/server';
-import type { ServerSettings } from './config.js';
+import type { ServerSettings } from '../config.js';
 
 export const bucketKey = (projectId: string | null, name: string) =>
   projectId ? `${projectId}:${name}` : name;

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createApiKeyService } from '../src/apiKeys.js';
+import { createApiKeyService } from '../src/auth/apiKeys.js';
 import { loadSettings } from '../src/config.js';
-import { normalizeSchema } from '../src/schema.js';
+import { normalizeSchema } from '../src/db/schema.js';
 import { createApp } from '../src/server.js';
 
 const base = {

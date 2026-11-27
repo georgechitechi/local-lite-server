@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { loadSettings } from '../src/config.js';
 import { createApp } from '../src/server.js';
-import { normalizeSchema } from '../src/schema.js';
-import { createRateLimiter } from '../src/rateLimit.js';
+import { normalizeSchema } from '../src/db/schema.js';
+import { createRateLimiter } from '../src/auth/rateLimit.js';
 
 const base = {
   DB_DIALECT: 'mysql',

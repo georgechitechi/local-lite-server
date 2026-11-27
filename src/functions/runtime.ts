@@ -6,9 +6,9 @@ import {
   setRowDeleted,
   upsertTableRow,
 } from '../core/changes.js';
-import { toPhysicalTable } from '../projects.js';
-import type { SchemaDictionary, SchemaFieldType } from '../schema.js';
-import { fromDbRow, toDbValue } from '../tableStorage.js';
+import { toPhysicalTable } from '../services/projects.js';
+import type { SchemaDictionary, SchemaFieldType } from '../db/schema.js';
+import { fromDbRow, toDbValue } from '../db/tableStorage.js';
 import {
   FunctionError,
   type ActionContext,

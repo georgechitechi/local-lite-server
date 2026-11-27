@@ -3,8 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadSettings } from '../src/config.js';
-import { matchesCron, runCronAction } from '../src/crons.js';
-import { normalizeSchema } from '../src/schema.js';
+import { matchesCron, runCronAction } from '../src/services/crons.js';
+import { normalizeSchema } from '../src/db/schema.js';
 import { createApp } from '../src/server.js';
 
 describe('Cron matcher & actions', () => {

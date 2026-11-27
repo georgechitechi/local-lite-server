@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { FunctionRegistry } from './functions/index.js';
-import type { SchemaDictionary, SchemaFieldType } from './schema.js';
+import type { FunctionRegistry } from '../functions/index.js';
+import type { SchemaDictionary, SchemaFieldType } from '../db/schema.js';
 
 function tsType(field: SchemaFieldType): string {
   const nullable = field.endsWith(' | null');
