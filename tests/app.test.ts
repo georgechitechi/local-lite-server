@@ -54,11 +54,9 @@ describe('local-lite-server app', () => {
     expect(() => loadSettings({})).toThrow(/Missing/);
   });
 
-  it('resolves root schema.ts inside the package repo and rejects invalid schema values', () => {
-    expect(resolveSchemaFile().endsWith('schema.ts')).toBe(true);
-    expect(resolveSchemaFile().replace(/\\/g, '/')).not.toContain(
-      '/src/schema.ts',
-    );
+  it('resolves template schema.ts and rejects invalid schema values', () => {
+    const resolved = resolveSchemaFile(undefined, 'templates').replace(/\\/g, '/');
+    expect(resolved.endsWith('templates/src/schema.ts')).toBe(true);
     expect(() => normalizeSchema({ bad: (() => {}) as any })).toThrow();
     expect(() => normalizeSchema({ bad: { col: 'invalid' as any } })).toThrow();
   });

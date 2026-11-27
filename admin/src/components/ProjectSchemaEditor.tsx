@@ -32,19 +32,7 @@ export function schemaToDrafts(
   rulesRaw: Record<string, any> = {},
 ): TableDraft[] {
   const entries = Object.entries(schema);
-  if (entries.length === 0) {
-    return [
-      {
-        name: 'notes',
-        rule: 'owner',
-        fields: [
-          { name: 'title', type: 'string' },
-          { name: 'body', type: 'string | null' },
-          { name: 'owner_id', type: 'string' },
-        ],
-      },
-    ];
-  }
+  if (entries.length === 0) return [];
   return entries.map(([name, cols]) => {
     const r = rulesRaw[name];
     return {

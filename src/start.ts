@@ -69,7 +69,13 @@ function friendlyDbError(err: unknown, s: ServerSettings): unknown {
 }
 
 export async function loadSchema(s: ServerSettings): Promise<SchemaDictionary> {
-  return loadSchemaFile(resolveSchemaFile(s.schemaPath));
+  let file: string | null = null;
+  try {
+    file = resolveSchemaFile(s.schemaPath);
+  } catch (err) {
+    if (s.schemaPath) throw err;
+  }
+  return file ? loadSchemaFile(file) : {};
 }
 
 /** Core + schema migrations. Returns a human-readable log. */
@@ -85,13 +91,15 @@ export async function migrate(
         '[local-lite-server] core migrations:',
         core.applied.join(', '),
       );
-    const plan = await applySchema(db.executor, schema);
-    if (plan.up.length)
-      console.log(
-        `[local-lite-server] schema: applied ${plan.up.length} change(s)`,
-      );
-    for (const w of plan.warnings)
-      console.warn('[local-lite-server] schema warning:', w);
+    if (Object.keys(schema).length > 0) {
+      const plan = await applySchema(db.executor, schema);
+      if (plan.up.length)
+        console.log(
+          `[local-lite-server] schema: applied ${plan.up.length} change(s)`,
+        );
+      for (const w of plan.warnings)
+        console.warn('[local-lite-server] schema warning:', w);
+    }
   };
   try {
     await applyAll();
@@ -117,7 +125,7 @@ export async function start() {
   const rules: RulesDictionary = rulesFile
     ? await loadRulesFile(rulesFile)
     : {};
-  if (settings.appSecret && !rulesFile) {
+  if (Object.keys(schema).length > 0 && settings.appSecret && !rulesFile) {
     console.warn(
       '[local-lite-server] APP_SECRET is set without src/rules.ts; authenticated users can sync all tables.',
     );
