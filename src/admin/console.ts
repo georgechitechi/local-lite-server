@@ -29,7 +29,7 @@ export function createAdminData(opts: {
       const activeSchema = project ? project.schema : session.consoleRole === 'super_admin' ? schema : {};
       try {
         for (const t of Object.keys(activeSchema)) {
-          const phys = toPhysicalTable(project?.id ?? null, t);
+          const phys = toPhysicalTable(project?.slug ?? null, t);
           const r = await db.query<any>(`SELECT COUNT(*) AS n FROM ${q(phys)}`);
           tableCounts.push({ table: t, count: Number(r[0]?.n ?? 0) });
         }
@@ -108,7 +108,7 @@ export function createAdminData(opts: {
         const table = tableOverride || url.searchParams.get('table') || '';
         if (!Object.hasOwn(activeSchema, table)) return Response.json({ error: 'Invalid table name.' }, { status: 400 });
         const fields = activeSchema[table];
-        const phys = toPhysicalTable(projectId, table);
+        const phys = toPhysicalTable(project?.slug ?? null, table);
         const limit = clampInt(url.searchParams.get('limit'), 30, 1, 500);
         const offset = clampInt(url.searchParams.get('offset'), 0, 0, 10_000_000);
         const where = url.searchParams.get('includeDeleted') === '1' ? '' : `WHERE ${q('deleted')} = ${notDeleted}`;
@@ -130,7 +130,7 @@ export function createAdminData(opts: {
       const table = tableOverride || url.searchParams.get('table') || String(body?.table ?? '');
       if (!Object.hasOwn(activeSchema, table)) return Response.json({ error: 'Invalid table name.' }, { status: 400 });
       const fields = activeSchema[table];
-      const phys = toPhysicalTable(projectId, table);
+      const phys = toPhysicalTable(project?.slug ?? null, table);
       const rowData = body?.row && typeof body.row === 'object' ? body.row : body || {};
 
       if (method === 'POST' || method === 'PATCH') {

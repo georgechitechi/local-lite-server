@@ -50,6 +50,10 @@ function createMockDb() {
         const a = accounts.get(params[0]);
         return a ? [a] : [];
       }
+      if (sql.includes('FROM _lls_projects WHERE slug IN')) {
+        const wanted = new Set(params);
+        return Array.from(projects.values()).filter((p) => wanted.has(p.slug));
+      }
       if (sql.includes('FROM _lls_projects WHERE slug = ?')) {
         for (const p of projects.values()) {
           if (p.slug === params[0]) return [p];
@@ -192,9 +196,8 @@ function createMockDb() {
 }
 
 describe('multi-project central server', () => {
-  it('maps logical tables to p_<shortId>_<table> physical SQL tables', () => {
-    const pid = 'prj_1234567890abcdef';
-    expect(toPhysicalTable(pid, 'notes')).toBe('p_12345678_notes');
+  it('maps logical tables to p_<slug>_<table> physical SQL tables', () => {
+    expect(toPhysicalTable('my-app', 'notes')).toBe('p_my_app_notes');
     expect(toPhysicalTable(null, 'notes')).toBe('notes');
   });
 
@@ -355,10 +358,25 @@ describe('multi-project central server', () => {
     );
     expect(pushRes.status).toBe(200);
 
-    // Physical table p_<shortId>_notes holds the row, and _server_changes has project_id = p1.id
-    const physTable = toPhysicalTable(p1.id, 'notes');
+    // Physical table p_<slug>_notes holds the row, and _server_changes has project_id = p1.id
+    const physTable = toPhysicalTable(p1.slug, 'notes');
+    expect(physTable).toBe('p_app_one_notes');
     expect(db.tables.get(physTable)?.get('n1')?.title).toBe('Hello P1');
     expect(db.changes.at(-1)?.project_id).toBe(p1.id);
+
+    // Creating a project with a taken slug returns 409 with available suggestions derived from name
+    const dupRes = await app.fetch(
+      new Request('http://localhost/projects', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', cookie },
+        body: JSON.stringify({ name: 'App One', slug: 'app-one' }),
+      }),
+    );
+    expect(dupRes.status).toBe(409);
+    const dupJson = (await dupRes.json()) as any;
+    expect(Array.isArray(dupJson.suggestions)).toBe(true);
+    expect(dupJson.suggestions.length).toBeGreaterThan(0);
+    expect(dupJson.suggestions[0]).toMatch(/^app-one-/);
 
     // Pull via /p/app-one/sync succeeds; /p/app-two/sync with p1Key is forbidden
     const pullP1 = await app.fetch(

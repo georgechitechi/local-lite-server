@@ -24,10 +24,10 @@ function createReader(
   db: SqlExecutor,
   schema: SchemaDictionary,
   readTables: Set<string>,
-  projectId: string | null = null,
+  projectSlug: string | null = null,
 ): DbReader {
   const q = (n: string) => quoteIdent(n, db.dialect);
-  const phys = (table: string) => toPhysicalTable(projectId, table);
+  const phys = (table: string) => toPhysicalTable(projectSlug, table);
   const fieldsOf = (table: string): Record<string, SchemaFieldType> => {
     const f = Object.hasOwn(schema, table) ? schema[table] : undefined;
     if (!f) throw new FunctionError(`Unknown table "${table}".`, 400);
@@ -100,11 +100,13 @@ export function createFunctionRuntime(opts: {
   broker: SyncEventBroker;
   scopeField?: string;
   projectId?: string | null;
+  projectSlug?: string | null;
 }): FunctionRuntime {
   const { registry, db, schema, broker } = opts;
   const scopeField = opts.scopeField ?? 'scope_id';
   const projectId = opts.projectId ?? null;
-  const phys = (table: string) => toPhysicalTable(projectId, table);
+  const projectSlug = opts.projectSlug ?? projectId;
+  const phys = (table: string) => toPhysicalTable(projectSlug, table);
 
   const getFn = (name: string) => {
     const fn = registry.get(name);
@@ -125,7 +127,7 @@ export function createFunctionRuntime(opts: {
     const fn = getFn(name);
     if (fn.__kind !== 'query') throw new FunctionError(`"${name}" is a ${fn.__kind}, not a query.`, 400);
     const readTables = new Set<string>();
-    const result = await fn.handler({ db: createReader(db, schema, readTables, projectId), auth }, parseArgs(fn, rawArgs));
+    const result = await fn.handler({ db: createReader(db, schema, readTables, projectSlug), auth }, parseArgs(fn, rawArgs));
     return { result, readTables };
   };
 
@@ -137,7 +139,7 @@ export function createFunctionRuntime(opts: {
     const readTables = new Set<string>();
 
     const result = await db.withTransaction(async (tx) => {
-      const reader = createReader(tx, schema, readTables, projectId);
+      const reader = createReader(tx, schema, readTables, projectSlug);
       const track = async (table: string, id: string, scopeVal: unknown) => {
         const ts = await recordChange(tx, table, id, '_server_changes', '_server_sync_clock', projectId);
         emitted.push({

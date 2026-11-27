@@ -11,7 +11,7 @@ import { defineRules, type RulesDictionary } from '../db/rules.js';
 import { normalizeSchema, type SchemaDictionary } from '../db/schema.js';
 import { fromDbRow } from '../db/tableStorage.js';
 
-const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,48}$/;
+const SLUG_RE = /^[a-z0-9][a-z0-9-]{2,48}$/;
 
 export interface ProjectRecord {
   id: string;
@@ -25,14 +25,23 @@ export interface ProjectRecord {
   updatedAt: number;
 }
 
-export function projectTablePrefix(projectId: string): string {
-  const short = projectId.replace(/^prj_/, '').replace(/[^a-z0-9]/gi, '').slice(0, 8);
-  return `p_${short}_`;
+export class SlugTakenError extends Error {
+  readonly status = 409;
+  readonly suggestions: string[];
+
+  constructor(slug: string, suggestions: string[]) {
+    super(`Project slug "${slug}" is already taken.`);
+    this.suggestions = suggestions;
+  }
 }
 
-export function toPhysicalTable(projectId: string | null | undefined, logicalTable: string): string {
-  if (!projectId) return logicalTable;
-  return `${projectTablePrefix(projectId)}${logicalTable}`;
+export function projectTablePrefix(slug: string): string {
+  return `p_${slug.replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '')}_`;
+}
+
+export function toPhysicalTable(projectSlug: string | null | undefined, logicalTable: string): string {
+  if (!projectSlug) return logicalTable;
+  return `${projectTablePrefix(projectSlug)}${logicalTable}`;
 }
 
 export function projectScope(project?: { id: string } | null) {
@@ -132,12 +141,33 @@ export function createProjectService(db: SqlExecutor, opts?: { maxProjectsPerUse
           .replace(/^-+|-+$/g, '')
       ).toLowerCase();
       if (!SLUG_RE.test(slug)) {
-        throw new Error('Project slug must be 2–49 lowercase letters, digits, or hyphens.');
+        throw new Error('Project slug must be 3–49 lowercase letters, digits, or hyphens.');
       }
 
       const existing = await db.query<any>('SELECT id FROM _lls_projects WHERE slug = ? LIMIT 1', [slug]);
       if (existing[0]) {
-        throw new Error(`Project slug "${slug}" is already taken.`);
+        const base =
+          name
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .slice(0, 36) || slug.slice(0, 36);
+        const candidates = [
+          `${base}-2`,
+          `${base}-3`,
+          `${base}-app`,
+          `${base}-db`,
+          `${base}-${crypto.randomBytes(2).toString('hex')}`,
+        ].filter((c) => SLUG_RE.test(c) && c !== slug);
+        const takenRows = candidates.length
+          ? await db.query<{ slug: string }>(
+              `SELECT slug FROM _lls_projects WHERE slug IN (${candidates.map(() => '?').join(', ')})`,
+              candidates,
+            )
+          : [];
+        const taken = new Set(takenRows.map((r) => r.slug));
+        const suggestions = candidates.filter((c) => !taken.has(c)).slice(0, 3);
+        throw new SlugTakenError(slug, suggestions);
       }
 
       const id = `prj_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
@@ -179,9 +209,10 @@ export function createProjectService(db: SqlExecutor, opts?: { maxProjectsPerUse
       if (!row) throw new Error('Project not found.');
 
       const schema = normalizeSchema(schemaInput);
+      const slug = String(row.slug);
       const physicalDict: SchemaDictionary = {};
       for (const [logical, fields] of Object.entries(schema)) {
-        physicalDict[toPhysicalTable(projectId, logical)] = fields;
+        physicalDict[toPhysicalTable(slug, logical)] = fields;
       }
 
       const prev = parseJsonOr<SqlSchemaState | null>(row.schema_state_json, null);
@@ -229,7 +260,7 @@ export function createProjectService(db: SqlExecutor, opts?: { maxProjectsPerUse
       const tables: Record<string, unknown[]> = {};
       for (const [logical, fields] of Object.entries(project.schema)) {
         const rows = await db.query<Record<string, any>>(
-          `SELECT * FROM ${q(toPhysicalTable(project.id, logical))}`,
+          `SELECT * FROM ${q(toPhysicalTable(project.slug, logical))}`,
         );
         tables[logical] = rows.map((r) => ({ id: String(r.id), ...fromDbRow(fields, r) }));
       }
@@ -246,7 +277,7 @@ export function createProjectService(db: SqlExecutor, opts?: { maxProjectsPerUse
       cacheEvict(project);
 
       for (const logical of Object.keys(project.schema)) {
-        const phys = toPhysicalTable(project.id, logical);
+        const phys = toPhysicalTable(project.slug, logical);
         await db.execute(`DROP TABLE IF EXISTS ${q(phys)}`);
       }
       for (const t of [

@@ -54,7 +54,12 @@ function resolveRemote(args: string[]): { url: string; headers: Record<string, s
 async function apiJson<T = any>(url: string, init: RequestInit): Promise<T> {
   const res = await fetch(url, init);
   const data = (await res.json().catch(() => ({}))) as any;
-  if (!res.ok) throw new Error(data?.error || `Request failed (${res.status})`);
+  if (!res.ok) {
+    const extra = Array.isArray(data?.suggestions) && data.suggestions.length
+      ? ` Try one of: ${data.suggestions.join(', ')}`
+      : '';
+    throw new Error(`${data?.error || `Request failed (${res.status})`}${extra}`);
+  }
   return data as T;
 }
 

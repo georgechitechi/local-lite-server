@@ -50,7 +50,7 @@ export function createBackupsHandler(settings: ServerSettings, db: SqlExecutor, 
       let recordCount = 0;
       for (const [table, fields] of Object.entries(activeSchema)) {
         const rows = await db.query<Record<string, any>>(
-          `SELECT * FROM ${q(toPhysicalTable(scope.projectId, table))}`,
+          `SELECT * FROM ${q(toPhysicalTable(project?.slug ?? null, table))}`,
         );
         data[table] = rows.map((r) => ({ id: String(r.id), ...fromDbRow(fields, r) }));
         recordCount += rows.length;

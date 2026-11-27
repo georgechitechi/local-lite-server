@@ -97,8 +97,10 @@ export interface TableSyncStorageOptions {
   clockTable?: string;
   /** Column used as the realtime event scope when a payload has it. */
   scopeField?: string;
-  /** Optional project id for physically isolated `p_<shortId>_<table>` tables. */
+  /** Optional project id for `_server_changes.project_id` scoping. */
   projectId?: string | null;
+  /** Optional project slug for physically isolated `p_<slug>_<table>` tables. */
+  projectSlug?: string | null;
 }
 
 /**
@@ -114,6 +116,7 @@ export class TableSyncStorage implements ServerSyncStorage {
   private clock: string;
   private scopeField: string;
   private projectId: string | null;
+  private projectSlug: string | null;
 
   constructor(db: SqlExecutor, opts: TableSyncStorageOptions) {
     this.db = db;
@@ -124,6 +127,7 @@ export class TableSyncStorage implements ServerSyncStorage {
     this.clock = opts.clockTable ?? '_server_sync_clock';
     this.scopeField = opts.scopeField ?? 'scope_id';
     this.projectId = opts.projectId ?? null;
+    this.projectSlug = opts.projectSlug ?? null;
   }
 
   get tables(): string[] {
@@ -133,7 +137,7 @@ export class TableSyncStorage implements ServerSyncStorage {
   private q = (name: string) => quoteIdent(name, this.db.dialect);
 
   private sqlTable(logicalTable: string): string {
-    return toPhysicalTable(this.projectId, logicalTable);
+    return toPhysicalTable(this.projectSlug ?? this.projectId, logicalTable);
   }
 
   private fields(table: string): Record<string, SchemaFieldType> {

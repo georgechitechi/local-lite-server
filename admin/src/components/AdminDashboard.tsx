@@ -242,7 +242,7 @@ export function AdminDashboard() {
     slug?: string;
     schema: Record<string, Record<string, string>>;
     rules?: Record<string, any>;
-  }): Promise<boolean> => {
+  }): Promise<{ ok: boolean; suggestions?: string[] }> => {
     const res = await adminFetch('/projects', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -251,13 +251,16 @@ export function AdminDashboard() {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       showToast(data?.error || 'Failed to create project.', 'error');
-      return false;
+      return {
+        ok: false,
+        suggestions: Array.isArray(data?.suggestions) ? data.suggestions : undefined,
+      };
     }
     showToast(`Project "${data.project.name}" created.`, 'info');
     await loadProjects(overview?.consoleRole);
     selectProject(data.project.id);
     void loadOverview();
-    return true;
+    return { ok: true };
   };
 
   const handleApplyProjectSchema = async (

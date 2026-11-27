@@ -1,4 +1,4 @@
-import type { ProjectRecord, ProjectService } from '../../services/projects.js';
+import { SlugTakenError, type ProjectRecord, type ProjectService } from '../../services/projects.js';
 import type { SchemaDictionary } from '../../db/schema.js';
 import type { AuthContext, ProjectCaller } from '../authContext.js';
 import type { ProjectRuntimeCache } from '../projectRuntime.js';
@@ -50,6 +50,12 @@ export function projectRoutes(deps: {
           });
           return Response.json({ project }, { status: 201 });
         } catch (err) {
+          if (err instanceof SlugTakenError) {
+            return Response.json(
+              { error: err.message, suggestions: err.suggestions },
+              { status: 409 },
+            );
+          }
           return Response.json({ error: (err as Error).message }, { status: 400 });
         }
       },

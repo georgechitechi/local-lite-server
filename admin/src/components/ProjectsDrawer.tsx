@@ -36,7 +36,7 @@ export function ProjectsDrawer({
     slug?: string;
     schema: Record<string, Record<string, string>>;
     rules?: Record<string, any>;
-  }) => Promise<boolean>;
+  }) => Promise<{ ok: boolean; suggestions?: string[] }>;
   onApplySchema: (
     projectId: string,
     schema: Record<string, Record<string, string>>,
@@ -54,6 +54,7 @@ export function ProjectsDrawer({
   const [rawJson, setRawJson] = useState('');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const [slugSuggestions, setSlugSuggestions] = useState<string[]>([]);
 
   const openNew = () => {
     setMode('new');
@@ -65,6 +66,7 @@ export function ProjectsDrawer({
     setRawJson(JSON.stringify(draftsToPayload(initial).schema, null, 2));
     setRawMode(false);
     setFormError('');
+    setSlugSuggestions([]);
   };
 
   const openEdit = (p: ProjectItem) => {
@@ -77,6 +79,7 @@ export function ProjectsDrawer({
     setRawJson(JSON.stringify(p.schema ?? {}, null, 2));
     setRawMode(false);
     setFormError('');
+    setSlugSuggestions([]);
   };
 
   const toggleRaw = () => {
@@ -113,18 +116,24 @@ export function ProjectsDrawer({
     }
 
     setSaving(true);
+    setSlugSuggestions([]);
     try {
-      const ok =
-        mode === 'new'
-          ? await onCreateProject({
-              name: name.trim(),
-              slug: slug.trim() || undefined,
-              schema,
-              rules,
-            })
-          : editingId
-            ? await onApplySchema(editingId, schema, rules)
-            : false;
+      let ok = false;
+      if (mode === 'new') {
+        const res = await onCreateProject({
+          name: name.trim(),
+          slug: slug.trim() || undefined,
+          schema,
+          rules,
+        });
+        ok = res.ok;
+        if (!res.ok && res.suggestions?.length) {
+          setSlugSuggestions(res.suggestions);
+          setFormError('That slug is already taken. Choose an available option below:');
+        }
+      } else if (editingId) {
+        ok = await onApplySchema(editingId, schema, rules);
+      }
       if (ok) {
         setMode('list');
         if (mode === 'new') onClose();
@@ -283,10 +292,34 @@ export function ProjectsDrawer({
                 </label>
                 <input
                   value={slug}
-                  onChange={(e) => setSlug(e.target.value)}
-                  placeholder="auto-generated from name"
+                  onChange={(e) => {
+                    setSlug(e.target.value);
+                    if (slugSuggestions.length) setSlugSuggestions([]);
+                  }}
+                  minLength={3}
+                  maxLength={49}
+                  pattern="[a-z0-9][a-z0-9-]{2,48}"
+                  placeholder="auto-generated from name (min 3 chars)"
                   style={inputStyle}
                 />
+                {slugSuggestions.length > 0 && (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                    {slugSuggestions.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => {
+                          setSlug(s);
+                          setSlugSuggestions([]);
+                          setFormError('');
+                        }}
+                        style={{ ...secondaryBtnStyle, padding: '4px 10px', fontSize: 12 }}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </>
           )}

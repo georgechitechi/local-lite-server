@@ -53,6 +53,7 @@ export function createProjectRuntimeCache(deps: {
       rules,
       broker,
       projectId: project.id,
+      projectSlug: project.slug,
     });
     const auth = createAuthService(deps.settings, deps.db, project.id);
     const fnRuntime = createFunctionRuntime({
@@ -61,6 +62,7 @@ export function createProjectRuntimeCache(deps: {
       schema: project.schema,
       broker,
       projectId: project.id,
+      projectSlug: project.slug,
     });
     const storageHandler = createStorageHandler(
       deps.settings,
