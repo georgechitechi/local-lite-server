@@ -224,7 +224,21 @@ export async function runCliProjects(sub: string | undefined, args: string[]) {
 
   if (sub === 'delete') {
     const idOrSlug = args.find((a) => !a.startsWith('-'));
-    if (!idOrSlug) throw new Error('Usage: local-lite-server projects delete <id-or-slug>');
+    if (!idOrSlug) throw new Error('Usage: local-lite-server projects delete <id-or-slug> [--yes]');
+    if (!args.includes('--yes') && !args.includes('-y') && !args.includes('--force')) {
+      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+      try {
+        const answer = (
+          await rl.question(`Type "${idOrSlug}" to confirm permanent deletion: `)
+        ).trim();
+        if (answer !== idOrSlug) {
+          console.log('Deletion cancelled.');
+          return;
+        }
+      } finally {
+        rl.close();
+      }
+    }
     await apiJson(`${url}/projects/${encodeURIComponent(idOrSlug)}`, { method: 'DELETE', headers });
     console.log(`Deleted project "${idOrSlug}"`);
     return;

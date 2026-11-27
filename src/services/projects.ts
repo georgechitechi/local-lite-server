@@ -170,7 +170,7 @@ export function createProjectService(db: SqlExecutor, opts?: { maxProjectsPerUse
         throw new SlugTakenError(slug, suggestions);
       }
 
-      const id = `prj_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
+      const id = crypto.randomUUID();
       const now = Date.now();
       const schema = input.schema && Object.keys(input.schema).length ? normalizeSchema(input.schema) : {};
       const rulesInput = input.rules && Object.keys(input.rules).length ? input.rules : {};

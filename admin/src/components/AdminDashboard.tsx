@@ -147,7 +147,7 @@ export function AdminDashboard() {
     if (authenticated) {
       void loadTabDetails(activeTab);
     }
-  }, [authenticated, activeTab, loadTabDetails]);
+  }, [authenticated, activeTab, activeProjectId, refreshTick, loadTabDetails]);
 
   useEffect(() => {
     if (authenticated === null) {

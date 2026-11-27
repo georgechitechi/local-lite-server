@@ -39,10 +39,17 @@ export function createAdminData(opts: {
       }
       let accountsCount = 0;
       let backupsCount = 0;
-      if (session.consoleRole === 'super_admin') {
-        const acctRow = await db.query<any>('SELECT COUNT(*) AS n FROM _local_auth_accounts');
-        const bkpRow = await db.query<any>('SELECT COUNT(*) AS n FROM _lls_backups');
-        accountsCount = Number(acctRow[0]?.n ?? 0);
+      const scope = projectScope(project);
+      const acctRow = await db.query<any>(
+        `SELECT COUNT(*) AS n FROM _local_auth_accounts WHERE ${scope.where}`,
+        scope.params,
+      );
+      accountsCount = Number(acctRow[0]?.n ?? 0);
+      if (session.consoleRole === 'super_admin' || project) {
+        const bkpRow = await db.query<any>(
+          `SELECT COUNT(*) AS n FROM _lls_backups WHERE ${scope.where}`,
+          scope.params,
+        );
         backupsCount = Number(bkpRow[0]?.n ?? 0);
       }
       return Response.json({

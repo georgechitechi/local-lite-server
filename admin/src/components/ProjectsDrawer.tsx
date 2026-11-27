@@ -55,6 +55,8 @@ export function ProjectsDrawer({
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [slugSuggestions, setSlugSuggestions] = useState<string[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteInput, setDeleteInput] = useState('');
 
   const openNew = () => {
     setMode('new');
@@ -67,6 +69,8 @@ export function ProjectsDrawer({
     setRawMode(false);
     setFormError('');
     setSlugSuggestions([]);
+    setConfirmDelete(false);
+    setDeleteInput('');
   };
 
   const openEdit = (p: ProjectItem) => {
@@ -80,6 +84,8 @@ export function ProjectsDrawer({
     setRawMode(false);
     setFormError('');
     setSlugSuggestions([]);
+    setConfirmDelete(false);
+    setDeleteInput('');
   };
 
   const toggleRaw = () => {
@@ -348,6 +354,71 @@ export function ProjectsDrawer({
 
           {formError && <div style={{ color: 'var(--danger)', fontSize: 12.5 }}>{formError}</div>}
 
+          {mode === 'edit' && editingProject && confirmDelete && (
+            <div
+              style={{
+                border: '1px solid var(--danger)',
+                borderRadius: 10,
+                padding: 12,
+                background: 'var(--danger-soft)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+              }}
+            >
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--danger)' }}>
+                Confirm permanent deletion
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                This permanently drops all tables, files, users, keys, and logs for{' '}
+                <strong>{editingProject.name}</strong>. Type{' '}
+                <code>{editingProject.slug}</code> to confirm.
+              </div>
+              <input
+                value={deleteInput}
+                onChange={(e) => setDeleteInput(e.target.value)}
+                placeholder={editingProject.slug}
+                style={inputStyle}
+              />
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmDelete(false);
+                    setDeleteInput('');
+                  }}
+                  style={secondaryBtnStyle}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={saving || deleteInput.trim() !== editingProject.slug}
+                  onClick={async () => {
+                    setSaving(true);
+                    try {
+                      const ok = await onDeleteProject(editingProject.id);
+                      if (ok) {
+                        setConfirmDelete(false);
+                        setDeleteInput('');
+                        setMode('list');
+                      }
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                  style={{
+                    ...primaryBtnStyle,
+                    background: 'var(--danger)',
+                    opacity: deleteInput.trim() === editingProject.slug ? 1 : 0.5,
+                  }}
+                >
+                  {saving ? 'Deleting...' : 'Delete Permanently'}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8, flexWrap: 'wrap' }}>
             {mode === 'edit' && editingProject && (
               <>
@@ -358,22 +429,19 @@ export function ProjectsDrawer({
                 >
                   Export JSON
                 </button>
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={async () => {
-                    setSaving(true);
-                    try {
-                      const ok = await onDeleteProject(editingProject.id);
-                      if (ok) setMode('list');
-                    } finally {
-                      setSaving(false);
-                    }
-                  }}
-                  style={{ ...secondaryBtnStyle, color: 'var(--danger)', marginRight: 'auto' }}
-                >
-                  Delete
-                </button>
+                {!confirmDelete && (
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => {
+                      setDeleteInput('');
+                      setConfirmDelete(true);
+                    }}
+                    style={{ ...secondaryBtnStyle, color: 'var(--danger)', marginRight: 'auto' }}
+                  >
+                    Delete
+                  </button>
+                )}
               </>
             )}
             <button type="button" onClick={() => setMode('list')} style={secondaryBtnStyle}>
