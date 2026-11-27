@@ -3,6 +3,7 @@ import { LoginGate } from '@/components/LoginGate';
 import { ProjectsDrawer } from '@/components/ProjectsDrawer';
 import { Sidebar } from '@/components/Sidebar';
 import { ToastContainer } from '@/components/Toast';
+import { useProjects } from '@/hooks/useProjects';
 import { useToasts } from '@/hooks/useToasts';
 import { ApiKeysTab } from '@/components/tabs/ApiKeysTab';
 import { AuthUsersTab } from '@/components/tabs/AuthUsersTab';
@@ -21,15 +22,14 @@ import {
   setActiveProjectId as persistActiveProjectId,
 } from '@/lib/api';
 import { secondaryBtnStyle } from '@/styles/adminStyles';
-import {
-  NAV_ITEMS,
-  type BackupArchiveRow,
-  type EndpointItem,
-  type LocalAuthAccount,
-  type NavTab,
-  type OverviewData,
-  type ProjectItem,
+import type {
+  BackupArchiveRow,
+  EndpointItem,
+  LocalAuthAccount,
+  NavTab,
+  OverviewData,
 } from '@/types/admin';
+import { NAV_ITEMS } from '@/types/admin';
 
 export function AdminDashboard() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
@@ -41,10 +41,6 @@ export function AdminDashboard() {
   const [endpoints, setEndpoints] = useState<EndpointItem[]>([]);
   const [selectedTable, setSelectedTable] = useState<string>('');
   const [refreshTick, setRefreshTick] = useState(0);
-  const [projects, setProjects] = useState<ProjectItem[]>([]);
-  const [activeProjectId, setActiveProjectIdState] = useState<string | null>(
-    () => getActiveProjectId(),
-  );
   const [projectsDrawerOpen, setProjectsDrawerOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [showDeletedRows, setShowDeletedRows] = useState<boolean>(() => {
@@ -63,6 +59,23 @@ export function AdminDashboard() {
   }, []);
   const { toasts, showToast, dismissToast } = useToasts();
 
+  const triggerProjectRefresh = useCallback(() => {
+    setSelectedTable('');
+    setRefreshTick((n) => n + 1);
+  }, []);
+
+  const {
+    projects,
+    activeProjectId,
+    setActiveProjectIdState,
+    selectProject,
+    loadProjects,
+    createProject,
+    applyProjectSchema,
+    exportProject,
+    deleteProject,
+  } = useProjects({ showToast, onProjectChange: triggerProjectRefresh });
+
   useEffect(() => {
     const onUnauthorized = () => {
       setAuthenticated(false);
@@ -71,31 +84,6 @@ export function AdminDashboard() {
     window.addEventListener('lls:unauthorized', onUnauthorized);
     return () => window.removeEventListener('lls:unauthorized', onUnauthorized);
   }, []);
-
-  const selectProject = useCallback((id: string | null) => {
-    persistActiveProjectId(id);
-    setActiveProjectIdState(id);
-    setSelectedTable('');
-    setRefreshTick((n) => n + 1);
-  }, []);
-
-  const loadProjects = useCallback(
-    async (role?: string | null) => {
-      const res = await adminFetch('/projects', { cache: 'no-store' });
-      if (!res.ok) return;
-      const d = (await res.json()) as { projects?: ProjectItem[] };
-      const list = d.projects ?? [];
-      setProjects(list);
-      const current = getActiveProjectId();
-      const stillExists = current && list.some((p) => p.id === current);
-      if (current && !stillExists) {
-        selectProject(role !== 'super_admin' && list[0] ? list[0].id : null);
-      } else if (!current && role !== 'super_admin' && list[0]) {
-        selectProject(list[0].id);
-      }
-    },
-    [selectProject],
-  );
 
   const loadOverview = useCallback(async () => {
     setLoading(true);
@@ -240,87 +228,6 @@ export function AdminDashboard() {
       setActiveTab('overview');
     }
   }, [activeTab, overview]);
-
-  const handleCreateProject = async (input: {
-    name: string;
-    slug?: string;
-    schema: Record<string, Record<string, string>>;
-    rules?: Record<string, any>;
-  }): Promise<{ ok: boolean; suggestions?: string[] }> => {
-    const res = await adminFetch('/projects', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      showToast(data?.error || 'Failed to create project.', 'error');
-      return {
-        ok: false,
-        suggestions: Array.isArray(data?.suggestions)
-          ? data.suggestions
-          : undefined,
-      };
-    }
-    showToast(`Project "${data.project.name}" created.`, 'info');
-    await loadProjects(overview?.consoleRole);
-    selectProject(data.project.id);
-    void loadOverview();
-    return { ok: true };
-  };
-
-  const handleApplyProjectSchema = async (
-    projectId: string,
-    schema: Record<string, Record<string, string>>,
-    rules?: Record<string, any>,
-  ): Promise<boolean> => {
-    const res = await adminFetch(`/projects/${projectId}/schema`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ schema, rules }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      showToast(data?.error || 'Failed to apply schema.', 'error');
-      return false;
-    }
-    showToast('Project schema applied.', 'info');
-    await Promise.all([loadProjects(overview?.consoleRole), loadOverview()]);
-    setRefreshTick((n) => n + 1);
-    return true;
-  };
-
-  const handleExportProject = (project: ProjectItem) => {
-    void (async () => {
-      const res = await adminFetch(`/projects/${project.id}/export`);
-      if (!res.ok) {
-        showToast('Failed to export project.', 'error');
-        return;
-      }
-      const blob = new Blob([await res.text()], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${project.slug}-export.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    })();
-  };
-
-  const handleDeleteProject = async (projectId: string): Promise<boolean> => {
-    const res = await adminFetch(`/projects/${projectId}`, {
-      method: 'DELETE',
-    });
-    if (!res.ok) {
-      const d = await res.json().catch(() => ({}));
-      showToast(d?.error || 'Failed to delete project.', 'error');
-      return false;
-    }
-    if (activeProjectId === projectId) selectProject(null);
-    showToast('Project deleted.', 'info');
-    await Promise.all([loadProjects(overview?.consoleRole), loadOverview()]);
-    return true;
-  };
 
   if (authenticated === null) {
     return (
@@ -519,10 +426,22 @@ export function AdminDashboard() {
           selectProject(id);
           void loadOverview();
         }}
-        onCreateProject={handleCreateProject}
-        onApplySchema={handleApplyProjectSchema}
-        onExportProject={handleExportProject}
-        onDeleteProject={handleDeleteProject}
+        onCreateProject={async (input) => {
+          const res = await createProject(input, overview?.consoleRole);
+          if (res.ok) void loadOverview();
+          return res;
+        }}
+        onApplySchema={async (id, s, r) => {
+          const ok = await applyProjectSchema(id, s, r, overview?.consoleRole);
+          if (ok) void loadOverview();
+          return ok;
+        }}
+        onExportProject={exportProject}
+        onDeleteProject={async (id) => {
+          const ok = await deleteProject(id, overview?.consoleRole);
+          if (ok) void loadOverview();
+          return ok;
+        }}
       />
 
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
