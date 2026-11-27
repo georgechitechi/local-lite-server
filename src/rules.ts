@@ -2,7 +2,13 @@ import { defineRules } from './db/rules.js';
 
 /**
  * Default row-level security rules for synced tables (loaded automatically from `src/rules.ts`).
+ * `*` applies to any table without an explicit per-table rule (owner-only by default).
  * Presets: 'authenticated' | 'owner' | 'owner:<col>' | 'admin' | 'none'
- * Or pass a custom predicate: (ctx, row) => ctx.userId === row.owner_id
  */
-export default defineRules({});
+export default defineRules({
+  '*': {
+    read: 'owner',
+    write: 'owner',
+    delete: 'owner',
+  },
+});

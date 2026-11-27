@@ -186,7 +186,7 @@ export class TableSyncStorage implements ServerSyncStorage {
             );
           }
           this.fields(op.tableName);
-          const tableRule = this.rules[op.tableName];
+          const tableRule = this.rules[op.tableName] ?? this.rules['*'];
           const needsCheck =
             op.operation === 'DELETE'
               ? (tableRule?.delete ?? tableRule?.write)
@@ -230,7 +230,9 @@ export class TableSyncStorage implements ServerSyncStorage {
         const fields = this.fields(op.tableName);
         const payload =
           op.payload && typeof op.payload === 'object' ? op.payload : {};
-        const tableRule = !auth.isAdmin ? this.rules[op.tableName] : undefined;
+        const tableRule = !auth.isAdmin
+          ? (this.rules[op.tableName] ?? this.rules['*'])
+          : undefined;
         const writeRule =
           op.operation === 'DELETE'
             ? (tableRule?.delete ?? tableRule?.write)
@@ -390,7 +392,7 @@ export class TableSyncStorage implements ServerSyncStorage {
     const changes = [];
     for (const c of allChanges) {
       const readRule = !auth.isAdmin
-        ? this.rules[c.tableName]?.read
+        ? (this.rules[c.tableName] ?? this.rules['*'])?.read
         : undefined;
       if (!readRule) {
         changes.push(c);

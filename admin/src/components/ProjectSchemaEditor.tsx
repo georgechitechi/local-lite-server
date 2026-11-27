@@ -14,7 +14,7 @@ const FIELD_TYPES = [
 ] as const;
 
 const RULE_PRESETS = [
-  { value: '', label: 'Default (Server Rules)' },
+  { value: '', label: 'Default (Server Rules — owner)' },
   { value: 'authenticated', label: 'Authenticated users' },
   { value: 'owner', label: 'Row owner (owner_id / user_id)' },
   { value: 'admin', label: 'Admin / API key only' },
