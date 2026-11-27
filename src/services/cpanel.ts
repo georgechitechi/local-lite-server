@@ -62,7 +62,7 @@ export async function buildCpanelBundle(
       js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);",
     },
     minify: true,
-    logLevel: 'info',
+    logLevel: 'warning',
     external: EXTERNAL_PEERS,
   });
 
@@ -83,7 +83,7 @@ export async function buildCpanelBundle(
       },
       outfile,
       minify: true,
-      logLevel: 'info',
+      logLevel: 'warning',
       external: EXTERNAL_PEERS,
     });
   };
