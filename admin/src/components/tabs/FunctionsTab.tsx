@@ -131,7 +131,7 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 320px) 1fr', gap: 16 }}>
+      <div className="split-grid-280">
         <section style={cardStyle}>
           <h2 style={sectionTitleStyle}>Server Functions ({serverFns.length})</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -292,7 +292,7 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
         </section>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 16 }}>
         <section style={cardStyle}>
           <h2 style={sectionTitleStyle}>Registered HTTP Endpoints</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

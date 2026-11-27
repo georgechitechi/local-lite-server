@@ -256,7 +256,7 @@ export function EnvVarsTab({
                 setSearch(e.target.value);
                 setOffset(0);
               }}
-              style={{ ...inputStyle, width: 210, padding: '7px 12px' }}
+              style={{ ...inputStyle, flex: '1 1 180px', minWidth: 0, maxWidth: 240, padding: '7px 12px' }}
             />
             <select
               aria-label="Filter environment variables"

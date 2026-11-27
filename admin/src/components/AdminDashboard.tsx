@@ -49,6 +49,7 @@ export function AdminDashboard() {
     getActiveProjectId(),
   );
   const [projectsDrawerOpen, setProjectsDrawerOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [showDeletedRows, setShowDeletedRows] = useState<boolean>(() => {
     try {
       return localStorage.getItem('lls_show_deleted_rows') === '1';
@@ -329,6 +330,8 @@ export function AdminDashboard() {
       <Sidebar
         activeTab={activeTab}
         overview={overview}
+        mobileOpen={mobileNavOpen}
+        onCloseMobile={() => setMobileNavOpen(false)}
         onLogout={() => void handleLogout(false)}
         onSelectTab={setActiveTab}
       />
@@ -336,6 +339,14 @@ export function AdminDashboard() {
       <div className="main-area">
         <header className="topbar">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
+              type="button"
+              aria-label="Open navigation"
+              className="mobile-menu-btn"
+              onClick={() => setMobileNavOpen(true)}
+            >
+              ☰
+            </button>
             <h1 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
               {activeTab === 'settings'
                 ? 'Settings'

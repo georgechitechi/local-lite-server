@@ -8,18 +8,27 @@ import {
 export function Sidebar({
   activeTab,
   overview,
+  mobileOpen = false,
+  onCloseMobile,
   onLogout,
   onSelectTab,
 }: {
   activeTab: NavTab;
   overview: OverviewData | null;
+  mobileOpen?: boolean;
+  onCloseMobile?: () => void;
   onLogout: () => void;
   onSelectTab: (tab: NavTab) => void;
 }) {
   const isSuperAdmin = overview?.consoleRole === 'super_admin';
 
   return (
-    <aside className="sidebar">
+    <>
+      <div
+        className={`sidebar-backdrop ${mobileOpen ? 'open' : ''}`}
+        onClick={() => onCloseMobile?.()}
+      />
+      <aside className={`sidebar ${mobileOpen ? 'open' : ''}`}>
       <div>
         <div style={{ padding: '4px 10px 16px' }}>
           <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: -0.2 }}>
@@ -57,7 +66,10 @@ export function Sidebar({
               key={item.id}
               type="button"
               className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
-              onClick={() => onSelectTab(item.id)}
+              onClick={() => {
+                onSelectTab(item.id);
+                onCloseMobile?.();
+              }}
             >
               <span style={{ flex: 1 }}>{item.label}</span>
               {item.id === 'auth' && overview && (
@@ -88,7 +100,10 @@ export function Sidebar({
           <button
             type="button"
             className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => onSelectTab('settings')}
+            onClick={() => {
+              onSelectTab('settings');
+              onCloseMobile?.();
+            }}
           >
             Settings
           </button>
@@ -96,12 +111,16 @@ export function Sidebar({
           <button
             type="button"
             className="nav-item"
-            onClick={onLogout}
+            onClick={() => {
+              onCloseMobile?.();
+              onLogout();
+            }}
           >
             Sign Out
           </button>
         )}
       </div>
     </aside>
+    </>
   );
 }
