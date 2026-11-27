@@ -18,9 +18,11 @@ type DrawerState =
 
 export function AuthUsersTab({
   accounts,
+  isSuperAdmin = false,
   onAction,
 }: {
   accounts: LocalAuthAccount[];
+  isSuperAdmin?: boolean;
   onAction: (
     payload: Record<string, any>,
     successMsg: string,
@@ -188,9 +190,11 @@ export function AuthUsersTab({
       <Card
         title="Users & Access"
         actions={
-          <button type="button" onClick={openCreate} style={primaryBtnStyle}>
-            + New Console Admin
-          </button>
+          isSuperAdmin ? (
+            <button type="button" onClick={openCreate} style={primaryBtnStyle}>
+              + New Console Admin
+            </button>
+          ) : undefined
         }
         toolbar={
           <>

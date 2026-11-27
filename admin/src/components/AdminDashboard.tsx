@@ -438,6 +438,7 @@ export function AdminDashboard() {
           {activeTab === 'auth' && (
             <AuthUsersTab
               accounts={localAccounts}
+              isSuperAdmin={overview?.consoleRole === 'super_admin'}
               onAction={(payload, successMsg) =>
                 runAdminAction('/admin/users', payload, successMsg)
               }
