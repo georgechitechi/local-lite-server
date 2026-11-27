@@ -26,7 +26,10 @@ if (fs.existsSync('.env')) {
 const cmd = process.argv[2] ?? 'start';
 const sub = process.argv[3];
 
-function resolveInitDir(targetDir: string | undefined, force: boolean): { cwd: string; relLabel?: string } {
+function resolveInitDir(
+  targetDir: string | undefined,
+  force: boolean,
+): { cwd: string; relLabel?: string } {
   if (targetDir) {
     return { cwd: path.resolve(process.cwd(), targetDir), relLabel: targetDir };
   }
@@ -35,7 +38,8 @@ function resolveInitDir(targetDir: string | undefined, force: boolean): { cwd: s
   if (!hasFiles || force) return { cwd: here };
   let name = 'local-lite-server';
   let n = 2;
-  while (fs.existsSync(path.join(here, name))) name = `local-lite-server-${n++}`;
+  while (fs.existsSync(path.join(here, name)))
+    name = `local-lite-server-${n++}`;
   console.log(`Current directory is not empty; creating ./${name}/`);
   return { cwd: path.join(here, name), relLabel: name };
 }
@@ -55,7 +59,11 @@ function runInit(targetDir: string | undefined, force: boolean) {
   fs.mkdirSync(cwd, { recursive: true });
   const tplRoot = path.resolve(import.meta.dirname, '../templates');
   const vars: Record<string, string> = {
-    PKG_NAME: path.basename(cwd).toLowerCase().replace(/[^a-z0-9-_]/g, '-') || 'my-local-lite-server',
+    PKG_NAME:
+      path
+        .basename(cwd)
+        .toLowerCase()
+        .replace(/[^a-z0-9-_]/g, '-') || 'my-local-lite-server',
     API_KEY: crypto.randomBytes(24).toString('hex'),
     APP_SECRET: crypto.randomBytes(32).toString('hex'),
   };
@@ -64,11 +72,14 @@ function runInit(targetDir: string | undefined, force: boolean) {
     const outRel = rel === 'gitignore' ? '.gitignore' : rel;
     const dest = path.join(cwd, outRel);
     if (fs.existsSync(dest) && !force) {
-      console.log(`skip  ${relLabel ? path.join(relLabel, outRel) : outRel} (already exists)`);
+      console.log(
+        `skip  ${relLabel ? path.join(relLabel, outRel) : outRel} (already exists)`,
+      );
       continue;
     }
     let content = fs.readFileSync(path.join(tplRoot, rel), 'utf8');
-    for (const [k, v] of Object.entries(vars)) content = content.replaceAll(`{{${k}}}`, v);
+    for (const [k, v] of Object.entries(vars))
+      content = content.replaceAll(`{{${k}}}`, v);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.writeFileSync(dest, content);
     console.log(`write ${relLabel ? path.join(relLabel, outRel) : outRel}`);
@@ -117,7 +128,10 @@ if (cmd === 'init') {
   await runCliPush(process.argv.slice(3));
 } else if (cmd === 'codegen') {
   const outIdx = process.argv.indexOf('--out');
-  const outFile = outIdx !== -1 && process.argv[outIdx + 1] ? process.argv[outIdx + 1] : 'src/client.ts';
+  const outFile =
+    outIdx !== -1 && process.argv[outIdx + 1]
+      ? process.argv[outIdx + 1]
+      : 'src/client.ts';
   const projIdx = process.argv.indexOf('--project');
   const projectRef = projIdx !== -1 ? process.argv[projIdx + 1] : undefined;
   if (projectRef) {
@@ -131,7 +145,10 @@ if (cmd === 'init') {
   }
 } else if (cmd === 'build:cpanel') {
   const outIdx = process.argv.indexOf('--out');
-  const outDir = outIdx !== -1 && process.argv[outIdx + 1] ? process.argv[outIdx + 1] : 'dist/cpanel';
+  const outDir =
+    outIdx !== -1 && process.argv[outIdx + 1]
+      ? process.argv[outIdx + 1]
+      : 'dist/cpanel';
   await buildCpanelBundle(process.cwd(), outDir);
 } else if (cmd === 'install-skills') {
   const dirIdx = process.argv.indexOf('--dir');
@@ -149,7 +166,10 @@ if (cmd === 'init') {
   }
 } else if (cmd === '-v' || cmd === '--version') {
   const pkg = JSON.parse(
-    fs.readFileSync(path.resolve(import.meta.dirname, '../package.json'), 'utf8'),
+    fs.readFileSync(
+      path.resolve(import.meta.dirname, '../package.json'),
+      'utf8',
+    ),
   );
   console.log(pkg.version);
 } else {

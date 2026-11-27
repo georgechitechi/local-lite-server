@@ -69,49 +69,45 @@ export function StorageBucketDrawer({
         onSubmit={(e) => void handleSubmit(e)}
         style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
       >
-          <div>
-            <label style={labelStyle}>Bucket Name</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="bucket-name (e.g. property-photos)"
-              style={{ ...inputStyle, fontFamily: 'monospace' }}
-            />
-          </div>
-
-          <ToggleSlider
-            checked={isPrivate}
-            onChange={setIsPrivate}
-            label="Private bucket (requires signed URLs)"
+        <div>
+          <label style={labelStyle}>Bucket Name</label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="bucket-name (e.g. property-photos)"
+            style={{ ...inputStyle, fontFamily: 'monospace' }}
           />
+        </div>
 
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              gap: 8,
-              marginTop: 8,
-              borderTop: '1px solid var(--border)',
-              paddingTop: 14,
-            }}
+        <ToggleSlider
+          checked={isPrivate}
+          onChange={setIsPrivate}
+          label="Private bucket (requires signed URLs)"
+        />
+
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: 8,
+            marginTop: 8,
+            borderTop: '1px solid var(--border)',
+            paddingTop: 14,
+          }}
+        >
+          <button
+            type="button"
+            disabled={saving}
+            onClick={onClose}
+            style={secondaryBtnStyle}
           >
-            <button
-              type="button"
-              disabled={saving}
-              onClick={onClose}
-              style={secondaryBtnStyle}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              style={primaryBtnStyle}
-            >
-              {saving ? 'Creating...' : 'Create Bucket'}
-            </button>
-          </div>
-        </form>
+            Cancel
+          </button>
+          <button type="submit" disabled={saving} style={primaryBtnStyle}>
+            {saving ? 'Creating...' : 'Create Bucket'}
+          </button>
+        </div>
+      </form>
     </SlideDrawer>
   );
 }

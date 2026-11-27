@@ -13,7 +13,10 @@ export interface ManagedBroker extends SyncEventBroker {
 }
 
 /** Isolates pub/sub events per project (or root server when projectId is null). */
-export function scopeBroker(broker: SyncEventBroker, projectId: string | null): SyncEventBroker {
+export function scopeBroker(
+  broker: SyncEventBroker,
+  projectId: string | null,
+): SyncEventBroker {
   const prefix = projectId ? `prj:${projectId}:` : null;
   return {
     publish(event) {
@@ -67,9 +70,14 @@ export async function createClusterBroker(
 
     return {
       publish(event) {
-        void db.query('SELECT pg_notify($1, $2)', ['lls_sync_events', JSON.stringify(event)]).catch(() => {
-          local.publish(event);
-        });
+        void db
+          .query('SELECT pg_notify($1, $2)', [
+            'lls_sync_events',
+            JSON.stringify(event),
+          ])
+          .catch(() => {
+            local.publish(event);
+          });
       },
       subscribe: (listener) => local.subscribe(listener),
       close: () => sub.end().catch(() => {}),
@@ -81,7 +89,9 @@ export async function createClusterBroker(
   const qTs = quoteIdent('timestamp', 'mysql');
   let lastId = 0;
   try {
-    const rows = await db.query<{ max_id: number }>(`SELECT COALESCE(MAX(id), 0) AS max_id FROM ${qChanges}`);
+    const rows = await db.query<{ max_id: number }>(
+      `SELECT COALESCE(MAX(id), 0) AS max_id FROM ${qChanges}`,
+    );
     lastId = Number(rows[0]?.max_id ?? 0);
   } catch {
     lastId = 0;
@@ -89,7 +99,11 @@ export async function createClusterBroker(
 
   const timer = setInterval(async () => {
     try {
-      const rows = await db.query<{ id: number; table_name: string; ts: number }>(
+      const rows = await db.query<{
+        id: number;
+        table_name: string;
+        ts: number;
+      }>(
         `SELECT id, table_name, ${qTs} AS ts FROM ${qChanges} WHERE id > ? ORDER BY id ASC LIMIT 200`,
         [lastId],
       );

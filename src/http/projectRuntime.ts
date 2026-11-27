@@ -47,7 +47,9 @@ export function createProjectRuntimeCache(deps: {
     }
 
     const broker = scopeBroker(deps.rootBroker, project.id);
-    const rules = Object.keys(project.rules).length ? project.rules : deps.rootRules;
+    const rules = Object.keys(project.rules).length
+      ? project.rules
+      : deps.rootRules;
     const syncStorage = new TableSyncStorage(deps.db, {
       schema: project.schema,
       rules,
@@ -71,7 +73,12 @@ export function createProjectRuntimeCache(deps: {
         const a = await deps.resolveAuth(req, true, project);
         if (!a) return null;
         if (a.projectId && a.projectId !== project.id) return null;
-        if (a.isAdmin && !a.isSuperAdmin && !a.projectId && project.ownerUserId !== a.userId) {
+        if (
+          a.isAdmin &&
+          !a.isSuperAdmin &&
+          !a.projectId &&
+          project.ownerUserId !== a.userId
+        ) {
           return null;
         }
         return { userId: a.userId ?? 'admin', isAdmin: a.isAdmin };

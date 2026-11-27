@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadSettings } from '../src/config.js';
 import {
-  createFunctionRuntime,
   defineAction,
   defineMutation,
   defineQuery,
@@ -21,7 +20,12 @@ const env = {
 } as NodeJS.ProcessEnv;
 
 const schema = normalizeSchema({
-  notes: { title: 'string', body: 'string | null', pinned: 'boolean', created_at: 'number' },
+  notes: {
+    title: 'string',
+    body: 'string | null',
+    pinned: 'boolean',
+    created_at: 'number',
+  },
 });
 
 /** In-memory SQLite-like mock for notes + sync clock/changes. */
@@ -47,8 +51,17 @@ function inMemoryNotesDb() {
     },
     execute: async (sql: string, params: any[] = []) => {
       if (sql.startsWith('INSERT INTO `notes`')) {
-        const [id, title, body, pinned, updated_at, deleted, created_at] = params;
-        notes.set(id, { id, title, body, pinned, updated_at, deleted, created_at });
+        const [id, title, body, pinned, updated_at, deleted, created_at] =
+          params;
+        notes.set(id, {
+          id,
+          title,
+          body,
+          pinned,
+          updated_at,
+          deleted,
+          created_at,
+        });
       } else if (sql.startsWith('UPDATE `notes` SET `pinned`')) {
         const [pinned, updated_at, id] = params;
         const row = notes.get(id);
@@ -84,7 +97,11 @@ function buildRegistry(): FunctionRegistry {
         if (typeof raw.title !== 'string' || !raw.title.trim()) {
           throw new FunctionError('title is required.');
         }
-        return { title: raw.title.trim(), body: null, pinned: Boolean(raw.pinned) };
+        return {
+          title: raw.title.trim(),
+          body: null,
+          pinned: Boolean(raw.pinned),
+        };
       },
       handler: ({ db }, args) => db.insert('notes', args),
     }),
@@ -103,7 +120,9 @@ function buildRegistry(): FunctionRegistry {
     'notes/createAndList',
     defineAction({
       handler: async (ctx, args: { title: string }) => {
-        const created = await ctx.runMutation('notes/create', { title: args.title });
+        const created = await ctx.runMutation('notes/create', {
+          title: args.title,
+        });
         const all = await ctx.runQuery<any[]>('notes/list');
         return { created, count: all.length };
       },
@@ -123,9 +142,14 @@ describe('Server functions & reactive queries', () => {
   it('lists and runs queries, mutations, and actions via HTTP', async () => {
     const db = inMemoryNotesDb();
     const app = createApp(loadSettings(env), db, schema, buildRegistry());
-    const auth = { authorization: 'Bearer secret', 'content-type': 'application/json' };
+    const auth = {
+      authorization: 'Bearer secret',
+      'content-type': 'application/json',
+    };
 
-    const listRes = await app.fetch(new Request('http://x/fn', { headers: auth }));
+    const listRes = await app.fetch(
+      new Request('http://x/fn', { headers: auth }),
+    );
     expect(listRes.status).toBe(200);
     expect(((await listRes.json()) as any).functions.length).toBe(4);
 
@@ -181,7 +205,10 @@ describe('Server functions & reactive queries', () => {
     await app.fetch(
       new Request('http://x/fn/notes/create', {
         method: 'POST',
-        headers: { authorization: 'Bearer secret', 'content-type': 'application/json' },
+        headers: {
+          authorization: 'Bearer secret',
+          'content-type': 'application/json',
+        },
         body: JSON.stringify({ args: { title: 'Live' } }),
       }),
     );

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { loadSettings } from '../src/config.js';
-import { createProjectService, toPhysicalTable } from '../src/services/projects.js';
+import {
+  createProjectService,
+  toPhysicalTable,
+} from '../src/services/projects.js';
 import { normalizeSchema } from '../src/db/schema.js';
 import { createApp } from '../src/server.js';
 import { TableSyncStorage } from '../src/db/tableStorage.js';
@@ -61,7 +64,9 @@ function createMockDb() {
         return [];
       }
       if (sql.includes('FROM _lls_projects WHERE owner_user_id = ?')) {
-        return Array.from(projects.values()).filter((p) => p.owner_user_id === params[0]);
+        return Array.from(projects.values()).filter(
+          (p) => p.owner_user_id === params[0],
+        );
       }
       if (sql.includes('FROM _lls_projects WHERE id = ? OR slug = ?')) {
         for (const p of projects.values()) {
@@ -80,7 +85,9 @@ function createMockDb() {
       }
       if (sql.includes('FROM _lls_api_keys')) {
         return Array.from(keys.values()).filter((k) =>
-          sql.includes('WHERE project_id = ?') ? k.project_id === params[0] : k.project_id == null,
+          sql.includes('WHERE project_id = ?')
+            ? k.project_id === params[0]
+            : k.project_id == null,
         );
       }
       if (sql.includes('FROM `information_schema`')) {
@@ -94,8 +101,16 @@ function createMockDb() {
         const hasPid = sql.includes('project_id = ?');
         const pid = hasPid ? params[1] : null;
         return changes
-          .filter((c) => c.timestamp > since && (hasPid ? c.project_id === pid : c.project_id == null))
-          .map((c) => ({ table_name: c.table_name, row_id: c.row_id, ts: c.timestamp }));
+          .filter(
+            (c) =>
+              c.timestamp > since &&
+              (hasPid ? c.project_id === pid : c.project_id == null),
+          )
+          .map((c) => ({
+            table_name: c.table_name,
+            row_id: c.row_id,
+            ts: c.timestamp,
+          }));
       }
       const m = sql.match(/SELECT \* FROM `([^`]+)` WHERE `id` IN/);
       if (m) {
@@ -180,7 +195,9 @@ function createMockDb() {
       const upsert = sql.match(/INSERT INTO `([^`]+)` \(([^)]+)\)/);
       if (upsert) {
         const tbl = getTable(upsert[1]);
-        const cols = upsert[2].split(',').map((c) => c.trim().replace(/`/g, ''));
+        const cols = upsert[2]
+          .split(',')
+          .map((c) => c.trim().replace(/`/g, ''));
         const row: Record<string, any> = {};
         cols.forEach((c, i) => {
           row[c] = params[i];
@@ -203,7 +220,11 @@ describe('multi-project central server', () => {
 
   it('allows console developer self-signup when ALLOW_CONSOLE_SIGNUP=true and isolates projects per owner', async () => {
     const db = createMockDb();
-    const app = createApp(loadSettings(baseEnv), db, normalizeSchema({ server_notes: { title: 'string' } }));
+    const app = createApp(
+      loadSettings(baseEnv),
+      db,
+      normalizeSchema({ server_notes: { title: 'string' } }),
+    );
 
     // Disabled check
     const appNoSignup = createApp(
@@ -215,7 +236,11 @@ describe('multi-project central server', () => {
       new Request('http://localhost/admin/login', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'signup', email: 'a@test.com', password: 'password123' }),
+        body: JSON.stringify({
+          action: 'signup',
+          email: 'a@test.com',
+          password: 'password123',
+        }),
       }),
     );
     expect(blocked.status).toBe(403);
@@ -225,7 +250,12 @@ describe('multi-project central server', () => {
       new Request('http://localhost/admin/login', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'signup', email: 'alice@test.com', password: 'password123', name: 'Alice' }),
+        body: JSON.stringify({
+          action: 'signup',
+          email: 'alice@test.com',
+          password: 'password123',
+          name: 'Alice',
+        }),
       }),
     );
     expect(signupA.status).toBe(200);
@@ -236,7 +266,12 @@ describe('multi-project central server', () => {
       new Request('http://localhost/admin/login', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'signup', email: 'bob@test.com', password: 'password123', name: 'Bob' }),
+        body: JSON.stringify({
+          action: 'signup',
+          email: 'bob@test.com',
+          password: 'password123',
+          name: 'Bob',
+        }),
       }),
     );
     expect(signupB.status).toBe(200);
@@ -260,7 +295,9 @@ describe('multi-project central server', () => {
 
     // User B lists projects -> sees 0 (cannot see Alice's project)
     const listB = await app.fetch(
-      new Request('http://localhost/projects', { headers: { cookie: cookieB } }),
+      new Request('http://localhost/projects', {
+        headers: { cookie: cookieB },
+      }),
     );
     expect(((await listB.json()) as any).projects).toHaveLength(0);
 
@@ -289,7 +326,9 @@ describe('multi-project central server', () => {
     expect(defaultTable.status).toBe(403);
 
     const adminUsers = await app.fetch(
-      new Request('http://localhost/admin/users', { headers: { cookie: cookieA } }),
+      new Request('http://localhost/admin/users', {
+        headers: { cookie: cookieA },
+      }),
     );
     expect(adminUsers.status).toBe(403);
 
@@ -310,7 +349,11 @@ describe('multi-project central server', () => {
       new Request('http://localhost/admin/login', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'signup', email: 'dev@test.com', password: 'password123' }),
+        body: JSON.stringify({
+          action: 'signup',
+          email: 'dev@test.com',
+          password: 'password123',
+        }),
       }),
     );
     const cookie = signup.headers.get('set-cookie')!.split(';')[0];
@@ -319,7 +362,11 @@ describe('multi-project central server', () => {
       new Request('http://localhost/projects', {
         method: 'POST',
         headers: { 'content-type': 'application/json', cookie },
-        body: JSON.stringify({ name: 'App One', slug: 'app-one', schema: { notes: { title: 'string' } } }),
+        body: JSON.stringify({
+          name: 'App One',
+          slug: 'app-one',
+          schema: { notes: { title: 'string' } },
+        }),
       }),
     );
     const { project: p1 } = (await p1Res.json()) as any;
@@ -328,16 +375,22 @@ describe('multi-project central server', () => {
       new Request('http://localhost/projects', {
         method: 'POST',
         headers: { 'content-type': 'application/json', cookie },
-        body: JSON.stringify({ name: 'App Two', slug: 'app-two', schema: { notes: { title: 'string' } } }),
+        body: JSON.stringify({
+          name: 'App Two',
+          slug: 'app-two',
+          schema: { notes: { title: 'string' } },
+        }),
       }),
     );
-    const { project: p2 } = (await p2Res.json()) as any;
-
     // Create project-scoped API key for App One
     const keyRes = await app.fetch(
       new Request('http://localhost/admin/api-keys', {
         method: 'POST',
-        headers: { 'content-type': 'application/json', cookie, 'x-project-id': p1.id },
+        headers: {
+          'content-type': 'application/json',
+          cookie,
+          'x-project-id': p1.id,
+        },
         body: JSON.stringify({ name: 'App One Key', role: 'admin' }),
       }),
     );
@@ -348,10 +401,19 @@ describe('multi-project central server', () => {
     const pushRes = await app.fetch(
       new Request('http://localhost/sync', {
         method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${p1Key}` },
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${p1Key}`,
+        },
         body: JSON.stringify({
           operations: [
-            { id: 'op1', tableName: 'notes', rowId: 'n1', operation: 'UPDATE', payload: { title: 'Hello P1' } },
+            {
+              id: 'op1',
+              tableName: 'notes',
+              rowId: 'n1',
+              operation: 'UPDATE',
+              payload: { title: 'Hello P1' },
+            },
           ],
         }),
       }),
@@ -406,9 +468,18 @@ describe('multi-project central server', () => {
       ownerUserId: 'u1',
       schema: { items: { label: 'string' } },
     });
-    const storage = new TableSyncStorage(db, { schema: proj.schema, projectId: proj.id });
+    const storage = new TableSyncStorage(db, {
+      schema: proj.schema,
+      projectId: proj.id,
+    });
     await storage.applyOperations([
-      { id: '1', tableName: 'items', rowId: 'i1', operation: 'UPDATE', payload: { label: 'One' } },
+      {
+        id: '1',
+        tableName: 'items',
+        rowId: 'i1',
+        operation: 'UPDATE',
+        payload: { label: 'One' },
+      },
     ]);
     const deltas = await storage.getDeltas(['items'], 0, 50);
     expect(deltas.changes.changes).toHaveLength(1);

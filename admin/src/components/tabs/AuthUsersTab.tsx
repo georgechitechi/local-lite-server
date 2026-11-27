@@ -125,7 +125,9 @@ export function AuthUsersTab({
         <>
           <div style={{ fontWeight: 500 }}>{acc.email}</div>
           {acc.displayName && (
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>{acc.displayName}</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+              {acc.displayName}
+            </div>
           )}
         </>
       ),
@@ -145,7 +147,9 @@ export function AuthUsersTab({
               color: 'var(--accent)',
             }}
           >
-            {acc.consoleRole === 'super_admin' ? 'Super Admin' : 'Console Admin'}
+            {acc.consoleRole === 'super_admin'
+              ? 'Super Admin'
+              : 'Console Admin'}
           </span>
         ) : (
           <span style={{ color: 'var(--muted)', fontSize: 12 }}>App User</span>
@@ -206,7 +210,13 @@ export function AuthUsersTab({
                 setSearch(e.target.value);
                 setOffset(0);
               }}
-              style={{ ...inputStyle, flex: '1 1 180px', minWidth: 0, maxWidth: 240, padding: '7px 12px' }}
+              style={{
+                ...inputStyle,
+                flex: '1 1 180px',
+                minWidth: 0,
+                maxWidth: 240,
+                padding: '7px 12px',
+              }}
             />
             <select
               aria-label="Filter users"
@@ -215,7 +225,12 @@ export function AuthUsersTab({
                 setFilter(e.target.value as UserFilter);
                 setOffset(0);
               }}
-              style={{ ...inputStyle, width: 'auto', minWidth: 140, padding: '7px 10px' }}
+              style={{
+                ...inputStyle,
+                width: 'auto',
+                minWidth: 140,
+                padding: '7px 10px',
+              }}
             >
               <option value="all">All Users</option>
               <option value="console">Console Admins</option>

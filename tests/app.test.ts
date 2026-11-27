@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { loadSettings } from '../src/config.js';
 import { createApp } from '../src/server.js';
 import { normalizeSchema, resolveSchemaFile } from '../src/db/schema.js';
-import { ClientError, TableSyncStorage, fromDbRow, toDbValue } from '../src/db/tableStorage.js';
+import {
+  ClientError,
+  TableSyncStorage,
+  fromDbRow,
+  toDbValue,
+} from '../src/db/tableStorage.js';
 
 const env = {
   DB_DIALECT: 'mysql',
@@ -13,7 +18,13 @@ const env = {
 } as NodeJS.ProcessEnv;
 
 const schema = normalizeSchema({
-  notes: { title: 'string', body: 'string | null', pinned: 'boolean', meta: 'json | null', created_at: 'number' },
+  notes: {
+    title: 'string',
+    body: 'string | null',
+    pinned: 'boolean',
+    meta: 'json | null',
+    created_at: 'number',
+  },
 });
 
 function fakeExecutor() {
@@ -45,7 +56,9 @@ describe('local-lite-server app', () => {
 
   it('resolves root schema.ts inside the package repo and rejects invalid schema values', () => {
     expect(resolveSchemaFile().endsWith('schema.ts')).toBe(true);
-    expect(resolveSchemaFile().replace(/\\/g, '/')).not.toContain('/src/schema.ts');
+    expect(resolveSchemaFile().replace(/\\/g, '/')).not.toContain(
+      '/src/schema.ts',
+    );
     expect(() => normalizeSchema({ bad: (() => {}) as any })).toThrow();
     expect(() => normalizeSchema({ bad: { col: 'invalid' as any } })).toThrow();
   });
@@ -61,7 +74,9 @@ describe('local-lite-server app', () => {
 
   it('returns 400 for unknown tables', async () => {
     const res = await app.fetch(
-      new Request('http://x/sync?tables=nope', { headers: { authorization: 'Bearer secret' } }),
+      new Request('http://x/sync?tables=nope', {
+        headers: { authorization: 'Bearer secret' },
+      }),
     );
     expect(res.status).toBe(400);
   });
@@ -70,7 +85,10 @@ describe('local-lite-server app', () => {
     const res = await app.fetch(
       new Request('http://x/sync', {
         method: 'POST',
-        headers: { authorization: 'Bearer secret', 'content-type': 'application/json' },
+        headers: {
+          authorization: 'Bearer secret',
+          'content-type': 'application/json',
+        },
         body: JSON.stringify({}),
       }),
     );
@@ -83,12 +101,20 @@ describe('TableSyncStorage', () => {
     const ex = fakeExecutor();
     const s = new TableSyncStorage(ex, { schema });
     const r = await s.applyOperations([
-      { id: 'op1', tableName: 'notes', rowId: 'n1', operation: 'INSERT', timestamp: 1,
-        payload: { title: 'Hi', pinned: true, junk: 'ignored' } },
+      {
+        id: 'op1',
+        tableName: 'notes',
+        rowId: 'n1',
+        operation: 'INSERT',
+        timestamp: 1,
+        payload: { title: 'Hi', pinned: true, junk: 'ignored' },
+      },
     ]);
     expect(r.successfulIds).toEqual(['op1']);
     expect(r.cursor).toBeGreaterThan(5);
-    const upsert = ex.log.find((l: any) => l.sql.includes('INSERT INTO `notes`'))!;
+    const upsert = ex.log.find((l: any) =>
+      l.sql.includes('INSERT INTO `notes`'),
+    )!;
     expect(upsert.sql).not.toContain('junk');
     expect(upsert.params.slice(0, 3)).toEqual(['n1', 'Hi', 1]);
     const change = ex.log.find((l: any) => l.sql.includes('_server_changes'))!;
@@ -98,10 +124,28 @@ describe('TableSyncStorage', () => {
   it('soft-deletes and rejects unknown tables', async () => {
     const ex = fakeExecutor();
     const s = new TableSyncStorage(ex, { schema });
-    await s.applyOperations([{ id: 'd', tableName: 'notes', rowId: 'n1', operation: 'DELETE', timestamp: 1 }]);
-    expect(ex.log.some((l: any) => l.sql.startsWith('UPDATE `notes` SET `deleted`'))).toBe(true);
+    await s.applyOperations([
+      {
+        id: 'd',
+        tableName: 'notes',
+        rowId: 'n1',
+        operation: 'DELETE',
+        timestamp: 1,
+      },
+    ]);
+    expect(
+      ex.log.some((l: any) => l.sql.startsWith('UPDATE `notes` SET `deleted`')),
+    ).toBe(true);
     await expect(
-      s.applyOperations([{ id: 'x', tableName: 'nope', rowId: '1', operation: 'INSERT', timestamp: 1 }]),
+      s.applyOperations([
+        {
+          id: 'x',
+          tableName: 'nope',
+          rowId: '1',
+          operation: 'INSERT',
+          timestamp: 1,
+        },
+      ]),
     ).rejects.toBeInstanceOf(ClientError);
   });
 
@@ -109,7 +153,19 @@ describe('TableSyncStorage', () => {
     expect(toDbValue('boolean', true, 'mysql')).toBe(1);
     expect(toDbValue('boolean', true, 'postgres')).toBe(true);
     expect(toDbValue('json | null', { a: 1 }, 'mysql')).toBe('{"a":1}');
-    const p = fromDbRow(schema.notes, { id: 'n1', title: 'T', pinned: 1, meta: '{"a":1}', deleted: 0, updated_at: '9' });
-    expect(p).toMatchObject({ pinned: true, meta: { a: 1 }, deleted: false, updated_at: 9 });
+    const p = fromDbRow(schema.notes, {
+      id: 'n1',
+      title: 'T',
+      pinned: 1,
+      meta: '{"a":1}',
+      deleted: 0,
+      updated_at: '9',
+    });
+    expect(p).toMatchObject({
+      pinned: true,
+      meta: { a: 1 },
+      deleted: false,
+      updated_at: 9,
+    });
   });
 });

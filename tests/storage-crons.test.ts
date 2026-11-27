@@ -33,19 +33,30 @@ describe('Cron matcher & actions', () => {
       SERVER_API_KEY: 'secret',
       UPLOAD_DIR: os.tmpdir(),
     });
-    const trim = await runCronAction('trim_old_logs', JSON.stringify({ keepDays: 7 }), { settings, db });
+    const trim = await runCronAction(
+      'trim_old_logs',
+      JSON.stringify({ keepDays: 7 }),
+      { settings, db },
+    );
     expect(trim).toContain('3 log row');
 
-    const prune = await runCronAction('storage_orphan_prune', null, { settings, db });
+    const prune = await runCronAction('storage_orphan_prune', null, {
+      settings,
+      db,
+    });
     expect(prune).toContain('1 missing file');
-    expect(executed.some((s) => s.includes('DELETE FROM _lls_storage_files'))).toBe(true);
+    expect(
+      executed.some((s) => s.includes('DELETE FROM _lls_storage_files')),
+    ).toBe(true);
   });
 });
 
 describe('Storage endpoint (/storage/*)', () => {
   it('uploads to a bucket and serves the file back', async () => {
     const uploadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lls-storage-'));
-    const buckets = new Map<string, any>([['docs', { name: 'docs', visibility: 'public', created_at: 1 }]]);
+    const buckets = new Map<string, any>([
+      ['docs', { name: 'docs', visibility: 'public', created_at: 1 }],
+    ]);
     const files = new Map<string, any>();
     const db: any = {
       dialect: 'mysql',
@@ -63,8 +74,13 @@ describe('Storage endpoint (/storage/*)', () => {
       execute: async (sql: string, p: any[] = []) => {
         if (sql.includes('_lls_storage_files')) {
           files.set(p[1], {
-            id: p[0], storage_key: p[1], bucket: p[2], name: p[3],
-            mime_type: p[4], size_bytes: p[5], created_at: p[6],
+            id: p[0],
+            storage_key: p[1],
+            bucket: p[2],
+            name: p[3],
+            mime_type: p[4],
+            size_bytes: p[5],
+            created_at: p[6],
           });
         }
         return { affectedRows: 1 };
@@ -79,10 +95,20 @@ describe('Storage endpoint (/storage/*)', () => {
       SERVER_API_KEY: 'secret',
       UPLOAD_DIR: uploadDir,
     });
-    const app = createApp(settings, db, normalizeSchema({ notes: { title: 'string' } }));
+    const app = createApp(
+      settings,
+      db,
+      normalizeSchema({ notes: { title: 'string' } }),
+    );
     const form = new FormData();
     form.append('bucket', 'docs');
-    form.append('file', new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], { type: 'image/png' }), 'test.png');
+    form.append(
+      'file',
+      new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], {
+        type: 'image/png',
+      }),
+      'test.png',
+    );
 
     const up = await app.fetch(
       new Request('http://x/storage/upload', {
@@ -92,7 +118,10 @@ describe('Storage endpoint (/storage/*)', () => {
       }),
     );
     expect(up.status).toBe(200);
-    const { key, remoteUrl } = (await up.json()) as { key: string; remoteUrl: string };
+    const { key, remoteUrl } = (await up.json()) as {
+      key: string;
+      remoteUrl: string;
+    };
     expect(key).toBeTruthy();
 
     const dl = await app.fetch(new Request(`http://x${remoteUrl}`));

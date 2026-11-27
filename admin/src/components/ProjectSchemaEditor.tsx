@@ -110,7 +110,12 @@ export function ProjectSchemaEditor({
             <button
               type="button"
               onClick={() => onChange(drafts.filter((_, i) => i !== ti))}
-              style={{ ...secondaryBtnStyle, padding: '6px 10px', fontSize: 12, color: 'var(--danger)' }}
+              style={{
+                ...secondaryBtnStyle,
+                padding: '6px 10px',
+                fontSize: 12,
+                color: 'var(--danger)',
+              }}
             >
               Remove
             </button>
@@ -133,7 +138,15 @@ export function ProjectSchemaEditor({
           </select>
 
           {tbl.fields.map((f, fi) => (
-            <div key={fi} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div
+              key={fi}
+              style={{
+                display: 'flex',
+                gap: 6,
+                alignItems: 'center',
+                flexWrap: 'wrap',
+              }}
+            >
               <input
                 value={f.name}
                 onChange={(e) => {
@@ -167,10 +180,17 @@ export function ProjectSchemaEditor({
                 type="button"
                 onClick={() => {
                   const next = [...drafts];
-                  next[ti] = { ...tbl, fields: tbl.fields.filter((_, i) => i !== fi) };
+                  next[ti] = {
+                    ...tbl,
+                    fields: tbl.fields.filter((_, i) => i !== fi),
+                  };
                   onChange(next);
                 }}
-                style={{ ...secondaryBtnStyle, padding: '6px 9px', fontSize: 12 }}
+                style={{
+                  ...secondaryBtnStyle,
+                  padding: '6px 9px',
+                  fontSize: 12,
+                }}
               >
                 ×
               </button>
@@ -181,10 +201,18 @@ export function ProjectSchemaEditor({
             type="button"
             onClick={() => {
               const next = [...drafts];
-              next[ti] = { ...tbl, fields: [...tbl.fields, { name: '', type: 'string' }] };
+              next[ti] = {
+                ...tbl,
+                fields: [...tbl.fields, { name: '', type: 'string' }],
+              };
               onChange(next);
             }}
-            style={{ ...secondaryBtnStyle, alignSelf: 'flex-start', padding: '4px 10px', fontSize: 12 }}
+            style={{
+              ...secondaryBtnStyle,
+              alignSelf: 'flex-start',
+              padding: '4px 10px',
+              fontSize: 12,
+            }}
           >
             + Add Column
           </button>
@@ -196,10 +224,18 @@ export function ProjectSchemaEditor({
         onClick={() =>
           onChange([
             ...drafts,
-            { name: '', rule: 'owner', fields: [{ name: 'title', type: 'string' }] },
+            {
+              name: '',
+              rule: 'owner',
+              fields: [{ name: 'title', type: 'string' }],
+            },
           ])
         }
-        style={{ ...secondaryBtnStyle, alignSelf: 'flex-start', fontSize: 12.5 }}
+        style={{
+          ...secondaryBtnStyle,
+          alignSelf: 'flex-start',
+          fontSize: 12.5,
+        }}
       >
         + Add Table
       </button>

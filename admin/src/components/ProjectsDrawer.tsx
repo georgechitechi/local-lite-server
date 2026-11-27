@@ -135,7 +135,9 @@ export function ProjectsDrawer({
         ok = res.ok;
         if (!res.ok && res.suggestions?.length) {
           setSlugSuggestions(res.suggestions);
-          setFormError('That slug is already taken. Choose an available option below:');
+          setFormError(
+            'That slug is already taken. Choose an available option below:',
+          );
         }
       } else if (editingId) {
         ok = await onApplySchema(editingId, schema, rules);
@@ -154,13 +156,25 @@ export function ProjectsDrawer({
   return (
     <SlideDrawer
       open={open}
-      title={mode === 'list' ? 'Projects' : mode === 'new' ? 'New Project' : `Schema: ${name}`}
+      title={
+        mode === 'list'
+          ? 'Projects'
+          : mode === 'new'
+            ? 'New Project'
+            : `Schema: ${name}`
+      }
       onClose={onClose}
       disabled={saving}
       maxWidth={480}
       zIndex={60}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
         {mode !== 'list' ? (
           <button
             type="button"
@@ -197,7 +211,9 @@ export function ProjectsDrawer({
                 padding: '12px 14px',
                 borderRadius: 10,
                 border: `1px solid ${!activeProjectId ? 'var(--accent)' : 'var(--border)'}`,
-                background: !activeProjectId ? 'rgba(167,139,250,0.08)' : 'transparent',
+                background: !activeProjectId
+                  ? 'rgba(167,139,250,0.08)'
+                  : 'transparent',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -205,13 +221,25 @@ export function ProjectsDrawer({
               }}
             >
               <div>
-                <div style={{ fontWeight: 600, fontSize: 13.5 }}>Default (Central Server)</div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                <div style={{ fontWeight: 600, fontSize: 13.5 }}>
+                  Default (Central Server)
+                </div>
+                <div
+                  style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}
+                >
                   Root server tables &amp; configuration
                 </div>
               </div>
               {!activeProjectId && (
-                <span style={{ fontSize: 11.5, color: 'var(--accent)', fontWeight: 600 }}>Active</span>
+                <span
+                  style={{
+                    fontSize: 11.5,
+                    color: 'var(--accent)',
+                    fontWeight: 600,
+                  }}
+                >
+                  Active
+                </span>
               )}
             </div>
           )}
@@ -227,7 +255,8 @@ export function ProjectsDrawer({
                 fontSize: 13,
               }}
             >
-              No projects yet. Click <strong>+ New Project</strong> to create an isolated database workspace.
+              No projects yet. Click <strong>+ New Project</strong> to create an
+              isolated database workspace.
             </div>
           ) : (
             projects.map((p) => {
@@ -240,7 +269,9 @@ export function ProjectsDrawer({
                     padding: '12px 14px',
                     borderRadius: 10,
                     border: `1px solid ${isActive ? 'var(--accent)' : 'var(--border)'}`,
-                    background: isActive ? 'rgba(167,139,250,0.08)' : 'transparent',
+                    background: isActive
+                      ? 'rgba(167,139,250,0.08)'
+                      : 'transparent',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
@@ -254,20 +285,43 @@ export function ProjectsDrawer({
                     }}
                     style={{ flex: 1, cursor: 'pointer', minWidth: 0 }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontWeight: 600, fontSize: 13.5 }}>{p.name}</span>
+                    <div
+                      style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+                    >
+                      <span style={{ fontWeight: 600, fontSize: 13.5 }}>
+                        {p.name}
+                      </span>
                       {isActive && (
-                        <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600 }}>Active</span>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: 'var(--accent)',
+                            fontWeight: 600,
+                          }}
+                        >
+                          Active
+                        </span>
                       )}
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                      <code>/p/{p.slug}/sync</code> • {tableCount} {tableCount === 1 ? 'table' : 'tables'}
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: 'var(--muted)',
+                        marginTop: 2,
+                      }}
+                    >
+                      <code>/p/{p.slug}/sync</code> • {tableCount}{' '}
+                      {tableCount === 1 ? 'table' : 'tables'}
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => openEdit(p)}
-                    style={{ ...secondaryBtnStyle, padding: '5px 10px', fontSize: 12 }}
+                    style={{
+                      ...secondaryBtnStyle,
+                      padding: '5px 10px',
+                      fontSize: 12,
+                    }}
                   >
                     Schema
                   </button>
@@ -277,11 +331,21 @@ export function ProjectsDrawer({
           )}
         </div>
       ) : (
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
+        >
           {mode === 'new' && (
             <>
               <div>
-                <label style={{ display: 'block', fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 12,
+                    color: 'var(--muted)',
+                    marginBottom: 6,
+                  }}
+                >
                   Project Name
                 </label>
                 <input
@@ -293,7 +357,14 @@ export function ProjectsDrawer({
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 12,
+                    color: 'var(--muted)',
+                    marginBottom: 6,
+                  }}
+                >
                   Slug (optional)
                 </label>
                 <input
@@ -309,7 +380,14 @@ export function ProjectsDrawer({
                   style={inputStyle}
                 />
                 {slugSuggestions.length > 0 && (
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 6,
+                      flexWrap: 'wrap',
+                      marginTop: 8,
+                    }}
+                  >
                     {slugSuggestions.map((s) => (
                       <button
                         key={s}
@@ -319,7 +397,11 @@ export function ProjectsDrawer({
                           setSlugSuggestions([]);
                           setFormError('');
                         }}
-                        style={{ ...secondaryBtnStyle, padding: '4px 10px', fontSize: 12 }}
+                        style={{
+                          ...secondaryBtnStyle,
+                          padding: '4px 10px',
+                          fontSize: 12,
+                        }}
                       >
                         {s}
                       </button>
@@ -330,12 +412,24 @@ export function ProjectsDrawer({
             </>
           )}
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 12.5, fontWeight: 600 }}>Tables, Columns &amp; Access Rules</span>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <span style={{ fontSize: 12.5, fontWeight: 600 }}>
+              Tables, Columns &amp; Access Rules
+            </span>
             <button
               type="button"
               onClick={toggleRaw}
-              style={{ ...secondaryBtnStyle, padding: '4px 10px', fontSize: 11.5 }}
+              style={{
+                ...secondaryBtnStyle,
+                padding: '4px 10px',
+                fontSize: 11.5,
+              }}
             >
               {rawMode ? 'Visual Editor' : 'Edit Raw JSON'}
             </button>
@@ -346,13 +440,22 @@ export function ProjectsDrawer({
               value={rawJson}
               onChange={(e) => setRawJson(e.target.value)}
               rows={12}
-              style={{ ...inputStyle, fontFamily: 'monospace', fontSize: 12, resize: 'vertical' }}
+              style={{
+                ...inputStyle,
+                fontFamily: 'monospace',
+                fontSize: 12,
+                resize: 'vertical',
+              }}
             />
           ) : (
             <ProjectSchemaEditor drafts={drafts} onChange={setDrafts} />
           )}
 
-          {formError && <div style={{ color: 'var(--danger)', fontSize: 12.5 }}>{formError}</div>}
+          {formError && (
+            <div style={{ color: 'var(--danger)', fontSize: 12.5 }}>
+              {formError}
+            </div>
+          )}
 
           {mode === 'edit' && editingProject && confirmDelete && (
             <div
@@ -366,12 +469,18 @@ export function ProjectsDrawer({
                 gap: 8,
               }}
             >
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--danger)' }}>
+              <div
+                style={{
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  color: 'var(--danger)',
+                }}
+              >
                 Confirm permanent deletion
               </div>
               <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                This permanently drops all tables, files, users, keys, and logs for{' '}
-                <strong>{editingProject.name}</strong>. Type{' '}
+                This permanently drops all tables, files, users, keys, and logs
+                for <strong>{editingProject.name}</strong>. Type{' '}
                 <code>{editingProject.slug}</code> to confirm.
               </div>
               <input
@@ -380,7 +489,9 @@ export function ProjectsDrawer({
                 placeholder={editingProject.slug}
                 style={inputStyle}
               />
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <div
+                style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}
+              >
                 <button
                   type="button"
                   onClick={() => {
@@ -393,7 +504,9 @@ export function ProjectsDrawer({
                 </button>
                 <button
                   type="button"
-                  disabled={saving || deleteInput.trim() !== editingProject.slug}
+                  disabled={
+                    saving || deleteInput.trim() !== editingProject.slug
+                  }
                   onClick={async () => {
                     setSaving(true);
                     try {
@@ -410,7 +523,8 @@ export function ProjectsDrawer({
                   style={{
                     ...primaryBtnStyle,
                     background: 'var(--danger)',
-                    opacity: deleteInput.trim() === editingProject.slug ? 1 : 0.5,
+                    opacity:
+                      deleteInput.trim() === editingProject.slug ? 1 : 0.5,
                   }}
                 >
                   {saving ? 'Deleting...' : 'Delete Permanently'}
@@ -419,7 +533,15 @@ export function ProjectsDrawer({
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8, flexWrap: 'wrap' }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              justifyContent: 'flex-end',
+              marginTop: 8,
+              flexWrap: 'wrap',
+            }}
+          >
             {mode === 'edit' && editingProject && (
               <>
                 <button
@@ -437,18 +559,30 @@ export function ProjectsDrawer({
                       setDeleteInput('');
                       setConfirmDelete(true);
                     }}
-                    style={{ ...secondaryBtnStyle, color: 'var(--danger)', marginRight: 'auto' }}
+                    style={{
+                      ...secondaryBtnStyle,
+                      color: 'var(--danger)',
+                      marginRight: 'auto',
+                    }}
                   >
                     Delete
                   </button>
                 )}
               </>
             )}
-            <button type="button" onClick={() => setMode('list')} style={secondaryBtnStyle}>
+            <button
+              type="button"
+              onClick={() => setMode('list')}
+              style={secondaryBtnStyle}
+            >
               Cancel
             </button>
             <button type="submit" disabled={saving} style={primaryBtnStyle}>
-              {saving ? 'Saving...' : mode === 'new' ? 'Create Project' : 'Apply Schema'}
+              {saving
+                ? 'Saving...'
+                : mode === 'new'
+                  ? 'Create Project'
+                  : 'Apply Schema'}
             </button>
           </div>
         </form>

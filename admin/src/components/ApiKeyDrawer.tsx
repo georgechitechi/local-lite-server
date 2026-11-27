@@ -61,7 +61,10 @@ export function ApiKeyDrawer({
       setUserId('');
       setExpiresInDays('0');
       setCreatedKey(data.key);
-      onToast('API key created — copy it now, it will not be shown again', 'info');
+      onToast(
+        'API key created — copy it now, it will not be shown again',
+        'info',
+      );
       await onCreated();
     } finally {
       setSaving(false);
@@ -86,133 +89,155 @@ export function ApiKeyDrawer({
       disabled={saving}
     >
       {createdKey ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div
+            style={{
+              padding: 12,
+              borderRadius: 8,
+              border: '1px solid var(--accent)',
+              background: 'rgba(59, 130, 246, 0.08)',
+              fontSize: 13,
+              lineHeight: 1.5,
+            }}
+          >
+            Save this key now. For security, it will <strong>not</strong> be
+            shown again after you close this drawer.
+          </div>
+
+          <div>
+            <label style={labelStyle}>Your API Key</label>
+            <code
               style={{
-                padding: 12,
-                borderRadius: 8,
-                border: '1px solid var(--accent)',
-                background: 'rgba(59, 130, 246, 0.08)',
+                display: 'block',
+                padding: '10px 12px',
+                borderRadius: 6,
+                background: 'var(--bg)',
+                border: '1px solid var(--border)',
                 fontSize: 13,
-                lineHeight: 1.5,
+                wordBreak: 'break-all',
               }}
             >
-              Save this key now. For security, it will <strong>not</strong> be shown again after you close this drawer.
-            </div>
-
-            <div>
-              <label style={labelStyle}>Your API Key</label>
-              <code
-                style={{
-                  display: 'block',
-                  padding: '10px 12px',
-                  borderRadius: 6,
-                  background: 'var(--bg)',
-                  border: '1px solid var(--border)',
-                  fontSize: 13,
-                  wordBreak: 'break-all',
-                }}
-              >
-                {createdKey}
-              </code>
-            </div>
-
-            <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.6 }}>
-              <div>Usage examples:</div>
-              <code style={{ display: 'block', marginTop: 4, wordBreak: 'break-all' }}>
-                Authorization: Bearer {createdKey}
-              </code>
-              <code style={{ display: 'block', marginTop: 4, wordBreak: 'break-all' }}>
-                X-API-Key: {createdKey}
-              </code>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 8 }}>
-              <button type="button" onClick={() => void handleCopy()} style={primaryBtnStyle}>
-                Copy Key
-              </button>
-              <button type="button" onClick={handleClose} style={secondaryBtnStyle}>
-                Done
-              </button>
-            </div>
+              {createdKey}
+            </code>
           </div>
-        ) : (
-          <form
-            onSubmit={handleSubmit}
-            style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
+
+          <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.6 }}>
+            <div>Usage examples:</div>
+            <code
+              style={{ display: 'block', marginTop: 4, wordBreak: 'break-all' }}
+            >
+              Authorization: Bearer {createdKey}
+            </code>
+            <code
+              style={{ display: 'block', marginTop: 4, wordBreak: 'break-all' }}
+            >
+              X-API-Key: {createdKey}
+            </code>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              gap: 10,
+              marginTop: 8,
+            }}
           >
+            <button
+              type="button"
+              onClick={() => void handleCopy()}
+              style={primaryBtnStyle}
+            >
+              Copy Key
+            </button>
+            <button
+              type="button"
+              onClick={handleClose}
+              style={secondaryBtnStyle}
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      ) : (
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
+        >
+          <div>
+            <label style={labelStyle}>Key Name</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Mobile Client"
+              autoFocus
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Access Role</label>
+            <select
+              value={role}
+              onChange={(e) =>
+                setRole(e.target.value === 'user' ? 'user' : 'admin')
+              }
+              style={inputStyle}
+            >
+              <option value="admin">Admin (full access)</option>
+              <option value="user">User (RLS-scoped)</option>
+            </select>
+          </div>
+
+          {role === 'user' && (
             <div>
-              <label style={labelStyle}>Key Name</label>
+              <label style={labelStyle}>User ID (optional)</label>
               <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Mobile Client"
-                autoFocus
+                value={userId}
+                onChange={(e) => setUserId(e.target.value)}
+                placeholder="Defaults to api_key:<id>"
                 style={inputStyle}
               />
             </div>
+          )}
 
-            <div>
-              <label style={labelStyle}>Access Role</label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value === 'user' ? 'user' : 'admin')}
-                style={inputStyle}
-              >
-                <option value="admin">Admin (full access)</option>
-                <option value="user">User (RLS-scoped)</option>
-              </select>
-            </div>
-
-            {role === 'user' && (
-              <div>
-                <label style={labelStyle}>User ID (optional)</label>
-                <input
-                  value={userId}
-                  onChange={(e) => setUserId(e.target.value)}
-                  placeholder="Defaults to api_key:<id>"
-                  style={inputStyle}
-                />
-              </div>
-            )}
-
-            <div>
-              <label style={labelStyle}>Expiration</label>
-              <select
-                value={expiresInDays}
-                onChange={(e) => setExpiresInDays(e.target.value)}
-                style={inputStyle}
-              >
-                <option value="0">Never expires</option>
-                <option value="7">7 days</option>
-                <option value="30">30 days</option>
-                <option value="90">90 days</option>
-                <option value="365">1 year</option>
-              </select>
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: 10,
-                marginTop: 8,
-              }}
+          <div>
+            <label style={labelStyle}>Expiration</label>
+            <select
+              value={expiresInDays}
+              onChange={(e) => setExpiresInDays(e.target.value)}
+              style={inputStyle}
             >
-              <button
-                type="button"
-                disabled={saving}
-                onClick={handleClose}
-                style={secondaryBtnStyle}
-              >
-                Cancel
-              </button>
-              <button type="submit" disabled={saving} style={primaryBtnStyle}>
-                {saving ? 'Creating...' : 'Create API Key'}
-              </button>
-            </div>
-          </form>
-        )}
+              <option value="0">Never expires</option>
+              <option value="7">7 days</option>
+              <option value="30">30 days</option>
+              <option value="90">90 days</option>
+              <option value="365">1 year</option>
+            </select>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              gap: 10,
+              marginTop: 8,
+            }}
+          >
+            <button
+              type="button"
+              disabled={saving}
+              onClick={handleClose}
+              style={secondaryBtnStyle}
+            >
+              Cancel
+            </button>
+            <button type="submit" disabled={saving} style={primaryBtnStyle}>
+              {saving ? 'Creating...' : 'Create API Key'}
+            </button>
+          </div>
+        </form>
+      )}
     </SlideDrawer>
   );
 }

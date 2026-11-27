@@ -84,10 +84,7 @@ export function DataBrowserTab({
 
   return (
     <div className="split-grid-230">
-      <div
-        className="data-table-sidebar"
-        style={cardStyle}
-      >
+      <div className="data-table-sidebar" style={cardStyle}>
         <input
           placeholder="Filter tables..."
           value={tableFilter}

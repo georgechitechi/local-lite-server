@@ -54,7 +54,12 @@ export function createSqlStorageMetadata(
           updateCols: ['visibility', 'project_id'],
           dialect: db.dialect,
         }),
-        [scope.key(bucket.name), bucket.visibility, projectId, bucket.createdAt ?? Date.now()],
+        [
+          scope.key(bucket.name),
+          bucket.visibility,
+          projectId,
+          bucket.createdAt ?? Date.now(),
+        ],
       );
     },
     async deleteBucket(name) {
@@ -75,11 +80,35 @@ export function createSqlStorageMetadata(
         buildUpsertSql({
           table: '_lls_storage_files',
           conflictCols: ['storage_key'],
-          insertCols: ['id', 'storage_key', 'bucket', 'name', 'mime_type', 'size_bytes', 'project_id', 'created_at'],
-          updateCols: ['bucket', 'name', 'mime_type', 'size_bytes', 'project_id'],
+          insertCols: [
+            'id',
+            'storage_key',
+            'bucket',
+            'name',
+            'mime_type',
+            'size_bytes',
+            'project_id',
+            'created_at',
+          ],
+          updateCols: [
+            'bucket',
+            'name',
+            'mime_type',
+            'size_bytes',
+            'project_id',
+          ],
           dialect: db.dialect,
         }),
-        [file.id, file.storageKey, file.bucket, file.name, file.mimeType, file.sizeBytes, projectId, file.createdAt],
+        [
+          file.id,
+          file.storageKey,
+          file.bucket,
+          file.name,
+          file.mimeType,
+          file.sizeBytes,
+          projectId,
+          file.createdAt,
+        ],
       );
     },
     async getFile(storageKey, bucket) {
@@ -127,7 +156,9 @@ export function createStorageHandler(
 ) {
   const projectId = opts?.projectId ?? null;
   return createStorageEndpoint({
-    uploadDir: projectId ? path.join(settings.uploadDir, 'projects', projectId) : settings.uploadDir,
+    uploadDir: projectId
+      ? path.join(settings.uploadDir, 'projects', projectId)
+      : settings.uploadDir,
     signingSecret: settings.appSecret || settings.apiKey,
     metadata: createSqlStorageMetadata(db, projectId),
     authenticate,

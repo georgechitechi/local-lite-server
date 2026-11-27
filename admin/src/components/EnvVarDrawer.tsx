@@ -118,107 +118,103 @@ export function EnvVarDrawer({
         onSubmit={(e) => void handleSubmit(e)}
         style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
       >
-          <div>
-            <label style={labelStyle}>Key</label>
-            <input
-              type="text"
-              placeholder="MY_API_KEY"
-              value={envKey}
-              disabled={isEdit}
-              onChange={(e) => setEnvKey(e.target.value.toUpperCase())}
-              style={{
-                ...inputStyle,
-                fontFamily: 'monospace',
-                opacity: isEdit ? 0.7 : 1,
-              }}
-            />
-          </div>
-
-          <div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: 6,
-              }}
-            >
-              <label style={{ ...labelStyle, marginBottom: 0 }}>Value</label>
-              <button
-                type="button"
-                onClick={() => setShowValue((v) => !v)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'var(--muted)',
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  padding: 0,
-                }}
-              >
-                {showValue ? 'Hide' : 'Show'}
-              </button>
-            </div>
-            <textarea
-              rows={3}
-              placeholder="sk_live_..."
-              value={envValue}
-              onChange={(e) => setEnvValue(e.target.value)}
-              style={{
-                ...inputStyle,
-                fontFamily: 'monospace',
-                resize: 'vertical',
-                ...(envSecret && !showValue
-                  ? ({ WebkitTextSecurity: 'disc' } as React.CSSProperties)
-                  : {}),
-              }}
-            />
-          </div>
-
-          <div>
-            <label style={labelStyle}>Description (optional)</label>
-            <input
-              type="text"
-              placeholder="External API key"
-              value={envDesc}
-              onChange={(e) => setEnvDesc(e.target.value)}
-              style={inputStyle}
-            />
-          </div>
-
-          <ToggleSlider
-            checked={envSecret}
-            onChange={setEnvSecret}
-            label="Mask value as secret"
+        <div>
+          <label style={labelStyle}>Key</label>
+          <input
+            type="text"
+            placeholder="MY_API_KEY"
+            value={envKey}
+            disabled={isEdit}
+            onChange={(e) => setEnvKey(e.target.value.toUpperCase())}
+            style={{
+              ...inputStyle,
+              fontFamily: 'monospace',
+              opacity: isEdit ? 0.7 : 1,
+            }}
           />
+        </div>
 
+        <div>
           <div
             style={{
               display: 'flex',
               justifyContent: 'space-between',
-              gap: 8,
-              marginTop: 8,
-              borderTop: '1px solid var(--border)',
-              paddingTop: 14,
+              alignItems: 'center',
+              marginBottom: 6,
             }}
           >
+            <label style={{ ...labelStyle, marginBottom: 0 }}>Value</label>
             <button
               type="button"
-              onClick={onClose}
-              disabled={saving}
-              style={secondaryBtnStyle}
+              onClick={() => setShowValue((v) => !v)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--muted)',
+                fontSize: 12,
+                cursor: 'pointer',
+                padding: 0,
+              }}
             >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              style={primaryBtnStyle}
-            >
-              {saving ? 'Saving...' : 'Save Variable'}
+              {showValue ? 'Hide' : 'Show'}
             </button>
           </div>
-        </form>
+          <textarea
+            rows={3}
+            placeholder="sk_live_..."
+            value={envValue}
+            onChange={(e) => setEnvValue(e.target.value)}
+            style={{
+              ...inputStyle,
+              fontFamily: 'monospace',
+              resize: 'vertical',
+              ...(envSecret && !showValue
+                ? ({ WebkitTextSecurity: 'disc' } as React.CSSProperties)
+                : {}),
+            }}
+          />
+        </div>
+
+        <div>
+          <label style={labelStyle}>Description (optional)</label>
+          <input
+            type="text"
+            placeholder="External API key"
+            value={envDesc}
+            onChange={(e) => setEnvDesc(e.target.value)}
+            style={inputStyle}
+          />
+        </div>
+
+        <ToggleSlider
+          checked={envSecret}
+          onChange={setEnvSecret}
+          label="Mask value as secret"
+        />
+
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: 8,
+            marginTop: 8,
+            borderTop: '1px solid var(--border)',
+            paddingTop: 14,
+          }}
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            style={secondaryBtnStyle}
+          >
+            Cancel
+          </button>
+          <button type="submit" disabled={saving} style={primaryBtnStyle}>
+            {saving ? 'Saving...' : 'Save Variable'}
+          </button>
+        </div>
+      </form>
     </SlideDrawer>
   );
 }

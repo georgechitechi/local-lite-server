@@ -10,7 +10,10 @@ import { createAuthService } from './auth/auth.js';
 import type { ServerSettings } from './config.js';
 import { scopeBroker } from './core/broker.js';
 import { corsHeaders, createHttpServer } from './core/http.js';
-import { createFunctionRuntime, type FunctionRegistry } from './functions/index.js';
+import {
+  createFunctionRuntime,
+  type FunctionRegistry,
+} from './functions/index.js';
 import { createAuthContext } from './http/authContext.js';
 import { createProjectRuntimeCache } from './http/projectRuntime.js';
 import { adminRoutes } from './http/routes/admin.js';
@@ -19,7 +22,10 @@ import { syncAndProjectRoutes } from './http/routes/sync.js';
 import { handleOAuthTokenExchange } from './auth/oauth.js';
 import { createProjectService } from './services/projects.js';
 import { createDistributedRateLimiter } from './auth/rateLimit.js';
-import type { CustomRoutesFactory, CustomRoutesMap } from './services/routes.js';
+import type {
+  CustomRoutesFactory,
+  CustomRoutesMap,
+} from './services/routes.js';
 import type { RulesDictionary } from './db/rules.js';
 import type { SchemaDictionary } from './db/schema.js';
 import { createStorageHandler } from './services/storage.js';
@@ -38,16 +44,36 @@ export function createApp(
 ) {
   const rootBroker = brokerOverride ?? createSyncEventBroker();
   const scopedRootBroker = scopeBroker(rootBroker, null);
-  const rootStorage = new TableSyncStorage(executor, { schema, rules, broker: scopedRootBroker });
+  const rootStorage = new TableSyncStorage(executor, {
+    schema,
+    rules,
+    broker: scopedRootBroker,
+  });
   const rootAuth = createAuthService(settings, executor, null);
   const apiKeys = createApiKeyService(executor);
   const projects = createProjectService(executor, {
     maxProjectsPerUser: settings.maxProjectsPerUser,
     uploadDir: settings.uploadDir,
   });
-  const fnRuntime = createFunctionRuntime({ registry: functions, db: executor, schema, broker: scopedRootBroker });
-  const consoleApi = createAdminConsole({ settings, db: executor, schema, broker: scopedRootBroker, fnRuntime });
-  const authLimiter = createDistributedRateLimiter(executor, 20, 60_000, settings.multiInstance);
+  const fnRuntime = createFunctionRuntime({
+    registry: functions,
+    db: executor,
+    schema,
+    broker: scopedRootBroker,
+  });
+  const consoleApi = createAdminConsole({
+    settings,
+    db: executor,
+    schema,
+    broker: scopedRootBroker,
+    fnRuntime,
+  });
+  const authLimiter = createDistributedRateLimiter(
+    executor,
+    20,
+    60_000,
+    settings.multiInstance,
+  );
 
   let runtimeCache: ReturnType<typeof createProjectRuntimeCache>;
 
@@ -67,13 +93,18 @@ export function createApp(
     rootBroker,
     rootRules: rules,
     functions,
-    resolveAuth: (req, allowQuery, projectScope) => authCtx.resolveAuth(req, allowQuery, projectScope),
+    resolveAuth: (req, allowQuery, projectScope) =>
+      authCtx.resolveAuth(req, allowQuery, projectScope),
   });
 
-  const rootStorageHandler = createStorageHandler(settings, executor, async (req) => {
-    const a = await authCtx.resolveAuth(req, true);
-    return a ? { userId: a.userId ?? 'admin', isAdmin: a.isAdmin } : null;
-  });
+  const rootStorageHandler = createStorageHandler(
+    settings,
+    executor,
+    async (req) => {
+      const a = await authCtx.resolveAuth(req, true);
+      return a ? { userId: a.userId ?? 'admin', isAdmin: a.isAdmin } : null;
+    },
+  );
 
   const customRoutes =
     typeof customRoutesInput === 'function'
@@ -82,7 +113,8 @@ export function createApp(
           settings,
           schema,
           broker: scopedRootBroker,
-          resolveAuth: (req, allowQuery) => authCtx.resolveAuth(req, allowQuery),
+          resolveAuth: (req, allowQuery) =>
+            authCtx.resolveAuth(req, allowQuery),
         })
       : (customRoutesInput ?? {});
 
@@ -100,7 +132,10 @@ export function createApp(
         } catch (err) {
           console.error('[local-lite-server]', err);
           return Response.json(
-            { error: err instanceof Error ? err.message : 'Internal Server Error' },
+            {
+              error:
+                err instanceof Error ? err.message : 'Internal Server Error',
+            },
             { status: 500, headers: cors },
           );
         }
@@ -116,20 +151,31 @@ export function createApp(
         GET: async () => {
           try {
             await executor.query('SELECT 1');
-            return Response.json({ ok: true, timestamp: new Date().toISOString() });
+            return Response.json({
+              ok: true,
+              timestamp: new Date().toISOString(),
+            });
           } catch {
-            return Response.json({ ok: false, timestamp: new Date().toISOString() }, { status: 503 });
+            return Response.json(
+              { ok: false, timestamp: new Date().toISOString() },
+              { status: 503 },
+            );
           }
         },
       },
       '/auth/google-token': {
-        POST: async ({ request }) => (await authCtx.rateLimited(request)) ?? handleOAuthTokenExchange(request),
+        POST: async ({ request }) =>
+          (await authCtx.rateLimited(request)) ??
+          handleOAuthTokenExchange(request),
       },
       '/auth/github-token': {
-        POST: async ({ request }) => (await authCtx.rateLimited(request)) ?? handleOAuthTokenExchange(request),
+        POST: async ({ request }) =>
+          (await authCtx.rateLimited(request)) ??
+          handleOAuthTokenExchange(request),
       },
       '/auth/*': {
-        POST: async ({ request }) => (await authCtx.rateLimited(request)) ?? rootAuth.handler(request),
+        POST: async ({ request }) =>
+          (await authCtx.rateLimited(request)) ?? rootAuth.handler(request),
       },
       ...projectRoutes({ projects, authCtx, runtimeCache }),
       ...syncAndProjectRoutes({
@@ -141,9 +187,15 @@ export function createApp(
         rootFnRuntime: fnRuntime,
         rootStorageHandler,
       }),
-      ...(settings.adminUi ? adminRoutes({ consoleApi, apiKeys, authCtx }) : {}),
+      ...(settings.adminUi
+        ? adminRoutes({ consoleApi, apiKeys, authCtx })
+        : {}),
     },
   });
 
-  return { fetch: (req: Request) => api.fetch(req), broker: scopedRootBroker, fnRuntime };
+  return {
+    fetch: (req: Request) => api.fetch(req),
+    broker: scopedRootBroker,
+    fnRuntime,
+  };
 }

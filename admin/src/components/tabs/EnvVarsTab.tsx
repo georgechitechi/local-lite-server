@@ -181,7 +181,9 @@ export function EnvVarsTab({
         wordBreak: 'break-all',
       },
       render: (item) =>
-        revealedValues[item.key] !== undefined ? revealedValues[item.key] : item.maskedValue,
+        revealedValues[item.key] !== undefined
+          ? revealedValues[item.key]
+          : item.maskedValue,
     },
     {
       header: 'Source',
@@ -192,8 +194,12 @@ export function EnvVarsTab({
             fontWeight: 600,
             padding: '2px 7px',
             borderRadius: 999,
-            background: item.source === 'database' ? 'var(--success-soft)' : 'var(--surface-alt)',
-            color: item.source === 'database' ? 'var(--success)' : 'var(--muted)',
+            background:
+              item.source === 'database'
+                ? 'var(--success-soft)'
+                : 'var(--surface-alt)',
+            color:
+              item.source === 'database' ? 'var(--success)' : 'var(--muted)',
           }}
         >
           {item.source === 'database' ? 'Database' : '.env'}
@@ -211,14 +217,28 @@ export function EnvVarsTab({
       render: (item) => {
         const isRevealed = revealedValues[item.key] !== undefined;
         return (
-          <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end' }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              gap: 6,
+              justifyContent: 'flex-end',
+            }}
+          >
             {item.revealable && (
-              <button type="button" onClick={() => void handleToggleReveal(item)} style={secondaryBtnStyle}>
+              <button
+                type="button"
+                onClick={() => void handleToggleReveal(item)}
+                style={secondaryBtnStyle}
+              >
                 {isRevealed ? 'Hide' : 'Reveal'}
               </button>
             )}
             {!item.readonly && (
-              <button type="button" onClick={() => void handleEdit(item)} style={secondaryBtnStyle}>
+              <button
+                type="button"
+                onClick={() => void handleEdit(item)}
+                style={secondaryBtnStyle}
+              >
                 Edit
               </button>
             )}
@@ -242,7 +262,11 @@ export function EnvVarsTab({
       <Card
         title="Environment Variables"
         actions={
-          <button type="button" onClick={() => setDrawer({ kind: 'create' })} style={primaryBtnStyle}>
+          <button
+            type="button"
+            onClick={() => setDrawer({ kind: 'create' })}
+            style={primaryBtnStyle}
+          >
             + Add Variable
           </button>
         }
@@ -256,7 +280,13 @@ export function EnvVarsTab({
                 setSearch(e.target.value);
                 setOffset(0);
               }}
-              style={{ ...inputStyle, flex: '1 1 180px', minWidth: 0, maxWidth: 240, padding: '7px 12px' }}
+              style={{
+                ...inputStyle,
+                flex: '1 1 180px',
+                minWidth: 0,
+                maxWidth: 240,
+                padding: '7px 12px',
+              }}
             />
             <select
               aria-label="Filter environment variables"
@@ -265,7 +295,12 @@ export function EnvVarsTab({
                 setFilter(e.target.value as SourceFilter);
                 setOffset(0);
               }}
-              style={{ ...inputStyle, width: 'auto', minWidth: 130, padding: '7px 10px' }}
+              style={{
+                ...inputStyle,
+                width: 'auto',
+                minWidth: 130,
+                padding: '7px 10px',
+              }}
             >
               <option value="all">All Sources</option>
               <option value="database">Database</option>

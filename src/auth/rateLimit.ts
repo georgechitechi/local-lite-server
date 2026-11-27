@@ -13,7 +13,11 @@ export function createRateLimiter(max: number, windowMs: number) {
       return { ok: true };
     }
     b.count += 1;
-    if (b.count > max) return { ok: false, retryAfter: Math.max(1, Math.ceil((b.resetAt - now) / 1000)) };
+    if (b.count > max)
+      return {
+        ok: false,
+        retryAfter: Math.max(1, Math.ceil((b.resetAt - now) / 1000)),
+      };
     return { ok: true };
   };
 }
@@ -26,7 +30,8 @@ export function createDistributedRateLimiter(
   enabled = false,
 ) {
   const memory = createRateLimiter(max, windowMs);
-  if (!enabled) return async (key: string, now = Date.now()) => memory(key, now);
+  if (!enabled)
+    return async (key: string, now = Date.now()) => memory(key, now);
 
   return async (key: string, now = Date.now()): Promise<RateLimitResult> => {
     try {
@@ -47,11 +52,17 @@ export function createDistributedRateLimiter(
           return { ok: true as const };
         }
         const nextHits = Number(existing.hits) + 1;
-        await tx.execute('UPDATE _lls_rate_limits SET hits = ? WHERE rate_key = ?', [nextHits, key]);
+        await tx.execute(
+          'UPDATE _lls_rate_limits SET hits = ? WHERE rate_key = ?',
+          [nextHits, key],
+        );
         if (nextHits > max) {
           return {
             ok: false as const,
-            retryAfter: Math.max(1, Math.ceil((Number(existing.reset_at) - now) / 1000)),
+            retryAfter: Math.max(
+              1,
+              Math.ceil((Number(existing.reset_at) - now) / 1000),
+            ),
           };
         }
         return { ok: true as const };

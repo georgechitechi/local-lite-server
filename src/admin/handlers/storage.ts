@@ -5,7 +5,10 @@ import type { ServerSettings } from '../../config.js';
 import { projectScope, type ProjectRecord } from '../../services/projects.js';
 import { clampInt } from '../console.js';
 
-export function createStorageAdminHandler(settings: ServerSettings, db: SqlExecutor) {
+export function createStorageAdminHandler(
+  settings: ServerSettings,
+  db: SqlExecutor,
+) {
   return async (request: Request, project?: ProjectRecord | null) => {
     const url = new URL(request.url);
     const method = request.method.toUpperCase();
@@ -19,8 +22,13 @@ export function createStorageAdminHandler(settings: ServerSettings, db: SqlExecu
         `SELECT * FROM _lls_storage_buckets WHERE ${scope.where} ORDER BY name ASC`,
         scope.params,
       );
-      const buckets = rawBuckets.map((b) => ({ ...b, name: scope.unkey(String(b.name)) }));
-      const where = bucket ? `WHERE ${scope.where} AND bucket = ?` : `WHERE ${scope.where}`;
+      const buckets = rawBuckets.map((b) => ({
+        ...b,
+        name: scope.unkey(String(b.name)),
+      }));
+      const where = bucket
+        ? `WHERE ${scope.where} AND bucket = ?`
+        : `WHERE ${scope.where}`;
       const params = bucket ? [...scope.params, bucket] : scope.params;
       const files = await db.query<any>(
         `SELECT * FROM _lls_storage_files ${where} ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`,
@@ -40,8 +48,14 @@ export function createStorageAdminHandler(settings: ServerSettings, db: SqlExecu
 
     if (method === 'POST') {
       const body = (await request.json().catch(() => null)) as any;
-      const name = String(body?.name ?? '').trim().toLowerCase();
-      if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(name)) return Response.json({ error: 'Invalid bucket name.' }, { status: 400 });
+      const name = String(body?.name ?? '')
+        .trim()
+        .toLowerCase();
+      if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(name))
+        return Response.json(
+          { error: 'Invalid bucket name.' },
+          { status: 400 },
+        );
       const vis = body?.visibility === 'public' ? 'public' : 'private';
       await db.execute(
         buildUpsertSql({
@@ -53,7 +67,10 @@ export function createStorageAdminHandler(settings: ServerSettings, db: SqlExecu
         }),
         [scope.key(name), vis, scope.projectId, Date.now()],
       );
-      return Response.json({ success: true, name, visibility: vis }, { status: 201 });
+      return Response.json(
+        { success: true, name, visibility: vis },
+        { status: 201 },
+      );
     }
 
     if (method === 'DELETE') {
@@ -67,7 +84,9 @@ export function createStorageAdminHandler(settings: ServerSettings, db: SqlExecu
         return Response.json({ success: true });
       }
       if (key) {
-        const uploadRoot = scope.projectId ? path.join(settings.uploadDir, 'projects', scope.projectId) : settings.uploadDir;
+        const uploadRoot = scope.projectId
+          ? path.join(settings.uploadDir, 'projects', scope.projectId)
+          : settings.uploadDir;
         const target = path.resolve(uploadRoot, key);
         if (fs.existsSync(target)) fs.unlinkSync(target);
         await db.execute(
@@ -76,7 +95,10 @@ export function createStorageAdminHandler(settings: ServerSettings, db: SqlExecu
         );
         return Response.json({ success: true });
       }
-      return Response.json({ error: 'bucket or key required.' }, { status: 400 });
+      return Response.json(
+        { error: 'bucket or key required.' },
+        { status: 400 },
+      );
     }
 
     return Response.json({ error: 'Method Not Allowed' }, { status: 405 });

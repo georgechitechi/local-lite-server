@@ -9,20 +9,35 @@ import { resolveSchemaFile } from '../db/schema.js';
 const require = createRequire(import.meta.url);
 
 const EXTERNAL_PEERS = [
-  'react-native', 'react-native/*', '@react-native/*', '@react-native-community/*',
-  'expo', 'expo-*', 'expo-modules-core', 'react', 'react/*',
-  'better-sqlite3', '@libsql/*', 'op-sqlite', '@op-engineering/*',
+  'react-native',
+  'react-native/*',
+  '@react-native/*',
+  '@react-native-community/*',
+  'expo',
+  'expo-*',
+  'expo-modules-core',
+  'react',
+  'react/*',
+  'better-sqlite3',
+  '@libsql/*',
+  'op-sqlite',
+  '@op-engineering/*',
   'pg-native',
 ];
 
-export async function buildCpanelBundle(cwd = process.cwd(), outDir = 'dist/cpanel') {
+export async function buildCpanelBundle(
+  cwd = process.cwd(),
+  outDir = 'dist/cpanel',
+) {
   const pkgRoot = path.resolve(import.meta.dirname, '..');
   const isOwnRepo = fs.existsSync(path.resolve(cwd, 'src/cli.ts'));
   const entryPoint = isOwnRepo
     ? path.resolve(cwd, 'src/app.ts')
     : path.resolve(import.meta.dirname, 'app.js');
   const absOut = path.resolve(cwd, outDir);
-  const nodemailerDir = path.dirname(require.resolve('nodemailer/package.json'));
+  const nodemailerDir = path.dirname(
+    require.resolve('nodemailer/package.json'),
+  );
 
   fs.rmSync(absOut, { recursive: true, force: true });
 
@@ -94,7 +109,12 @@ export async function buildCpanelBundle(cwd = process.cwd(), outDir = 'dist/cpan
 
   const srcFns = path.resolve(cwd, 'src/functions');
   const rootFns = path.resolve(cwd, 'functions');
-  const fnsDir = !isOwnRepo && fs.existsSync(srcFns) ? srcFns : fs.existsSync(rootFns) ? rootFns : null;
+  const fnsDir =
+    !isOwnRepo && fs.existsSync(srcFns)
+      ? srcFns
+      : fs.existsSync(rootFns)
+        ? rootFns
+        : null;
   if (fnsDir) {
     fs.cpSync(fnsDir, path.join(absOut, 'functions'), { recursive: true });
   }

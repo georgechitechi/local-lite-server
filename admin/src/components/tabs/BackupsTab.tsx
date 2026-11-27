@@ -154,7 +154,9 @@ export function BackupsTab({
       header: 'Actions',
       align: 'right',
       render: (b) => (
-        <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end' }}>
+        <div
+          style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end' }}
+        >
           <button
             type="button"
             disabled={busyFile === b.fileName}

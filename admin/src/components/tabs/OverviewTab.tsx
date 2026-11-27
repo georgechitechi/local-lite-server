@@ -26,7 +26,8 @@ export function OverviewTab({
     () => (overview?.tableCounts ?? []).reduce((sum, t) => sum + t.count, 0),
     [overview],
   );
-  const needsFirstProject = overview?.consoleRole !== 'super_admin' && !activeProject;
+  const needsFirstProject =
+    overview?.consoleRole !== 'super_admin' && !activeProject;
 
   return (
     <>
@@ -47,10 +48,15 @@ export function OverviewTab({
               Create Your First Project
             </h2>
             <div style={{ fontSize: 13, color: 'var(--muted)' }}>
-              Each project gets isolated SQL tables, sync endpoint, auth users, file storage, and API keys.
+              Each project gets isolated SQL tables, sync endpoint, auth users,
+              file storage, and API keys.
             </div>
           </div>
-          <button type="button" onClick={onOpenProjects} style={primaryBtnStyle}>
+          <button
+            type="button"
+            onClick={onOpenProjects}
+            style={primaryBtnStyle}
+          >
             + New Project
           </button>
         </section>
@@ -58,22 +64,56 @@ export function OverviewTab({
 
       {activeProject && (
         <section style={{ ...cardStyle, marginBottom: 22 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 10,
+            }}
+          >
             <h2 style={{ ...sectionTitleStyle, margin: 0 }}>
               Quick Connect — {activeProject.name}
             </h2>
-            <span style={{ fontSize: 12, color: 'var(--muted)' }}>slug: <code>{activeProject.slug}</code></span>
+            <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+              slug: <code>{activeProject.slug}</code>
+            </span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, fontSize: 12.5 }}>
-            <div style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: 10,
+              fontSize: 12.5,
+            }}
+          >
+            <div
+              style={{
+                padding: '8px 10px',
+                borderRadius: 8,
+                border: '1px solid var(--border)',
+              }}
+            >
               <div style={labelStyle}>Sync Endpoint</div>
               <code>/p/{activeProject.slug}/sync</code>
             </div>
-            <div style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }}>
+            <div
+              style={{
+                padding: '8px 10px',
+                borderRadius: 8,
+                border: '1px solid var(--border)',
+              }}
+            >
               <div style={labelStyle}>Auth Endpoint</div>
               <code>/p/{activeProject.slug}/auth</code>
             </div>
-            <div style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }}>
+            <div
+              style={{
+                padding: '8px 10px',
+                borderRadius: 8,
+                border: '1px solid var(--border)',
+              }}
+            >
               <div style={labelStyle}>Storage Endpoint</div>
               <code>/p/{activeProject.slug}/storage</code>
             </div>

@@ -43,5 +43,6 @@ export const togglePin = {
 export const remove = {
   __kind: 'mutation' as const,
   args: (raw: Record<string, unknown>) => ({ id: requireString(raw.id, 'id') }),
-  handler: ({ db }: any, { id }: { id: string }): Promise<boolean> => db.remove('notes', id),
+  handler: ({ db }: any, { id }: { id: string }): Promise<boolean> =>
+    db.remove('notes', id),
 };

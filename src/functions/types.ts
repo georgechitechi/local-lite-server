@@ -33,8 +33,15 @@ export interface DbReader {
 }
 
 export interface DbWriter extends DbReader {
-  insert(table: string, data: Record<string, unknown>): Promise<Record<string, any>>;
-  patch(table: string, id: string, patch: Record<string, unknown>): Promise<Record<string, any> | null>;
+  insert(
+    table: string,
+    data: Record<string, unknown>,
+  ): Promise<Record<string, any>>;
+  patch(
+    table: string,
+    id: string,
+    patch: Record<string, unknown>,
+  ): Promise<Record<string, any> | null>;
   remove(table: string, id: string): Promise<boolean>;
 }
 
@@ -50,8 +57,14 @@ export interface MutationContext {
 
 export interface ActionContext {
   auth: FunctionAuth;
-  runQuery<T = unknown>(name: string, args?: Record<string, unknown>): Promise<T>;
-  runMutation<T = unknown>(name: string, args?: Record<string, unknown>): Promise<T>;
+  runQuery<T = unknown>(
+    name: string,
+    args?: Record<string, unknown>,
+  ): Promise<T>;
+  runMutation<T = unknown>(
+    name: string,
+    args?: Record<string, unknown>,
+  ): Promise<T>;
 }
 
 export type ArgValidator<TArgs> = (raw: Record<string, unknown>) => TArgs;
@@ -64,21 +77,30 @@ export interface FunctionDef<TCtx, TArgs, TRes> {
 
 export type FunctionRegistry = Map<string, FunctionDef<any, any, any>>;
 
-export function defineQuery<TArgs = Record<string, unknown>, TRes = unknown>(def: {
+export function defineQuery<
+  TArgs = Record<string, unknown>,
+  TRes = unknown,
+>(def: {
   args?: ArgValidator<TArgs>;
   handler: (ctx: QueryContext, args: TArgs) => Promise<TRes> | TRes;
 }): FunctionDef<QueryContext, TArgs, TRes> {
   return { __kind: 'query', ...def };
 }
 
-export function defineMutation<TArgs = Record<string, unknown>, TRes = unknown>(def: {
+export function defineMutation<
+  TArgs = Record<string, unknown>,
+  TRes = unknown,
+>(def: {
   args?: ArgValidator<TArgs>;
   handler: (ctx: MutationContext, args: TArgs) => Promise<TRes> | TRes;
 }): FunctionDef<MutationContext, TArgs, TRes> {
   return { __kind: 'mutation', ...def };
 }
 
-export function defineAction<TArgs = Record<string, unknown>, TRes = unknown>(def: {
+export function defineAction<
+  TArgs = Record<string, unknown>,
+  TRes = unknown,
+>(def: {
   args?: ArgValidator<TArgs>;
   handler: (ctx: ActionContext, args: TArgs) => Promise<TRes> | TRes;
 }): FunctionDef<ActionContext, TArgs, TRes> {

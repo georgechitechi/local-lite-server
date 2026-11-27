@@ -6,7 +6,10 @@ export interface Database {
   close(): Promise<void>;
 }
 
-export function pgClientConfig(settings: ServerSettings, database = settings.db.database) {
+export function pgClientConfig(
+  settings: ServerSettings,
+  database = settings.db.database,
+) {
   const { db } = settings;
   return {
     host: db.host,
@@ -18,7 +21,9 @@ export function pgClientConfig(settings: ServerSettings, database = settings.db.
   };
 }
 
-export async function createDatabase(settings: ServerSettings): Promise<Database> {
+export async function createDatabase(
+  settings: ServerSettings,
+): Promise<Database> {
   const { db, dialect } = settings;
   if (dialect === 'postgres') {
     const pg = (await import('pg')).default;

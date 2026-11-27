@@ -32,18 +32,31 @@ export function createEnvHandler(db: SqlExecutor) {
         return Response.json({ value: rows[0]?.var_value ?? '' });
       }
       const key = String(body?.key ?? '').trim();
-      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) return Response.json({ error: 'Invalid key.' }, { status: 400 });
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key))
+        return Response.json({ error: 'Invalid key.' }, { status: 400 });
       const val = String(body?.value ?? '');
       const isSecret = Boolean(body?.isSecret);
       await db.execute(
         buildUpsertSql({
           table: '_lls_env_vars',
           conflictCols: ['var_key'],
-          insertCols: ['var_key', 'project_id', 'var_value', 'is_secret', 'updated_at'],
+          insertCols: [
+            'var_key',
+            'project_id',
+            'var_value',
+            'is_secret',
+            'updated_at',
+          ],
           updateCols: ['project_id', 'var_value', 'is_secret', 'updated_at'],
           dialect: db.dialect,
         }),
-        [scope.key(key), scope.projectId, val, db.dialect === 'postgres' ? isSecret : isSecret ? 1 : 0, Date.now()],
+        [
+          scope.key(key),
+          scope.projectId,
+          val,
+          db.dialect === 'postgres' ? isSecret : isSecret ? 1 : 0,
+          Date.now(),
+        ],
       );
       if (!scope.projectId) process.env[key] = val;
       return Response.json({ success: true });

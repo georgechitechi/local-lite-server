@@ -1,12 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { generateClientCode } from '../src/services/codegen.js';
-import { defineMutation, defineQuery, type FunctionRegistry } from '../src/functions/index.js';
+import {
+  defineMutation,
+  defineQuery,
+  type FunctionRegistry,
+} from '../src/functions/index.js';
 import { normalizeSchema } from '../src/db/schema.js';
 
 describe('Client SDK codegen', () => {
   it('emits typed row interfaces, function callers, and SSE subscribers', () => {
     const schema = normalizeSchema({
-      notes: { title: 'string', body: 'string | null', pinned: 'boolean', tags: 'string[] | null' },
+      notes: {
+        title: 'string',
+        body: 'string | null',
+        pinned: 'boolean',
+        tags: 'string[] | null',
+      },
     });
     const fns: FunctionRegistry = new Map([
       ['notes/list', defineQuery({ handler: () => [] })],

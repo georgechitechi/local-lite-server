@@ -40,14 +40,22 @@ export interface ServerSettings {
   corsOrigins: string[];
 }
 
-export function loadSettings(env: NodeJS.ProcessEnv = process.env): ServerSettings {
+export function loadSettings(
+  env: NodeJS.ProcessEnv = process.env,
+): ServerSettings {
   const dialect = (env.DB_DIALECT ?? 'mysql').toLowerCase();
   if (dialect !== 'mysql' && dialect !== 'postgres') {
-    throw new Error(`DB_DIALECT must be "mysql" or "postgres", got "${dialect}".`);
+    throw new Error(
+      `DB_DIALECT must be "mysql" or "postgres", got "${dialect}".`,
+    );
   }
-  const missing = ['DB_HOST', 'DB_USER', 'DB_NAME', 'SERVER_API_KEY'].filter((k) => !env[k]);
+  const missing = ['DB_HOST', 'DB_USER', 'DB_NAME', 'SERVER_API_KEY'].filter(
+    (k) => !env[k],
+  );
   if (missing.length) {
-    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+    throw new Error(
+      `Missing required environment variables: ${missing.join(', ')}`,
+    );
   }
   const rawPort = env.PORT || env.SERVER_PORT || '3000';
   const smtpPort = Number(env.SMTP_PORT || 465);
@@ -79,13 +87,15 @@ export function loadSettings(env: NodeJS.ProcessEnv = process.env): ServerSettin
     maxProjectsPerUser: Math.max(1, Number(env.MAX_PROJECTS_PER_USER || 20)),
     smtp: env.SMTP_HOST
       ? {
-        host: env.SMTP_HOST,
-        port: smtpPort,
-        secure: env.SMTP_SECURE ? env.SMTP_SECURE === 'true' : smtpPort === 465,
-        user: env.SMTP_USER || undefined,
-        pass: env.SMTP_PASS || undefined,
-        from: env.SMTP_FROM || env.SMTP_USER || 'no-reply@localhost',
-      }
+          host: env.SMTP_HOST,
+          port: smtpPort,
+          secure: env.SMTP_SECURE
+            ? env.SMTP_SECURE === 'true'
+            : smtpPort === 465,
+          user: env.SMTP_USER || undefined,
+          pass: env.SMTP_PASS || undefined,
+          from: env.SMTP_FROM || env.SMTP_USER || 'no-reply@localhost',
+        }
       : undefined,
     corsOrigins: (env.CORS_ORIGINS ?? '*')
       .split(',')

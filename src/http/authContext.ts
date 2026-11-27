@@ -33,7 +33,14 @@ export function createAuthContext(deps: {
   authLimiter: (ip: string) => Promise<{ ok: boolean; retryAfter?: number }>;
   getProjectAuth?: (project: ProjectRecord) => AuthService;
 }) {
-  const { settings, apiKeys, rootAuth, projects, authenticateAdmin, authLimiter } = deps;
+  const {
+    settings,
+    apiKeys,
+    rootAuth,
+    projects,
+    authenticateAdmin,
+    authLimiter,
+  } = deps;
 
   const bearer = (request: Request): string => {
     const header = request.headers.get('authorization') ?? '';
@@ -42,8 +49,10 @@ export function createAuthContext(deps: {
   const apiKeyHeader = (request: Request): string =>
     request.headers.get('x-api-key')?.trim() ?? '';
 
-  const unauthorized = () => Response.json({ error: 'Unauthorized' }, { status: 401 });
-  const forbidden = (msg = 'Forbidden') => Response.json({ error: msg }, { status: 403 });
+  const unauthorized = () =>
+    Response.json({ error: 'Unauthorized' }, { status: 401 });
+  const forbidden = (msg = 'Forbidden') =>
+    Response.json({ error: msg }, { status: 403 });
 
   const resolveAuth = async (
     request: Request,
@@ -53,7 +62,9 @@ export function createAuthContext(deps: {
     const token =
       bearer(request) ||
       apiKeyHeader(request) ||
-      (allowQuery ? (new URL(request.url).searchParams.get('token') ?? '') : '');
+      (allowQuery
+        ? (new URL(request.url).searchParams.get('token') ?? '')
+        : '');
     if (token) {
       if (safeEqual(token, settings.apiKey)) {
         return { isAdmin: true, isSuperAdmin: true, projectId: null };
@@ -66,10 +77,17 @@ export function createAuthContext(deps: {
           projectId: keyAuth.projectId ?? null,
         };
       }
-      const authSvc = projectScope && deps.getProjectAuth ? deps.getProjectAuth(projectScope) : rootAuth;
+      const authSvc =
+        projectScope && deps.getProjectAuth
+          ? deps.getProjectAuth(projectScope)
+          : rootAuth;
       const user = await authSvc.verifyUser(token);
       if (user) {
-        return { isAdmin: false, userId: user.id, projectId: projectScope?.id ?? null };
+        return {
+          isAdmin: false,
+          userId: user.id,
+          projectId: projectScope?.id ?? null,
+        };
       }
       const oauthUser = await verifyOAuthToken(token);
       if (oauthUser) return { isAdmin: false, userId: oauthUser.id };
@@ -111,16 +129,27 @@ export function createAuthContext(deps: {
   };
 
   const withAdmin =
-    (run: (request: Request, session: AdminSessionLike) => Promise<Response> | Response) =>
+    (
+      run: (
+        request: Request,
+        session: AdminSessionLike,
+      ) => Promise<Response> | Response,
+    ) =>
     async ({ request }: { request: Request }) => {
       const s = await authenticateAdmin(request);
       return s ? run(request, s) : unauthorized();
     };
 
-  const withSuperAdmin =
-    (run: (request: Request, session: AdminSessionLike) => Promise<Response> | Response) =>
+  const withSuperAdmin = (
+    run: (
+      request: Request,
+      session: AdminSessionLike,
+    ) => Promise<Response> | Response,
+  ) =>
     withAdmin((request, s) =>
-      s.consoleRole === 'super_admin' ? run(request, s) : forbidden('Super admin required.'),
+      s.consoleRole === 'super_admin'
+        ? run(request, s)
+        : forbidden('Super admin required.'),
     );
 
   // Breaking change: /admin/* reads X-Project-Id header exclusively (no ?projectId= query fallback).
@@ -137,41 +166,54 @@ export function createAuthContext(deps: {
       return { project: null };
     }
     const project = await projects.getProject(pid);
-    if (!project) return { project: null, error: Response.json({ error: 'Project not found.' }, { status: 404 }) };
+    if (!project)
+      return {
+        project: null,
+        error: Response.json({ error: 'Project not found.' }, { status: 404 }),
+      };
     if (s.consoleRole !== 'super_admin' && project.ownerUserId !== s.userId) {
-      return { project: null, error: forbidden('You do not own this project.') };
+      return {
+        project: null,
+        error: forbidden('You do not own this project.'),
+      };
     }
     return { project };
   };
 
-  const withAdminProject =
-    (
-      run: (
-        request: Request,
-        session: AdminSessionLike,
-        project: ProjectRecord | null,
-      ) => Promise<Response> | Response,
-    ) =>
+  const withAdminProject = (
+    run: (
+      request: Request,
+      session: AdminSessionLike,
+      project: ProjectRecord | null,
+    ) => Promise<Response> | Response,
+  ) =>
     withAdmin(async (request, s) => {
       const { project, error } = await resolveAdminProject(request, s);
       if (error) return error;
       return run(request, s, project);
     });
 
-  const resolveProjectCaller = async (request: Request): Promise<ProjectCaller | null> => {
+  const resolveProjectCaller = async (
+    request: Request,
+  ): Promise<ProjectCaller | null> => {
     const token = bearer(request) || apiKeyHeader(request);
     if (token && safeEqual(token, settings.apiKey)) {
       return { isSuperAdmin: true, userId: null };
     }
     if (settings.adminUi) {
       const s = await authenticateAdmin(request);
-      if (s) return { isSuperAdmin: s.consoleRole === 'super_admin', userId: s.userId ?? null };
+      if (s)
+        return {
+          isSuperAdmin: s.consoleRole === 'super_admin',
+          userId: s.userId ?? null,
+        };
     }
     return null;
   };
 
   const canManageProject = (caller: ProjectCaller, p: ProjectRecord) =>
-    caller.isSuperAdmin || (caller.userId !== null && p.ownerUserId === caller.userId);
+    caller.isSuperAdmin ||
+    (caller.userId !== null && p.ownerUserId === caller.userId);
 
   const rateLimited = async (request: Request): Promise<Response | null> => {
     const limit = await authLimiter(clientIp(request));

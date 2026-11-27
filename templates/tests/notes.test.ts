@@ -20,7 +20,10 @@ test('notes.create validates title and inserts row', async () => {
 
 test('notes.togglePin throws 404 when missing', async () => {
   const fakeDb = { get: async () => null };
-  await assert.rejects(() => togglePin.handler({ db: fakeDb } as any, { id: 'missing' }), {
-    status: 404,
-  });
+  await assert.rejects(
+    () => togglePin.handler({ db: fakeDb } as any, { id: 'missing' }),
+    {
+      status: 404,
+    },
+  );
 });

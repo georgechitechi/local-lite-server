@@ -298,7 +298,10 @@ export function LoginGate({ onSuccess }: { onSuccess: () => void }) {
           />
         )}
 
-        {(view === 'login' || view === 'signup' || view === 'reset' || view === 'bootstrap') && (
+        {(view === 'login' ||
+          view === 'signup' ||
+          view === 'reset' ||
+          view === 'bootstrap') && (
           <PasswordInput
             placeholder={view === 'reset' ? 'New password' : 'Password'}
             value={password}

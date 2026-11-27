@@ -12,7 +12,9 @@ const base = {
   SERVER_API_KEY: 'master-secret',
 } as NodeJS.ProcessEnv;
 
-const schema = normalizeSchema({ notes: { title: 'string', owner_id: 'string' } });
+const schema = normalizeSchema({
+  notes: { title: 'string', owner_id: 'string' },
+});
 
 function apiKeysExecutor() {
   const keys = new Map<string, any>();
@@ -26,7 +28,9 @@ function apiKeysExecutor() {
         return [];
       }
       if (sql.includes('FROM _lls_api_keys')) {
-        return Array.from(keys.values()).sort((a, b) => b.created_at - a.created_at);
+        return Array.from(keys.values()).sort(
+          (a, b) => b.created_at - a.created_at,
+        );
       }
       return [];
     },
@@ -120,7 +124,11 @@ describe('apiKeys', () => {
       userId: 'user_42',
     });
     const verified = await svc.verifyKey(userKey.key);
-    expect(verified).toEqual({ id: userKey.record.id, isAdmin: false, userId: 'user_42' });
+    expect(verified).toEqual({
+      id: userKey.record.id,
+      isAdmin: false,
+      userId: 'user_42',
+    });
 
     // Expired key cannot verify
     const now = Date.now();

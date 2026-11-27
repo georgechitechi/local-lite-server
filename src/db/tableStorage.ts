@@ -35,7 +35,11 @@ const MAX_BATCH = 1000;
 const baseType = (t: SchemaFieldType) => t.replace(' | null', '');
 
 /** Client value -> DB parameter. */
-export function toDbValue(type: SchemaFieldType, value: unknown, dialect: string): unknown {
+export function toDbValue(
+  type: SchemaFieldType,
+  value: unknown,
+  dialect: string,
+): unknown {
   if (value === undefined || value === null) return null;
   switch (baseType(type)) {
     case 'boolean':
@@ -141,7 +145,9 @@ export class TableSyncStorage implements ServerSyncStorage {
   }
 
   private fields(table: string): Record<string, SchemaFieldType> {
-    const f = Object.hasOwn(this.schema, table) ? this.schema[table] : undefined;
+    const f = Object.hasOwn(this.schema, table)
+      ? this.schema[table]
+      : undefined;
     if (!f) throw new ClientError(`Unknown table "${table}".`);
     return f;
   }
@@ -151,8 +157,13 @@ export class TableSyncStorage implements ServerSyncStorage {
     _serverTime?: number,
     auth: RuleContext = { isAdmin: true },
   ) {
-    if (operations.length > MAX_BATCH) throw new ClientError('Batch is too large.');
-    const emitted: Array<{ scopeId: string; tableName: string; checkpoint: number }> = [];
+    if (operations.length > MAX_BATCH)
+      throw new ClientError('Batch is too large.');
+    const emitted: Array<{
+      scopeId: string;
+      tableName: string;
+      checkpoint: number;
+    }> = [];
     const successfulIds: string[] = [];
     let cursor = 0;
 
@@ -164,13 +175,22 @@ export class TableSyncStorage implements ServerSyncStorage {
       if (!auth.isAdmin) {
         const idsByTable = new Map<string, Set<string>>();
         for (const op of operations as Op[]) {
-          if (!op || typeof op.rowId !== 'string' || !op.rowId || op.rowId.length > 128) {
-            throw new ClientError('Each operation needs a rowId string (max 128 chars).');
+          if (
+            !op ||
+            typeof op.rowId !== 'string' ||
+            !op.rowId ||
+            op.rowId.length > 128
+          ) {
+            throw new ClientError(
+              'Each operation needs a rowId string (max 128 chars).',
+            );
           }
           this.fields(op.tableName);
           const tableRule = this.rules[op.tableName];
           const needsCheck =
-            op.operation === 'DELETE' ? (tableRule?.delete ?? tableRule?.write) : tableRule?.write;
+            op.operation === 'DELETE'
+              ? (tableRule?.delete ?? tableRule?.write)
+              : tableRule?.write;
           if (needsCheck) {
             const set = idsByTable.get(op.tableName) ?? new Set<string>();
             set.add(op.rowId);
@@ -197,24 +217,40 @@ export class TableSyncStorage implements ServerSyncStorage {
       }
 
       for (const op of operations as Op[]) {
-        if (!op || typeof op.rowId !== 'string' || !op.rowId || op.rowId.length > 128) {
-          throw new ClientError('Each operation needs a rowId string (max 128 chars).');
+        if (
+          !op ||
+          typeof op.rowId !== 'string' ||
+          !op.rowId ||
+          op.rowId.length > 128
+        ) {
+          throw new ClientError(
+            'Each operation needs a rowId string (max 128 chars).',
+          );
         }
         const fields = this.fields(op.tableName);
-        const payload = op.payload && typeof op.payload === 'object' ? op.payload : {};
+        const payload =
+          op.payload && typeof op.payload === 'object' ? op.payload : {};
         const tableRule = !auth.isAdmin ? this.rules[op.tableName] : undefined;
         const writeRule =
-          op.operation === 'DELETE' ? (tableRule?.delete ?? tableRule?.write) : tableRule?.write;
+          op.operation === 'DELETE'
+            ? (tableRule?.delete ?? tableRule?.write)
+            : tableRule?.write;
         if (writeRule) {
-          const existing = existingByKey.get(`${op.tableName}\u0000${op.rowId}`);
+          const existing = existingByKey.get(
+            `${op.tableName}\u0000${op.rowId}`,
+          );
           if (existing) {
             if (!(await writeRule(auth, existing))) {
-              throw new ForbiddenError(`Write denied on ${op.tableName}/${op.rowId}.`);
+              throw new ForbiddenError(
+                `Write denied on ${op.tableName}/${op.rowId}.`,
+              );
             }
           }
           if (!existing || op.operation !== 'DELETE') {
             if (!(await writeRule(auth, { id: op.rowId, ...payload }))) {
-              throw new ForbiddenError(`Write denied on ${op.tableName}/${op.rowId}.`);
+              throw new ForbiddenError(
+                `Write denied on ${op.tableName}/${op.rowId}.`,
+              );
             }
           }
         }
@@ -224,10 +260,27 @@ export class TableSyncStorage implements ServerSyncStorage {
         if (op.operation === 'DELETE') {
           await setRowDeleted(tx, physicalTable, op.rowId, true, cursor);
         } else {
-          await upsertTableRow(tx, physicalTable, fields, op.rowId, payload, cursor);
-          existingByKey.set(`${op.tableName}\u0000${op.rowId}`, { id: op.rowId, ...payload });
+          await upsertTableRow(
+            tx,
+            physicalTable,
+            fields,
+            op.rowId,
+            payload,
+            cursor,
+          );
+          existingByKey.set(`${op.tableName}\u0000${op.rowId}`, {
+            id: op.rowId,
+            ...payload,
+          });
         }
-        await appendChangeLog(tx, op.tableName, op.rowId, cursor, this.changes, this.projectId);
+        await appendChangeLog(
+          tx,
+          op.tableName,
+          op.rowId,
+          cursor,
+          this.changes,
+          this.projectId,
+        );
 
         const scope = payload[this.scopeField];
         emitted.push({
@@ -244,7 +297,12 @@ export class TableSyncStorage implements ServerSyncStorage {
     });
 
     for (const e of emitted) this.broker?.publish(e);
-    return { applied: successfulIds.length, successfulIds, serverTime: Date.now(), cursor };
+    return {
+      applied: successfulIds.length,
+      successfulIds,
+      serverTime: Date.now(),
+      cursor,
+    };
   }
 
   async getDeltas(
@@ -255,8 +313,12 @@ export class TableSyncStorage implements ServerSyncStorage {
   ) {
     const names = tables.length ? tables : this.tables;
     for (const t of names) this.fields(t);
-    const checkpoint = Number.isFinite(since) && since >= 0 ? Math.floor(since) : 0;
-    const safeLimit = Math.max(1, Math.min(2000, Math.floor(Number(limit) || 500)));
+    const checkpoint =
+      Number.isFinite(since) && since >= 0 ? Math.floor(since) : 0;
+    const safeLimit = Math.max(
+      1,
+      Math.min(2000, Math.floor(Number(limit) || 500)),
+    );
     const empty = {
       changes: { timestamp: checkpoint, changes: [] as any[] },
       cursor: checkpoint,
@@ -265,9 +327,15 @@ export class TableSyncStorage implements ServerSyncStorage {
     };
     if (!names.length) return empty;
 
-    const projectWhere = this.projectId ? 'project_id = ?' : 'project_id IS NULL';
+    const projectWhere = this.projectId
+      ? 'project_id = ?'
+      : 'project_id IS NULL';
     const projectParams = this.projectId ? [this.projectId] : [];
-    const raw = await this.db.query<{ table_name: string; row_id: string; ts: number }>(
+    const raw = await this.db.query<{
+      table_name: string;
+      row_id: string;
+      ts: number;
+    }>(
       `SELECT table_name, row_id, ${this.q('timestamp')} AS ts FROM ${this.q(this.changes)} ` +
         `WHERE ${this.q('timestamp')} > ? AND ${projectWhere} AND table_name IN (${names.map(() => '?').join(', ')}) ` +
         `ORDER BY ${this.q('timestamp')} ASC LIMIT ${safeLimit + 1}`,
@@ -282,7 +350,11 @@ export class TableSyncStorage implements ServerSyncStorage {
     for (const c of page) {
       const key = `${c.table_name}\u0000${c.row_id}`;
       latest.delete(key);
-      latest.set(key, { table: c.table_name, id: String(c.row_id), ts: Number(c.ts) });
+      latest.set(key, {
+        table: c.table_name,
+        id: String(c.row_id),
+        ts: Number(c.ts),
+      });
     }
 
     const byTable = new Map<string, string[]>();
@@ -317,7 +389,9 @@ export class TableSyncStorage implements ServerSyncStorage {
 
     const changes = [];
     for (const c of allChanges) {
-      const readRule = !auth.isAdmin ? this.rules[c.tableName]?.read : undefined;
+      const readRule = !auth.isAdmin
+        ? this.rules[c.tableName]?.read
+        : undefined;
       if (!readRule) {
         changes.push(c);
         continue;

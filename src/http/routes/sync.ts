@@ -1,12 +1,20 @@
-import { createSyncEventsHandler, type SyncEventBroker } from 'local-lite/server';
+import {
+  createSyncEventsHandler,
+  type SyncEventBroker,
+} from 'local-lite/server';
 import type { FunctionRuntime } from '../../functions/index.js';
 import type { ProjectRecord, ProjectService } from '../../services/projects.js';
 import type { TableSyncStorage } from '../../db/tableStorage.js';
 import type { AuthContext, ResolvedAuth } from '../authContext.js';
 import type { ProjectRuntimeCache } from '../projectRuntime.js';
 
-function assertProjectAccess(userAuth: ResolvedAuth, project: ProjectRecord, authCtx: AuthContext): Response | null {
-  if (userAuth.projectId && userAuth.projectId !== project.id) return authCtx.forbidden();
+function assertProjectAccess(
+  userAuth: ResolvedAuth,
+  project: ProjectRecord,
+  authCtx: AuthContext,
+): Response | null {
+  if (userAuth.projectId && userAuth.projectId !== project.id)
+    return authCtx.forbidden();
   if (
     userAuth.isAdmin &&
     !userAuth.isSuperAdmin &&
@@ -38,7 +46,15 @@ export function syncAndProjectRoutes(deps: {
   rootFnRuntime: FunctionRuntime;
   rootStorageHandler: (req: Request) => Promise<Response>;
 }) {
-  const { authCtx, projects, runtimeCache, rootStorage, rootBroker, rootFnRuntime, rootStorageHandler } = deps;
+  const {
+    authCtx,
+    projects,
+    runtimeCache,
+    rootStorage,
+    rootBroker,
+    rootFnRuntime,
+    rootStorageHandler,
+  } = deps;
 
   const resolveScope = async (
     request: Request,
@@ -57,30 +73,60 @@ export function syncAndProjectRoutes(deps: {
   > => {
     const slugProject = slug ? await projects.getProject(slug) : null;
     if (slug && !slugProject) {
-      return { error: Response.json({ error: 'Project not found.' }, { status: 404 }) };
+      return {
+        error: Response.json({ error: 'Project not found.' }, { status: 404 }),
+      };
     }
-    const userAuth = await authCtx.resolveAuth(request, allowQuery, slugProject);
+    const userAuth = await authCtx.resolveAuth(
+      request,
+      allowQuery,
+      slugProject,
+    );
     if (!userAuth) return { error: authCtx.unauthorized() };
 
-    const project = slugProject ?? (userAuth.projectId ? await projects.getProject(userAuth.projectId) : null);
+    const project =
+      slugProject ??
+      (userAuth.projectId
+        ? await projects.getProject(userAuth.projectId)
+        : null);
     if (userAuth.projectId && !project) {
-      return { error: Response.json({ error: 'Project not found.' }, { status: 404 }) };
+      return {
+        error: Response.json({ error: 'Project not found.' }, { status: 404 }),
+      };
     }
     if (project) {
       const denied = assertProjectAccess(userAuth, project, authCtx);
       if (denied) return { error: denied };
       const rt = runtimeCache.get(project);
-      return { userAuth, project, storage: rt.syncStorage, fnRuntime: rt.fnRuntime, broker: rt.broker };
+      return {
+        userAuth,
+        project,
+        storage: rt.syncStorage,
+        fnRuntime: rt.fnRuntime,
+        broker: rt.broker,
+      };
     }
-    return { userAuth, project: null, storage: rootStorage, fnRuntime: rootFnRuntime, broker: rootBroker };
+    return {
+      userAuth,
+      project: null,
+      storage: rootStorage,
+      fnRuntime: rootFnRuntime,
+      broker: rootBroker,
+    };
   };
 
   const handleSyncGet = async (request: Request, slug?: string) => {
     const scoped = await resolveScope(request, slug);
     if (scoped.error) return scoped.error;
     const url = new URL(request.url);
-    const tables = (url.searchParams.get('tables') ?? '').split(',').map((t) => t.trim()).filter(Boolean);
-    const limit = Math.min(Math.max(Number(url.searchParams.get('limit') || 500), 1), 2000);
+    const tables = (url.searchParams.get('tables') ?? '')
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
+    const limit = Math.min(
+      Math.max(Number(url.searchParams.get('limit') || 500), 1),
+      2000,
+    );
     return authCtx.guard(async () => {
       const result = await scoped.storage.getDeltas(
         tables,
@@ -95,9 +141,14 @@ export function syncAndProjectRoutes(deps: {
   const handleSyncPost = async (request: Request, slug?: string) => {
     const scoped = await resolveScope(request, slug);
     if (scoped.error) return scoped.error;
-    const body = (await request.json().catch(() => null)) as { operations?: unknown } | null;
+    const body = (await request.json().catch(() => null)) as {
+      operations?: unknown;
+    } | null;
     if (!body || !Array.isArray(body.operations)) {
-      return Response.json({ error: 'Operations must be an array.' }, { status: 400 });
+      return Response.json(
+        { error: 'Operations must be an array.' },
+        { status: 400 },
+      );
     }
     return authCtx.guard(async () => {
       const result = await scoped.storage.applyOperations(
@@ -105,7 +156,11 @@ export function syncAndProjectRoutes(deps: {
         undefined,
         scoped.userAuth,
       );
-      return Response.json({ success: true, processed: result.applied, ...result });
+      return Response.json({
+        success: true,
+        processed: result.applied,
+        ...result,
+      });
     });
   };
 
@@ -118,7 +173,11 @@ export function syncAndProjectRoutes(deps: {
     })(request);
   };
 
-  const handleFnRun = async (request: Request, params: Record<string, string>, slug?: string) => {
+  const handleFnRun = async (
+    request: Request,
+    params: Record<string, string>,
+    slug?: string,
+  ) => {
     const scoped = await resolveScope(request, slug);
     if (scoped.error) return scoped.error;
     const raw = await request.json().catch(() => ({}));
@@ -132,7 +191,11 @@ export function syncAndProjectRoutes(deps: {
     });
   };
 
-  const handleFnSubscribe = async (request: Request, params: Record<string, string>, slug?: string) => {
+  const handleFnSubscribe = async (
+    request: Request,
+    params: Record<string, string>,
+    slug?: string,
+  ) => {
     const scoped = await resolveScope(request, slug, true);
     if (scoped.error) return scoped.error;
     const rawArgs = new URL(request.url).searchParams.get('args');
@@ -145,21 +208,29 @@ export function syncAndProjectRoutes(deps: {
       }
     }
     return authCtx.guard(() =>
-      scoped.fnRuntime.subscribe(`${params.module}/${params.name}`, args, scoped.userAuth),
+      scoped.fnRuntime.subscribe(
+        `${params.module}/${params.name}`,
+        args,
+        scoped.userAuth,
+      ),
     );
   };
 
   const handleRootStorage = async (request: Request, rewritePublic = false) => {
     const url = new URL(request.url);
-    if (rewritePublic) url.pathname = url.pathname.replace(/^\/public\/files/, '/storage/files');
+    if (rewritePublic)
+      url.pathname = url.pathname.replace(/^\/public\/files/, '/storage/files');
     const a = await authCtx.resolveAuth(request, true);
     if (a?.projectId) {
       const p = await projects.getProject(a.projectId);
-      if (!p) return Response.json({ error: 'Project not found.' }, { status: 404 });
+      if (!p)
+        return Response.json({ error: 'Project not found.' }, { status: 404 });
       url.pathname = `/p/${p.slug}${url.pathname}`;
       return runtimeCache.get(p).storageHandler(new Request(url, request));
     }
-    return rootStorageHandler(rewritePublic ? new Request(url, request) : request);
+    return rootStorageHandler(
+      rewritePublic ? new Request(url, request) : request,
+    );
   };
 
   return {
@@ -174,69 +245,138 @@ export function syncAndProjectRoutes(deps: {
       ALL: ({ request }: { request: Request }) => handleRootStorage(request),
     },
     '/public/files/*': {
-      GET: ({ request }: { request: Request }) => handleRootStorage(request, true),
+      GET: ({ request }: { request: Request }) =>
+        handleRootStorage(request, true),
     },
     '/fn': {
       GET: async ({ request }: { request: Request }) => {
-        if (!(await authCtx.resolveAuth(request))) return authCtx.unauthorized();
+        if (!(await authCtx.resolveAuth(request)))
+          return authCtx.unauthorized();
         return Response.json({ functions: rootFnRuntime.list() });
       },
     },
     '/fn/:module/:name': {
-      POST: ({ request, params }: { request: Request; params: Record<string, string> }) =>
-        handleFnRun(request, params),
+      POST: ({
+        request,
+        params,
+      }: {
+        request: Request;
+        params: Record<string, string>;
+      }) => handleFnRun(request, params),
     },
     '/subscribe/:module/:name': {
-      GET: ({ request, params }: { request: Request; params: Record<string, string> }) =>
-        handleFnSubscribe(request, params),
+      GET: ({
+        request,
+        params,
+      }: {
+        request: Request;
+        params: Record<string, string>;
+      }) => handleFnSubscribe(request, params),
     },
     '/p/:slug/sync': {
-      GET: ({ request, params }: { request: Request; params: Record<string, string> }) =>
-        handleSyncGet(request, params.slug),
-      POST: ({ request, params }: { request: Request; params: Record<string, string> }) =>
-        handleSyncPost(request, params.slug),
+      GET: ({
+        request,
+        params,
+      }: {
+        request: Request;
+        params: Record<string, string>;
+      }) => handleSyncGet(request, params.slug),
+      POST: ({
+        request,
+        params,
+      }: {
+        request: Request;
+        params: Record<string, string>;
+      }) => handleSyncPost(request, params.slug),
     },
     '/p/:slug/sync/events': {
-      GET: ({ request, params }: { request: Request; params: Record<string, string> }) =>
-        handleSyncEvents(request, params.slug),
+      GET: ({
+        request,
+        params,
+      }: {
+        request: Request;
+        params: Record<string, string>;
+      }) => handleSyncEvents(request, params.slug),
     },
     '/p/:slug/auth/*': {
-      POST: async ({ request, params }: { request: Request; params: Record<string, string> }) => {
+      POST: async ({
+        request,
+        params,
+      }: {
+        request: Request;
+        params: Record<string, string>;
+      }) => {
         const limited = await authCtx.rateLimited(request);
         if (limited) return limited;
         const p = await projects.getProject(params.slug);
-        if (!p) return Response.json({ error: 'Project not found.' }, { status: 404 });
+        if (!p)
+          return Response.json(
+            { error: 'Project not found.' },
+            { status: 404 },
+          );
         const url = new URL(request.url);
         url.pathname = url.pathname.slice(`/p/${params.slug}`.length) || '/';
         return runtimeCache.get(p).auth.handler(new Request(url, request));
       },
     },
     '/p/:slug/storage/*': {
-      ALL: async ({ request, params }: { request: Request; params: Record<string, string> }) => {
+      ALL: async ({
+        request,
+        params,
+      }: {
+        request: Request;
+        params: Record<string, string>;
+      }) => {
         const p = await projects.getProject(params.slug);
-        if (!p) return Response.json({ error: 'Project not found.' }, { status: 404 });
+        if (!p)
+          return Response.json(
+            { error: 'Project not found.' },
+            { status: 404 },
+          );
         return runtimeCache.get(p).storageHandler(request);
       },
     },
     '/p/:slug/public/files/*': {
-      GET: async ({ request, params }: { request: Request; params: Record<string, string> }) => {
+      GET: async ({
+        request,
+        params,
+      }: {
+        request: Request;
+        params: Record<string, string>;
+      }) => {
         const p = await projects.getProject(params.slug);
-        if (!p) return Response.json({ error: 'Project not found.' }, { status: 404 });
+        if (!p)
+          return Response.json(
+            { error: 'Project not found.' },
+            { status: 404 },
+          );
         const url = new URL(request.url);
         url.pathname = url.pathname.replace(
-          new RegExp(`^/p/${params.slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/public/files`),
+          new RegExp(
+            `^/p/${params.slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/public/files`,
+          ),
           `/p/${params.slug}/storage/files`,
         );
         return runtimeCache.get(p).storageHandler(new Request(url, request));
       },
     },
     '/p/:slug/fn/:module/:name': {
-      POST: ({ request, params }: { request: Request; params: Record<string, string> }) =>
-        handleFnRun(request, params, params.slug),
+      POST: ({
+        request,
+        params,
+      }: {
+        request: Request;
+        params: Record<string, string>;
+      }) => handleFnRun(request, params, params.slug),
     },
     '/p/:slug/subscribe/:module/:name': {
-      GET: ({ request, params }: { request: Request; params: Record<string, string> }) =>
-        handleFnSubscribe(request, params, params.slug),
+      GET: ({
+        request,
+        params,
+      }: {
+        request: Request;
+        params: Record<string, string>;
+      }) => handleFnSubscribe(request, params, params.slug),
     },
   };
 }

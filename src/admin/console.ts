@@ -1,14 +1,32 @@
-import { quoteIdent, type SqlExecutor, type SyncEventBroker } from 'local-lite/server';
+import {
+  quoteIdent,
+  type SqlExecutor,
+  type SyncEventBroker,
+} from 'local-lite/server';
 import type { ServerSettings } from '../config.js';
 import type { FunctionRuntime } from '../functions/index.js';
 import type { SchemaDictionary } from '../db/schema.js';
-import { projectScope, toPhysicalTable, type ProjectRecord } from '../services/projects.js';
+import {
+  projectScope,
+  toPhysicalTable,
+  type ProjectRecord,
+} from '../services/projects.js';
 import { fromDbRow } from '../db/tableStorage.js';
-import { newRowId, patchTableRow, recordChange, setRowDeleted, upsertTableRow } from '../core/changes.js';
+import {
+  newRowId,
+  patchTableRow,
+  recordChange,
+  setRowDeleted,
+  upsertTableRow,
+} from '../core/changes.js';
 import type { AdminSession } from './session.js';
 
-export const clampInt = (v: string | null, d: number, min: number, max: number) =>
-  Math.min(Math.max(Math.floor(Number(v ?? d)) || d, min), max);
+export const clampInt = (
+  v: string | null,
+  d: number,
+  min: number,
+  max: number,
+) => Math.min(Math.max(Math.floor(Number(v ?? d)) || d, min), max);
 
 export function createAdminData(opts: {
   settings: ServerSettings;
@@ -26,7 +44,11 @@ export function createAdminData(opts: {
       let dbConnected = true;
       let dbError: string | null = null;
       const tableCounts: Array<{ table: string; count: number }> = [];
-      const activeSchema = project ? project.schema : session.consoleRole === 'super_admin' ? schema : {};
+      const activeSchema = project
+        ? project.schema
+        : session.consoleRole === 'super_admin'
+          ? schema
+          : {};
       try {
         for (const t of Object.keys(activeSchema)) {
           const phys = toPhysicalTable(project?.slug ?? null, t);
@@ -113,13 +135,29 @@ export function createAdminData(opts: {
       const method = request.method.toUpperCase();
       if (method === 'GET') {
         const table = tableOverride || url.searchParams.get('table') || '';
-        if (!Object.hasOwn(activeSchema, table)) return Response.json({ error: 'Invalid table name.' }, { status: 400 });
+        if (!Object.hasOwn(activeSchema, table))
+          return Response.json(
+            { error: 'Invalid table name.' },
+            { status: 400 },
+          );
         const fields = activeSchema[table];
         const phys = toPhysicalTable(project?.slug ?? null, table);
         const limit = clampInt(url.searchParams.get('limit'), 30, 1, 500);
-        const offset = clampInt(url.searchParams.get('offset'), 0, 0, 10_000_000);
-        const where = url.searchParams.get('includeDeleted') === '1' ? '' : `WHERE ${q('deleted')} = ${notDeleted}`;
-        const total = Number((await db.query<any>(`SELECT COUNT(*) AS n FROM ${q(phys)} ${where}`))[0]?.n ?? 0);
+        const offset = clampInt(
+          url.searchParams.get('offset'),
+          0,
+          0,
+          10_000_000,
+        );
+        const where =
+          url.searchParams.get('includeDeleted') === '1'
+            ? ''
+            : `WHERE ${q('deleted')} = ${notDeleted}`;
+        const total = Number(
+          (
+            await db.query<any>(`SELECT COUNT(*) AS n FROM ${q(phys)} ${where}`)
+          )[0]?.n ?? 0,
+        );
         const raw = await db.query<Record<string, any>>(
           `SELECT * FROM ${q(phys)} ${where} ORDER BY ${q('updated_at')} DESC LIMIT ${limit} OFFSET ${offset}`,
         );
@@ -133,44 +171,92 @@ export function createAdminData(opts: {
         });
       }
 
-      const body = (await request.json().catch(() => null)) as Record<string, any> | null;
-      const table = tableOverride || url.searchParams.get('table') || String(body?.table ?? '');
-      if (!Object.hasOwn(activeSchema, table)) return Response.json({ error: 'Invalid table name.' }, { status: 400 });
+      const body = (await request.json().catch(() => null)) as Record<
+        string,
+        any
+      > | null;
+      const table =
+        tableOverride ||
+        url.searchParams.get('table') ||
+        String(body?.table ?? '');
+      if (!Object.hasOwn(activeSchema, table))
+        return Response.json({ error: 'Invalid table name.' }, { status: 400 });
       const fields = activeSchema[table];
       const phys = toPhysicalTable(project?.slug ?? null, table);
-      const rowData = body?.row && typeof body.row === 'object' ? body.row : body || {};
+      const rowData =
+        body?.row && typeof body.row === 'object' ? body.row : body || {};
 
       if (method === 'POST' || method === 'PATCH') {
         const id = idOverride || newRowId(rowData.id);
         const ts = await db.withTransaction(async (tx) => {
-          const checkpoint = await recordChange(tx, table, id, '_server_changes', '_server_sync_clock', projectId);
-          if (method === 'PATCH') await patchTableRow(tx, phys, fields, id, rowData, checkpoint);
+          const checkpoint = await recordChange(
+            tx,
+            table,
+            id,
+            '_server_changes',
+            '_server_sync_clock',
+            projectId,
+          );
+          if (method === 'PATCH')
+            await patchTableRow(tx, phys, fields, id, rowData, checkpoint);
           else await upsertTableRow(tx, phys, fields, id, rowData, checkpoint);
           return checkpoint;
         });
-        broker?.publish({ scopeId: 'default', tableName: table, checkpoint: ts });
-        return Response.json({ success: true, id, cursor: ts }, { status: method === 'POST' ? 201 : 200 });
+        broker?.publish({
+          scopeId: 'default',
+          tableName: table,
+          checkpoint: ts,
+        });
+        return Response.json(
+          { success: true, id, cursor: ts },
+          { status: method === 'POST' ? 201 : 200 },
+        );
       }
 
       if (method === 'DELETE') {
-        const id = idOverride || url.searchParams.get('id') || String(body?.id ?? '');
+        const id =
+          idOverride || url.searchParams.get('id') || String(body?.id ?? '');
         const restore = url.searchParams.get('restore') === '1';
         const ts = await db.withTransaction(async (tx) => {
-          const checkpoint = await recordChange(tx, table, id, '_server_changes', '_server_sync_clock', projectId);
+          const checkpoint = await recordChange(
+            tx,
+            table,
+            id,
+            '_server_changes',
+            '_server_sync_clock',
+            projectId,
+          );
           await setRowDeleted(tx, phys, id, !restore, checkpoint);
           return checkpoint;
         });
-        broker?.publish({ scopeId: 'default', tableName: table, checkpoint: ts });
-        return Response.json({ success: true, id, deleted: !restore, cursor: ts });
+        broker?.publish({
+          scopeId: 'default',
+          tableName: table,
+          checkpoint: ts,
+        });
+        return Response.json({
+          success: true,
+          id,
+          deleted: !restore,
+          cursor: ts,
+        });
       }
       return Response.json({ error: 'Method Not Allowed' }, { status: 405 });
     },
 
-    async manageUsers(request: Request, session: AdminSession, project?: ProjectRecord | null) {
-      const body = (await request.json().catch(() => null)) as Record<string, any> | null;
+    async manageUsers(
+      request: Request,
+      session: AdminSession,
+      project?: ProjectRecord | null,
+    ) {
+      const body = (await request.json().catch(() => null)) as Record<
+        string,
+        any
+      > | null;
       const userId = String(body?.userId ?? '');
       const action = String(body?.action ?? '');
-      if (!userId) return Response.json({ error: 'userId is required.' }, { status: 400 });
+      if (!userId)
+        return Response.json({ error: 'userId is required.' }, { status: 400 });
       const scope = projectScope(project);
 
       if (action === 'unlock') {
@@ -185,13 +271,24 @@ export function createAdminData(opts: {
         );
       } else if (action === 'set_console_role') {
         if (session.consoleRole !== 'super_admin' || scope.projectId) {
-          return Response.json({ error: 'Super admin on root server required.' }, { status: 403 });
+          return Response.json(
+            { error: 'Super admin on root server required.' },
+            { status: 403 },
+          );
         }
-        const role = body?.consoleRole === 'super_admin' || body?.consoleRole === 'admin' ? body.consoleRole : null;
+        const role =
+          body?.consoleRole === 'super_admin' || body?.consoleRole === 'admin'
+            ? body.consoleRole
+            : null;
         const active = role !== null;
         await db.execute(
           'UPDATE _local_auth_accounts SET console_role = ?, console_active = ?, updated_at = ? WHERE id = ? AND project_id IS NULL',
-          [role, db.dialect === 'postgres' ? active : active ? 1 : 0, Date.now(), userId],
+          [
+            role,
+            db.dialect === 'postgres' ? active : active ? 1 : 0,
+            Date.now(),
+            userId,
+          ],
         );
       } else {
         return Response.json({ error: 'Unsupported action.' }, { status: 400 });
@@ -214,7 +311,12 @@ export function createAdminData(opts: {
       }
       const where = `WHERE ${clauses.join(' AND ')}`;
       const total = Number(
-        (await db.query<any>(`SELECT COUNT(*) AS n FROM ${q('_server_changes')} ${where}`, params))[0]?.n ?? 0,
+        (
+          await db.query<any>(
+            `SELECT COUNT(*) AS n FROM ${q('_server_changes')} ${where}`,
+            params,
+          )
+        )[0]?.n ?? 0,
       );
       const raw = await db.query<any>(
         `SELECT id, table_name, row_id, ${q('timestamp')} FROM ${q('_server_changes')} ${where} ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`,

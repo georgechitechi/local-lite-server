@@ -12,11 +12,7 @@ export type RowPredicate = (
 ) => boolean | Promise<boolean>;
 
 export type RulePreset =
-  | 'authenticated'
-  | 'owner'
-  | `owner:${string}`
-  | 'admin'
-  | 'none';
+  'authenticated' | 'owner' | `owner:${string}` | 'admin' | 'none';
 
 export type RuleExpression = RowPredicate | RulePreset;
 
@@ -35,21 +31,27 @@ export interface TableRule {
 export type RulesInputDictionary = Record<string, TableRuleInput | RulePreset>;
 export type RulesDictionary = Record<string, TableRule>;
 
-function compileRule(expr: RuleExpression | undefined): RowPredicate | undefined {
+function compileRule(
+  expr: RuleExpression | undefined,
+): RowPredicate | undefined {
   if (!expr) return undefined;
   if (typeof expr === 'function') return expr;
-  if (expr === 'authenticated') return (ctx) => ctx.isAdmin || Boolean(ctx.userId);
+  if (expr === 'authenticated')
+    return (ctx) => ctx.isAdmin || Boolean(ctx.userId);
   if (expr === 'admin') return (ctx) => ctx.isAdmin;
   if (expr === 'none') return () => false;
   if (expr === 'owner') {
     return (ctx, row) =>
       ctx.isAdmin ||
       (Boolean(ctx.userId) &&
-        (row.owner_id != null ? row.owner_id === ctx.userId : row.user_id === ctx.userId));
+        (row.owner_id != null
+          ? row.owner_id === ctx.userId
+          : row.user_id === ctx.userId));
   }
   if (expr.startsWith('owner:')) {
     const col = expr.slice(6).trim();
-    return (ctx, row) => ctx.isAdmin || (Boolean(ctx.userId) && row[col] === ctx.userId);
+    return (ctx, row) =>
+      ctx.isAdmin || (Boolean(ctx.userId) && row[col] === ctx.userId);
   }
   throw new Error(`Unknown rule preset "${String(expr)}".`);
 }
@@ -76,15 +78,25 @@ export function defineRules(rules: RulesInputDictionary): RulesDictionary {
   return normalizeRules(rules);
 }
 
-export function resolveRulesFile(explicit?: string, cwd = process.cwd()): string | null {
-  return resolveProjectFile(explicit, 'RULES_PATH', ['src/rules.ts', 'rules.ts'], cwd);
+export function resolveRulesFile(
+  explicit?: string,
+  cwd = process.cwd(),
+): string | null {
+  return resolveProjectFile(
+    explicit,
+    'RULES_PATH',
+    ['src/rules.ts', 'rules.ts'],
+    cwd,
+  );
 }
 
 export async function loadRulesFile(file: string): Promise<RulesDictionary> {
   const loaded = await import(pathToFileURL(file).href);
   const mod = loaded.default;
   if (!mod || typeof mod !== 'object' || Array.isArray(mod)) {
-    throw new Error(`${file} must export default an object of { table: { read?, write?, delete? } }.`);
+    throw new Error(
+      `${file} must export default an object of { table: { read?, write?, delete? } }.`,
+    );
   }
   return normalizeRules(mod as RulesInputDictionary);
 }

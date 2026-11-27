@@ -36,7 +36,9 @@ function readCookie(req: Request, name: string): string | null {
 }
 
 function makeCookie(req: Request, val: string, maxAgeSec: number): string {
-  const secure = req.url.startsWith('https://') || req.headers.get('x-forwarded-proto') === 'https';
+  const secure =
+    req.url.startsWith('https://') ||
+    req.headers.get('x-forwarded-proto') === 'https';
   return `${COOKIE_NAME}=${encodeURIComponent(val)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSec}${secure ? '; Secure' : ''}`;
 }
 
@@ -50,7 +52,9 @@ export function createAdminSession(settings: ServerSettings, db: SqlExecutor) {
     for (const dir of [
       path.resolve(process.cwd(), 'admin/dist'),
       path.resolve(process.cwd(), 'admin'),
-      ...(import.meta.dirname ? [path.resolve(import.meta.dirname, '../../admin/dist')] : []),
+      ...(import.meta.dirname
+        ? [path.resolve(import.meta.dirname, '../../admin/dist')]
+        : []),
     ]) {
       if (fs.existsSync(path.join(dir, 'index.html'))) return dir;
     }
@@ -60,7 +64,8 @@ export function createAdminSession(settings: ServerSettings, db: SqlExecutor) {
   async function authenticate(req: Request): Promise<AdminSession | null> {
     const auth = req.headers.get('authorization') ?? '';
     const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-    if (bearer && safeEqual(bearer, settings.apiKey)) return { consoleRole: 'super_admin' };
+    if (bearer && safeEqual(bearer, settings.apiKey))
+      return { consoleRole: 'super_admin' };
     const token = readCookie(req, COOKIE_NAME);
     if (!token) return null;
     const verified = verifySignedToken<{
@@ -90,25 +95,36 @@ export function createAdminSession(settings: ServerSettings, db: SqlExecutor) {
     serveStatic(pathname: string): Response {
       const dist = resolveAdminDist();
       if (!dist) {
-        return new Response('Admin UI not built. Run `cd admin && npm run build`.', { status: 404 });
+        return new Response(
+          'Admin UI not built. Run `cd admin && npm run build`.',
+          { status: 404 },
+        );
       }
       const rel = pathname.replace(/^\/admin\/?/, '') || 'index.html';
       const target = path.resolve(dist, rel);
       const file =
-        target.startsWith(dist) && fs.existsSync(target) && fs.statSync(target).isFile()
+        target.startsWith(dist) &&
+        fs.existsSync(target) &&
+        fs.statSync(target).isFile()
           ? target
           : path.join(dist, 'index.html');
       const ext = path.extname(file);
       return new Response(fs.readFileSync(file), {
         headers: {
           'content-type': MIME[ext] || 'application/octet-stream',
-          'cache-control': ext === '.html' ? 'no-store' : 'public, max-age=31536000, immutable',
+          'cache-control':
+            ext === '.html'
+              ? 'no-store'
+              : 'public, max-age=31536000, immutable',
         },
       });
     },
 
     async getLogin(request: Request) {
-      const activeCond = db.dialect === 'postgres' ? 'console_active IS TRUE' : 'console_active != 0';
+      const activeCond =
+        db.dialect === 'postgres'
+          ? 'console_active IS TRUE'
+          : 'console_active != 0';
       const rows = await db.query<any>(
         `SELECT COUNT(*) AS n FROM _local_auth_accounts WHERE console_role IS NOT NULL AND ${activeCond}`,
       );
@@ -122,37 +138,63 @@ export function createAdminSession(settings: ServerSettings, db: SqlExecutor) {
     },
 
     async postLogin(request: Request) {
-      const body = (await request.json().catch(() => null)) as Record<string, any> | null;
-      const email = String(body?.email ?? '').trim().toLowerCase();
+      const body = (await request.json().catch(() => null)) as Record<
+        string,
+        any
+      > | null;
+      const email = String(body?.email ?? '')
+        .trim()
+        .toLowerCase();
       const password = String(body?.password ?? '');
       if (!email || !password) {
-        return Response.json({ error: 'Email and password are required.' }, { status: 400 });
+        return Response.json(
+          { error: 'Email and password are required.' },
+          { status: 400 },
+        );
       }
 
       if (body?.action === 'signup') {
         if (!settings.allowConsoleSignup) {
-          return Response.json({ error: 'Console self-signup is disabled.' }, { status: 403 });
+          return Response.json(
+            { error: 'Console self-signup is disabled.' },
+            { status: 403 },
+          );
         }
         if (password.length < 8) {
-          return Response.json({ error: 'Password must be at least 8 characters.' }, { status: 400 });
+          return Response.json(
+            { error: 'Password must be at least 8 characters.' },
+            { status: 400 },
+          );
         }
         const existing = await db.query<any>(
           'SELECT id FROM _local_auth_accounts WHERE email = ? AND project_id IS NULL LIMIT 1',
           [email],
         );
         if (existing[0]) {
-          return Response.json({ error: 'An account with this email already exists.' }, { status: 409 });
+          return Response.json(
+            { error: 'An account with this email already exists.' },
+            { status: 409 },
+          );
         }
         const now = Date.now();
         const userId = crypto.randomUUID();
-        const displayName = String(body?.displayName ?? '').trim() || email.split('@')[0];
+        const displayName =
+          String(body?.displayName ?? '').trim() || email.split('@')[0];
         const hashed = await hashPassword(password, { iterations: 100_000 });
         await db.execute(
           `INSERT INTO _local_auth_accounts (id, email, display_name, password_hash, salt, iterations, algorithm, failed_login_attempts, locked_until, token_version, console_role, console_active, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, 0, NULL, 1, 'admin', ?, ?, ?)`,
           [
-            userId, email, displayName, hashed.hash, hashed.salt, hashed.iterations,
-            hashed.algorithm, db.dialect === 'postgres' ? true : 1, now, now,
+            userId,
+            email,
+            displayName,
+            hashed.hash,
+            hashed.salt,
+            hashed.iterations,
+            hashed.algorithm,
+            db.dialect === 'postgres' ? true : 1,
+            now,
+            now,
           ],
         );
         const token = createSignedToken({
@@ -162,16 +204,29 @@ export function createAdminSession(settings: ServerSettings, db: SqlExecutor) {
         });
         return Response.json(
           { ok: true, success: true, consoleRole: 'admin' },
-          { headers: { 'Set-Cookie': makeCookie(request, token, SESSION_TTL_MS / 1000) } },
+          {
+            headers: {
+              'Set-Cookie': makeCookie(request, token, SESSION_TTL_MS / 1000),
+            },
+          },
         );
       }
 
       if (body?.action === 'bootstrap') {
         const sec = String(body.secret ?? '').trim();
         const validSecret =
-          (settings.appSecret && safeEqual(sec, settings.appSecret)) || safeEqual(sec, settings.apiKey);
-        if (!validSecret) return Response.json({ error: 'Invalid APP_SECRET / SERVER_API_KEY.' }, { status: 403 });
-        if (password.length < 8) return Response.json({ error: 'Password must be at least 8 characters.' }, { status: 400 });
+          (settings.appSecret && safeEqual(sec, settings.appSecret)) ||
+          safeEqual(sec, settings.apiKey);
+        if (!validSecret)
+          return Response.json(
+            { error: 'Invalid APP_SECRET / SERVER_API_KEY.' },
+            { status: 403 },
+          );
+        if (password.length < 8)
+          return Response.json(
+            { error: 'Password must be at least 8 characters.' },
+            { status: 400 },
+          );
         const existing = await db.query<any>(
           'SELECT id FROM _local_auth_accounts WHERE email = ? AND project_id IS NULL LIMIT 1',
           [email],
@@ -191,8 +246,17 @@ export function createAdminSession(settings: ServerSettings, db: SqlExecutor) {
             `INSERT INTO _local_auth_accounts (id, email, display_name, password_hash, salt, iterations, algorithm, failed_login_attempts, locked_until, token_version, console_role, console_active, created_at, updated_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, 0, NULL, 1, ?, ?, ?, ?)`,
             [
-              userId, email, email.split('@')[0], hashed.hash, hashed.salt, hashed.iterations,
-              hashed.algorithm, 'super_admin', db.dialect === 'postgres' ? true : 1, now, now,
+              userId,
+              email,
+              email.split('@')[0],
+              hashed.hash,
+              hashed.salt,
+              hashed.iterations,
+              hashed.algorithm,
+              'super_admin',
+              db.dialect === 'postgres' ? true : 1,
+              now,
+              now,
             ],
           );
         }
@@ -203,37 +267,73 @@ export function createAdminSession(settings: ServerSettings, db: SqlExecutor) {
         });
         return Response.json(
           { ok: true, success: true, consoleRole: 'super_admin' },
-          { headers: { 'Set-Cookie': makeCookie(request, token, SESSION_TTL_MS / 1000) } },
+          {
+            headers: {
+              'Set-Cookie': makeCookie(request, token, SESSION_TTL_MS / 1000),
+            },
+          },
         );
       }
 
-      const rows = await db.query<any>('SELECT * FROM _local_auth_accounts WHERE email = ? LIMIT 1', [email]);
+      const rows = await db.query<any>(
+        'SELECT * FROM _local_auth_accounts WHERE email = ? LIMIT 1',
+        [email],
+      );
       const user = rows[0];
       if (!user || !user.console_active || !user.console_role) {
-        return Response.json({ error: 'Invalid console credentials.' }, { status: 401 });
+        return Response.json(
+          { error: 'Invalid console credentials.' },
+          { status: 401 },
+        );
       }
-      const ok = await verifyPassword(password, user.password_hash, user.salt, Number(user.iterations), user.algorithm);
-      if (!ok) return Response.json({ error: 'Invalid console credentials.' }, { status: 401 });
-      const role = user.console_role === 'super_admin' ? 'super_admin' : 'admin';
+      const ok = await verifyPassword(
+        password,
+        user.password_hash,
+        user.salt,
+        Number(user.iterations),
+        user.algorithm,
+      );
+      if (!ok)
+        return Response.json(
+          { error: 'Invalid console credentials.' },
+          { status: 401 },
+        );
+      const role =
+        user.console_role === 'super_admin' ? 'super_admin' : 'admin';
       const token = createSignedToken({
         secret: sessionSecret,
         expiresInMs: SESSION_TTL_MS,
-        payload: { sub: String(user.id), email, consoleRole: role, tv: Number(user.token_version ?? 1) },
+        payload: {
+          sub: String(user.id),
+          email,
+          consoleRole: role,
+          tv: Number(user.token_version ?? 1),
+        },
       });
       return Response.json(
         { ok: true, success: true, consoleRole: role },
-        { headers: { 'Set-Cookie': makeCookie(request, token, SESSION_TTL_MS / 1000) } },
+        {
+          headers: {
+            'Set-Cookie': makeCookie(request, token, SESSION_TTL_MS / 1000),
+          },
+        },
       );
     },
 
     async postLogout(request: Request, session: AdminSession | null) {
-      if (new URL(request.url).searchParams.get('all') === '1' && session?.userId) {
+      if (
+        new URL(request.url).searchParams.get('all') === '1' &&
+        session?.userId
+      ) {
         await db.execute(
           'UPDATE _local_auth_accounts SET token_version = COALESCE(token_version, 1) + 1 WHERE id = ?',
           [session.userId],
         );
       }
-      return Response.json({ ok: true, success: true }, { headers: { 'Set-Cookie': makeCookie(request, '', 0) } });
+      return Response.json(
+        { ok: true, success: true },
+        { headers: { 'Set-Cookie': makeCookie(request, '', 0) } },
+      );
     },
   };
 }

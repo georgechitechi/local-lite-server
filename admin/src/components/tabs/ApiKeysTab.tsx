@@ -16,14 +16,30 @@ import type { ApiKeyItem } from '@/types/admin';
 const PAGE_SIZE = 30;
 type KeyFilter = 'all' | 'active' | 'revoked';
 
-function keyStatus(item: ApiKeyItem): { label: string; color: string; bg: string } {
+function keyStatus(item: ApiKeyItem): {
+  label: string;
+  color: string;
+  bg: string;
+} {
   if (item.revokedAt) {
-    return { label: 'Revoked', color: 'var(--danger)', bg: 'var(--danger-soft)' };
+    return {
+      label: 'Revoked',
+      color: 'var(--danger)',
+      bg: 'var(--danger-soft)',
+    };
   }
   if (item.expiresAt && item.expiresAt <= Date.now()) {
-    return { label: 'Expired', color: 'var(--danger)', bg: 'var(--danger-soft)' };
+    return {
+      label: 'Expired',
+      color: 'var(--danger)',
+      bg: 'var(--danger-soft)',
+    };
   }
-  return { label: 'Active', color: 'var(--success)', bg: 'var(--success-soft)' };
+  return {
+    label: 'Active',
+    color: 'var(--success)',
+    bg: 'var(--success-soft)',
+  };
 }
 
 export function ApiKeysTab({
@@ -49,7 +65,10 @@ export function ApiKeysTab({
         setKeys(data.keys ?? []);
       } else {
         const data = await res.json().catch(() => ({}));
-        onToast(data?.error || `Failed to load API keys (${res.status})`, 'error');
+        onToast(
+          data?.error || `Failed to load API keys (${res.status})`,
+          'error',
+        );
       }
     } finally {
       setLoading(false);
@@ -76,9 +95,12 @@ export function ApiKeysTab({
   };
 
   const handleDelete = async (item: ApiKeyItem) => {
-    const res = await adminFetch(`/admin/api-keys?id=${encodeURIComponent(item.id)}`, {
-      method: 'DELETE',
-    });
+    const res = await adminFetch(
+      `/admin/api-keys?id=${encodeURIComponent(item.id)}`,
+      {
+        method: 'DELETE',
+      },
+    );
     if (res.ok) {
       onToast(`Deleted "${item.name}"`, 'info');
       await loadKeys();
@@ -91,7 +113,9 @@ export function ApiKeysTab({
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return keys.filter((item) => {
-      const inactive = Boolean(item.revokedAt || (item.expiresAt && item.expiresAt <= Date.now()));
+      const inactive = Boolean(
+        item.revokedAt || (item.expiresAt && item.expiresAt <= Date.now()),
+      );
       if (filter === 'active' && inactive) return false;
       if (filter === 'revoked' && !inactive) return false;
       if (!q) return true;
@@ -115,7 +139,9 @@ export function ApiKeysTab({
         <>
           <div style={{ fontWeight: 500 }}>{item.name}</div>
           {item.userId && (
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>userId: {item.userId}</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+              userId: {item.userId}
+            </div>
           )}
         </>
       ),
@@ -170,9 +196,15 @@ export function ApiKeysTab({
       header: 'Actions',
       align: 'right',
       render: (item) => (
-        <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end' }}>
+        <div
+          style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end' }}
+        >
           {!item.revokedAt && (
-            <button type="button" onClick={() => void handleRevoke(item)} style={secondaryBtnStyle}>
+            <button
+              type="button"
+              onClick={() => void handleRevoke(item)}
+              style={secondaryBtnStyle}
+            >
               Revoke
             </button>
           )}
@@ -193,7 +225,11 @@ export function ApiKeysTab({
       <Card
         title="API Keys"
         actions={
-          <button type="button" onClick={() => setDrawerOpen(true)} style={primaryBtnStyle}>
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            style={primaryBtnStyle}
+          >
             + Create API Key
           </button>
         }
@@ -207,7 +243,13 @@ export function ApiKeysTab({
                 setSearch(e.target.value);
                 setOffset(0);
               }}
-              style={{ ...inputStyle, flex: '1 1 180px', minWidth: 0, maxWidth: 240, padding: '7px 12px' }}
+              style={{
+                ...inputStyle,
+                flex: '1 1 180px',
+                minWidth: 0,
+                maxWidth: 240,
+                padding: '7px 12px',
+              }}
             />
             <select
               aria-label="Filter API keys"
@@ -216,7 +258,12 @@ export function ApiKeysTab({
                 setFilter(e.target.value as KeyFilter);
                 setOffset(0);
               }}
-              style={{ ...inputStyle, width: 'auto', minWidth: 140, padding: '7px 10px' }}
+              style={{
+                ...inputStyle,
+                width: 'auto',
+                minWidth: 140,
+                padding: '7px 10px',
+              }}
             >
               <option value="all">All Keys</option>
               <option value="active">Active</option>

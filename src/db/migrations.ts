@@ -7,7 +7,8 @@ interface Migration {
   postgres: string[];
 }
 
-const MYSQL_OPTS = 'ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci';
+const MYSQL_OPTS =
+  'ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci';
 
 /** Framework tables. App tables come from schema.ts or per-project schemas. */
 export const MIGRATIONS: Migration[] = [
@@ -282,20 +283,27 @@ export const MIGRATIONS: Migration[] = [
   },
 ];
 
-export async function runMigrations(db: SqlExecutor): Promise<{ applied: string[] }> {
+export async function runMigrations(
+  db: SqlExecutor,
+): Promise<{ applied: string[] }> {
   await db.execute(
     db.dialect === 'postgres'
       ? `CREATE TABLE IF NOT EXISTS _lls_migrations (id VARCHAR(128) PRIMARY KEY, applied_at BIGINT NOT NULL)`
       : `CREATE TABLE IF NOT EXISTS _lls_migrations (id VARCHAR(128) PRIMARY KEY, applied_at BIGINT NOT NULL) ${MYSQL_OPTS}`,
   );
   const done = new Set(
-    (await db.query<{ id: string }>('SELECT id FROM _lls_migrations')).map((r) => r.id),
+    (await db.query<{ id: string }>('SELECT id FROM _lls_migrations')).map(
+      (r) => r.id,
+    ),
   );
   const applied: string[] = [];
   for (const m of MIGRATIONS) {
     if (done.has(m.id)) continue;
     for (const stmt of m[db.dialect]) await db.execute(stmt);
-    await db.execute('INSERT INTO _lls_migrations (id, applied_at) VALUES (?, ?)', [m.id, Date.now()]);
+    await db.execute(
+      'INSERT INTO _lls_migrations (id, applied_at) VALUES (?, ?)',
+      [m.id, Date.now()],
+    );
     applied.push(m.id);
   }
   for (const t of [
@@ -316,7 +324,9 @@ export async function runMigrations(db: SqlExecutor): Promise<{ applied: string[
 
 export async function coreMigrationStatus(db: SqlExecutor) {
   try {
-    const rows = await db.query<{ id: string }>('SELECT id FROM _lls_migrations');
+    const rows = await db.query<{ id: string }>(
+      'SELECT id FROM _lls_migrations',
+    );
     const done = new Set(rows.map((r) => r.id));
     return {
       applied: MIGRATIONS.filter((m) => done.has(m.id)).map((m) => m.id),

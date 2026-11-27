@@ -5,9 +5,17 @@ import { quoteIdent, type SqlExecutor } from 'local-lite/server';
 import type { ServerSettings } from '../../config.js';
 import type { SchemaDictionary } from '../../db/schema.js';
 import { fromDbRow } from '../../db/tableStorage.js';
-import { projectScope, toPhysicalTable, type ProjectRecord } from '../../services/projects.js';
+import {
+  projectScope,
+  toPhysicalTable,
+  type ProjectRecord,
+} from '../../services/projects.js';
 
-export function createBackupsHandler(settings: ServerSettings, db: SqlExecutor, schema: SchemaDictionary) {
+export function createBackupsHandler(
+  settings: ServerSettings,
+  db: SqlExecutor,
+  schema: SchemaDictionary,
+) {
   const q = (n: string) => quoteIdent(n, db.dialect);
 
   return async (request: Request, project?: ProjectRecord | null) => {
@@ -39,8 +47,11 @@ export function createBackupsHandler(settings: ServerSettings, db: SqlExecutor, 
         });
       }
       const target = path.resolve(dir, path.basename(file));
-      if (!fs.existsSync(target)) return Response.json({ error: 'Backup not found.' }, { status: 404 });
-      return new Response(fs.readFileSync(target), { headers: { 'content-type': 'application/json; charset=utf-8' } });
+      if (!fs.existsSync(target))
+        return Response.json({ error: 'Backup not found.' }, { status: 404 });
+      return new Response(fs.readFileSync(target), {
+        headers: { 'content-type': 'application/json; charset=utf-8' },
+      });
     }
 
     if (method === 'POST') {
@@ -52,12 +63,24 @@ export function createBackupsHandler(settings: ServerSettings, db: SqlExecutor, 
         const rows = await db.query<Record<string, any>>(
           `SELECT * FROM ${q(toPhysicalTable(project?.slug ?? null, table))}`,
         );
-        data[table] = rows.map((r) => ({ id: String(r.id), ...fromDbRow(fields, r) }));
+        data[table] = rows.map((r) => ({
+          id: String(r.id),
+          ...fromDbRow(fields, r),
+        }));
         recordCount += rows.length;
       }
       const now = Date.now();
       const fileName = `backup-${project ? project.slug : settings.db.database}-${now}.json`;
-      const json = JSON.stringify({ version: 1, dialect: settings.dialect, exportedAt: now, tables: data }, null, 2);
+      const json = JSON.stringify(
+        {
+          version: 1,
+          dialect: settings.dialect,
+          exportedAt: now,
+          tables: data,
+        },
+        null,
+        2,
+      );
       fs.writeFileSync(path.join(dir, fileName), json);
       const backup = {
         id: crypto.randomUUID(),
@@ -70,7 +93,16 @@ export function createBackupsHandler(settings: ServerSettings, db: SqlExecutor, 
       };
       await db.execute(
         'INSERT INTO _lls_backups (id, project_id, user_id, file_name, status, size_bytes, record_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [backup.id, scope.projectId, backup.userId, backup.fileName, backup.status, backup.sizeBytes, backup.recordCount, backup.createdAt],
+        [
+          backup.id,
+          scope.projectId,
+          backup.userId,
+          backup.fileName,
+          backup.status,
+          backup.sizeBytes,
+          backup.recordCount,
+          backup.createdAt,
+        ],
       );
       return Response.json({ success: true, backup });
     }
@@ -79,7 +111,10 @@ export function createBackupsHandler(settings: ServerSettings, db: SqlExecutor, 
       const file = path.basename(url.searchParams.get('file') || '');
       const target = path.resolve(dir, file);
       if (fs.existsSync(target)) fs.unlinkSync(target);
-      await db.execute(`DELETE FROM _lls_backups WHERE file_name = ? AND ${scope.where}`, [file, ...scope.params]);
+      await db.execute(
+        `DELETE FROM _lls_backups WHERE file_name = ? AND ${scope.where}`,
+        [file, ...scope.params],
+      );
       return Response.json({ success: true });
     }
 

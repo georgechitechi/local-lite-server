@@ -136,14 +136,20 @@ export function SettingsTab({
 
   const integrationList: Array<{ label: string; enabled: boolean }> = settings
     ? [
-      { label: 'APP_SECRET', enabled: settings.integrations.appSecret },
-      { label: 'SMTP Email', enabled: settings.integrations.smtp },
-      { label: 'Auto-Migrate', enabled: settings.integrations.autoMigrate },
-      { label: 'Internal Crons', enabled: settings.integrations.internalCrons },
-      { label: 'Multi-Instance', enabled: settings.integrations.multiInstance },
-      { label: 'Google OAuth', enabled: settings.integrations.googleOAuth },
-      { label: 'GitHub OAuth', enabled: settings.integrations.githubOAuth },
-    ]
+        { label: 'APP_SECRET', enabled: settings.integrations.appSecret },
+        { label: 'SMTP Email', enabled: settings.integrations.smtp },
+        { label: 'Auto-Migrate', enabled: settings.integrations.autoMigrate },
+        {
+          label: 'Internal Crons',
+          enabled: settings.integrations.internalCrons,
+        },
+        {
+          label: 'Multi-Instance',
+          enabled: settings.integrations.multiInstance,
+        },
+        { label: 'Google OAuth', enabled: settings.integrations.googleOAuth },
+        { label: 'GitHub OAuth', enabled: settings.integrations.githubOAuth },
+      ]
     : [];
 
   const pendingCount = settings?.pendingSql?.length ?? 0;
@@ -165,12 +171,18 @@ export function SettingsTab({
             <h2 style={{ ...sectionTitleStyle, margin: 0 }}>
               Server Connection &amp; Runtime
             </h2>
-            <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--muted)' }}>
+            <p
+              style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--muted)' }}
+            >
               Active database, runtime memory, and directory configuration.
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button type="button" onClick={() => void loadSettings()} style={secondaryBtnStyle}>
+            <button
+              type="button"
+              onClick={() => void loadSettings()}
+              style={secondaryBtnStyle}
+            >
               Refresh
             </button>
             <button
@@ -214,7 +226,9 @@ export function SettingsTab({
             </strong>
           </div>
           <div style={infoTileStyle}>
-            <span style={{ color: 'var(--muted)' }}>Database ({settings?.dialect || '—'})</span>
+            <span style={{ color: 'var(--muted)' }}>
+              Database ({settings?.dialect || '—'})
+            </span>
             <strong style={{ fontFamily: 'monospace', fontSize: 12 }}>
               {settings?.dbName
                 ? `${settings.dbName} (${settings.dbHost}:${settings.dbPort}, pool ${settings.poolSize})`
@@ -224,12 +238,16 @@ export function SettingsTab({
           <div style={infoTileStyle}>
             <span style={{ color: 'var(--muted)' }}>Node.js &amp; Memory</span>
             <strong>
-              {settings ? `${settings.nodeVersion} • ${settings.memoryMb} MB` : '—'}
+              {settings
+                ? `${settings.nodeVersion} • ${settings.memoryMb} MB`
+                : '—'}
             </strong>
           </div>
           <div style={infoTileStyle}>
             <span style={{ color: 'var(--muted)' }}>Uptime</span>
-            <strong>{settings ? formatUptime(settings.uptimeSeconds) : '—'}</strong>
+            <strong>
+              {settings ? formatUptime(settings.uptimeSeconds) : '—'}
+            </strong>
           </div>
           <div style={infoTileStyle}>
             <span style={{ color: 'var(--muted)' }}>Uploads / Backups</span>
@@ -251,8 +269,12 @@ export function SettingsTab({
           }}
         >
           <div>
-            <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Schema &amp; Migrations</h2>
-            <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--muted)' }}>
+            <h2 style={{ ...sectionTitleStyle, margin: 0 }}>
+              Schema &amp; Migrations
+            </h2>
+            <p
+              style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--muted)' }}
+            >
               {pendingCount === 0
                 ? 'Database schema matches schema.ts.'
                 : `${pendingCount} pending SQL statement(s) detected in schema.ts.`}
@@ -330,7 +352,9 @@ export function SettingsTab({
                 borderRadius: 999,
                 fontSize: 12.5,
                 fontWeight: 600,
-                background: item.enabled ? 'var(--success-soft)' : 'var(--surface-alt)',
+                background: item.enabled
+                  ? 'var(--success-soft)'
+                  : 'var(--surface-alt)',
                 color: item.enabled ? 'var(--success)' : 'var(--muted)',
               }}
             >
@@ -342,7 +366,13 @@ export function SettingsTab({
         {settings?.integrations.smtp && (
           <form
             onSubmit={handleSendTestEmail}
-            style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap', alignItems: 'center' }}
+            style={{
+              display: 'flex',
+              gap: 8,
+              marginTop: 14,
+              flexWrap: 'wrap',
+              alignItems: 'center',
+            }}
           >
             <input
               type="email"
@@ -352,7 +382,11 @@ export function SettingsTab({
               placeholder="Send test email to..."
               style={{ ...inputStyle, maxWidth: 280, height: 36 }}
             />
-            <button type="submit" disabled={sendingEmail} style={secondaryBtnStyle}>
+            <button
+              type="submit"
+              disabled={sendingEmail}
+              style={secondaryBtnStyle}
+            >
               {sendingEmail ? 'Sending...' : 'Send Test Email'}
             </button>
           </form>
@@ -370,9 +404,14 @@ export function SettingsTab({
           }}
         >
           <div>
-            <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Table Browser Visibility</h2>
-            <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--muted)' }}>
-              Show or hide soft-deleted rows (<code>deleted = 1</code>) in the Data tab.
+            <h2 style={{ ...sectionTitleStyle, margin: 0 }}>
+              Table Browser Visibility
+            </h2>
+            <p
+              style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--muted)' }}
+            >
+              Show or hide soft-deleted rows (<code>deleted = 1</code>) in the
+              Data tab.
             </p>
           </div>
           <ToggleSlider
@@ -403,12 +442,18 @@ export function SettingsTab({
         >
           <div>
             <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Admin Session</h2>
-            <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--muted)' }}>
+            <p
+              style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--muted)' }}
+            >
               Sign out of this browser&apos;s admin console session.
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button type="button" onClick={() => onLogout(false)} style={secondaryBtnStyle}>
+            <button
+              type="button"
+              onClick={() => onLogout(false)}
+              style={secondaryBtnStyle}
+            >
               Sign Out
             </button>
             <button

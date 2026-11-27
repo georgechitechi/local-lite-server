@@ -42,8 +42,8 @@ export function AdminDashboard() {
   const [selectedTable, setSelectedTable] = useState<string>('');
   const [refreshTick, setRefreshTick] = useState(0);
   const [projects, setProjects] = useState<ProjectItem[]>([]);
-  const [activeProjectId, setActiveProjectIdState] = useState<string | null>(() =>
-    getActiveProjectId(),
+  const [activeProjectId, setActiveProjectIdState] = useState<string | null>(
+    () => getActiveProjectId(),
   );
   const [projectsDrawerOpen, setProjectsDrawerOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -79,20 +79,23 @@ export function AdminDashboard() {
     setRefreshTick((n) => n + 1);
   }, []);
 
-  const loadProjects = useCallback(async (role?: string | null) => {
-    const res = await adminFetch('/projects', { cache: 'no-store' });
-    if (!res.ok) return;
-    const d = (await res.json()) as { projects?: ProjectItem[] };
-    const list = d.projects ?? [];
-    setProjects(list);
-    const current = getActiveProjectId();
-    const stillExists = current && list.some((p) => p.id === current);
-    if (current && !stillExists) {
-      selectProject(role !== 'super_admin' && list[0] ? list[0].id : null);
-    } else if (!current && role !== 'super_admin' && list[0]) {
-      selectProject(list[0].id);
-    }
-  }, [selectProject]);
+  const loadProjects = useCallback(
+    async (role?: string | null) => {
+      const res = await adminFetch('/projects', { cache: 'no-store' });
+      if (!res.ok) return;
+      const d = (await res.json()) as { projects?: ProjectItem[] };
+      const list = d.projects ?? [];
+      setProjects(list);
+      const current = getActiveProjectId();
+      const stillExists = current && list.some((p) => p.id === current);
+      if (current && !stillExists) {
+        selectProject(role !== 'super_admin' && list[0] ? list[0].id : null);
+      } else if (!current && role !== 'super_admin' && list[0]) {
+        selectProject(list[0].id);
+      }
+    },
+    [selectProject],
+  );
 
   const loadOverview = useCallback(async () => {
     setLoading(true);
@@ -109,7 +112,8 @@ export function AdminDashboard() {
         setAuthenticated(true);
         void loadProjects(data.consoleRole);
         setSelectedTable((prev) =>
-          data.tableCounts.length > 0 && !data.tableCounts.some((t) => t.table === prev)
+          data.tableCounts.length > 0 &&
+          !data.tableCounts.some((t) => t.table === prev)
             ? data.tableCounts[0].table
             : prev,
         );
@@ -253,7 +257,9 @@ export function AdminDashboard() {
       showToast(data?.error || 'Failed to create project.', 'error');
       return {
         ok: false,
-        suggestions: Array.isArray(data?.suggestions) ? data.suggestions : undefined,
+        suggestions: Array.isArray(data?.suggestions)
+          ? data.suggestions
+          : undefined,
       };
     }
     showToast(`Project "${data.project.name}" created.`, 'info');
@@ -390,9 +396,7 @@ export function AdminDashboard() {
             >
               Projects:{' '}
               {projects.find((p) => p.id === activeProjectId)?.name ??
-                (overview?.consoleRole === 'super_admin'
-                  ? 'Default'
-                  : 'None')}
+                (overview?.consoleRole === 'super_admin' ? 'Default' : 'None')}
             </button>
             <button
               type="button"
@@ -412,7 +416,9 @@ export function AdminDashboard() {
           {activeTab === 'overview' && (
             <OverviewTab
               overview={overview}
-              activeProject={projects.find((p) => p.id === activeProjectId) ?? null}
+              activeProject={
+                projects.find((p) => p.id === activeProjectId) ?? null
+              }
               onOpenDataTab={() => setActiveTab('data')}
               onOpenProjects={() => setProjectsDrawerOpen(true)}
               onOpenTable={(table) => {
@@ -451,7 +457,9 @@ export function AdminDashboard() {
           {activeTab === 'functions' && (
             <FunctionsTab
               endpoints={endpoints}
-              activeProjectSlug={projects.find((p) => p.id === activeProjectId)?.slug ?? null}
+              activeProjectSlug={
+                projects.find((p) => p.id === activeProjectId)?.slug ?? null
+              }
             />
           )}
 
@@ -471,7 +479,9 @@ export function AdminDashboard() {
 
           {activeTab === 'storage' && (
             <StorageTab
-              activeProjectSlug={projects.find((p) => p.id === activeProjectId)?.slug ?? null}
+              activeProjectSlug={
+                projects.find((p) => p.id === activeProjectId)?.slug ?? null
+              }
               onToast={showToast}
               refreshSignal={refreshTick}
             />

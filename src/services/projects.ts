@@ -39,7 +39,10 @@ export function projectTablePrefix(slug: string): string {
   return `p_${slug.replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '')}_`;
 }
 
-export function toPhysicalTable(projectSlug: string | null | undefined, logicalTable: string): string {
+export function toPhysicalTable(
+  projectSlug: string | null | undefined,
+  logicalTable: string,
+): string {
   if (!projectSlug) return logicalTable;
   return `${projectTablePrefix(projectSlug)}${logicalTable}`;
 }
@@ -52,7 +55,9 @@ export function projectScope(project?: { id: string } | null) {
     params: (projectId ? [projectId] : []) as unknown[],
     key: (name: string) => (projectId ? `${projectId}:${name}` : name),
     unkey: (raw: string) =>
-      projectId && raw.startsWith(`${projectId}:`) ? raw.slice(projectId.length + 1) : raw,
+      projectId && raw.startsWith(`${projectId}:`)
+        ? raw.slice(projectId.length + 1)
+        : raw,
   };
 }
 
@@ -81,7 +86,10 @@ function toProjectRecord(row: any): ProjectRecord {
   };
 }
 
-export function createProjectService(db: SqlExecutor, opts?: { maxProjectsPerUser?: number; uploadDir?: string }) {
+export function createProjectService(
+  db: SqlExecutor,
+  opts?: { maxProjectsPerUser?: number; uploadDir?: string },
+) {
   const q = (n: string) => quoteIdent(n, db.dialect);
   const cache = new Map<string, ProjectRecord>();
   const cachePut = (p: ProjectRecord) => {
@@ -102,7 +110,9 @@ export function createProjectService(db: SqlExecutor, opts?: { maxProjectsPerUse
             'SELECT * FROM _lls_projects WHERE owner_user_id = ? ORDER BY created_at DESC',
             [ownerUserId],
           )
-        : await db.query<any>('SELECT * FROM _lls_projects ORDER BY created_at DESC');
+        : await db.query<any>(
+            'SELECT * FROM _lls_projects ORDER BY created_at DESC',
+          );
       return rows.map((r) => cachePut(toProjectRecord(r)));
     },
 
@@ -130,7 +140,9 @@ export function createProjectService(db: SqlExecutor, opts?: { maxProjectsPerUse
       if (input.ownerUserId && opts?.maxProjectsPerUser) {
         const owned = await this.listProjects(input.ownerUserId);
         if (owned.length >= opts.maxProjectsPerUser) {
-          throw new Error(`Project limit reached (max ${opts.maxProjectsPerUser} per user).`);
+          throw new Error(
+            `Project limit reached (max ${opts.maxProjectsPerUser} per user).`,
+          );
         }
       }
       const slug = (
@@ -141,10 +153,15 @@ export function createProjectService(db: SqlExecutor, opts?: { maxProjectsPerUse
           .replace(/^-+|-+$/g, '')
       ).toLowerCase();
       if (!SLUG_RE.test(slug)) {
-        throw new Error('Project slug must be 3–49 lowercase letters, digits, or hyphens.');
+        throw new Error(
+          'Project slug must be 3–49 lowercase letters, digits, or hyphens.',
+        );
       }
 
-      const existing = await db.query<any>('SELECT id FROM _lls_projects WHERE slug = ? LIMIT 1', [slug]);
+      const existing = await db.query<any>(
+        'SELECT id FROM _lls_projects WHERE slug = ? LIMIT 1',
+        [slug],
+      );
       if (existing[0]) {
         const base =
           name
@@ -172,8 +189,12 @@ export function createProjectService(db: SqlExecutor, opts?: { maxProjectsPerUse
 
       const id = crypto.randomUUID();
       const now = Date.now();
-      const schema = input.schema && Object.keys(input.schema).length ? normalizeSchema(input.schema) : {};
-      const rulesInput = input.rules && Object.keys(input.rules).length ? input.rules : {};
+      const schema =
+        input.schema && Object.keys(input.schema).length
+          ? normalizeSchema(input.schema)
+          : {};
+      const rulesInput =
+        input.rules && Object.keys(input.rules).length ? input.rules : {};
       if (Object.keys(rulesInput).length) defineRules(rulesInput);
 
       await db.execute(
@@ -203,8 +224,15 @@ export function createProjectService(db: SqlExecutor, opts?: { maxProjectsPerUse
       projectId: string,
       schemaInput: SchemaDictionary,
       rulesInput?: Record<string, any>,
-    ): Promise<{ applied: number; warnings: string[]; project: ProjectRecord }> {
-      const rows = await db.query<any>('SELECT * FROM _lls_projects WHERE id = ? LIMIT 1', [projectId]);
+    ): Promise<{
+      applied: number;
+      warnings: string[];
+      project: ProjectRecord;
+    }> {
+      const rows = await db.query<any>(
+        'SELECT * FROM _lls_projects WHERE id = ? LIMIT 1',
+        [projectId],
+      );
       const row = rows[0];
       if (!row) throw new Error('Project not found.');
 
@@ -215,15 +243,24 @@ export function createProjectService(db: SqlExecutor, opts?: { maxProjectsPerUse
         physicalDict[toPhysicalTable(slug, logical)] = fields;
       }
 
-      const prev = parseJsonOr<SqlSchemaState | null>(row.schema_state_json, null);
-      const next = buildSqlTargetSchema(physicalDict, [], { dialect: db.dialect });
+      const prev = parseJsonOr<SqlSchemaState | null>(
+        row.schema_state_json,
+        null,
+      );
+      const next = buildSqlTargetSchema(physicalDict, [], {
+        dialect: db.dialect,
+      });
       const diff = generateSqlDiff(prev, next, db.dialect);
       const stmts =
         db.dialect === 'mysql'
           ? diff.up.map((stmt) => {
-              if (!/^\s*CREATE TABLE/i.test(stmt) || /COLLATE=/i.test(stmt)) return stmt;
+              if (!/^\s*CREATE TABLE/i.test(stmt) || /COLLATE=/i.test(stmt))
+                return stmt;
               if (/CHARSET=utf8mb4/i.test(stmt)) {
-                return stmt.replace(/CHARSET=utf8mb4/gi, 'CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci');
+                return stmt.replace(
+                  /CHARSET=utf8mb4/gi,
+                  'CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci',
+                );
               }
               return `${stmt} ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci`;
             })
@@ -234,12 +271,20 @@ export function createProjectService(db: SqlExecutor, opts?: { maxProjectsPerUse
       let nextRulesJson = row.rules_json as string | null;
       if (rulesInput !== undefined) {
         defineRules(rulesInput);
-        nextRulesJson = Object.keys(rulesInput).length ? JSON.stringify(rulesInput) : null;
+        nextRulesJson = Object.keys(rulesInput).length
+          ? JSON.stringify(rulesInput)
+          : null;
       }
 
       await db.execute(
         'UPDATE _lls_projects SET schema_json = ?, schema_state_json = ?, rules_json = ?, updated_at = ? WHERE id = ?',
-        [JSON.stringify(schema), JSON.stringify(next), nextRulesJson, Date.now(), projectId],
+        [
+          JSON.stringify(schema),
+          JSON.stringify(next),
+          nextRulesJson,
+          Date.now(),
+          projectId,
+        ],
       );
       cacheEvict(cache.get(projectId));
 
@@ -251,7 +296,12 @@ export function createProjectService(db: SqlExecutor, opts?: { maxProjectsPerUse
     },
 
     async exportProject(projectId: string): Promise<{
-      project: { id: string; slug: string; name: string; schema: SchemaDictionary };
+      project: {
+        id: string;
+        slug: string;
+        name: string;
+        schema: SchemaDictionary;
+      };
       exportedAt: number;
       tables: Record<string, unknown[]>;
     } | null> {
@@ -262,10 +312,18 @@ export function createProjectService(db: SqlExecutor, opts?: { maxProjectsPerUse
         const rows = await db.query<Record<string, any>>(
           `SELECT * FROM ${q(toPhysicalTable(project.slug, logical))}`,
         );
-        tables[logical] = rows.map((r) => ({ id: String(r.id), ...fromDbRow(fields, r) }));
+        tables[logical] = rows.map((r) => ({
+          id: String(r.id),
+          ...fromDbRow(fields, r),
+        }));
       }
       return {
-        project: { id: project.id, slug: project.slug, name: project.name, schema: project.schema },
+        project: {
+          id: project.id,
+          slug: project.slug,
+          name: project.name,
+          schema: project.schema,
+        },
         exportedAt: Date.now(),
         tables,
       };
@@ -291,11 +349,14 @@ export function createProjectService(db: SqlExecutor, opts?: { maxProjectsPerUse
         '_lls_crons',
         '_server_changes',
       ]) {
-        await db.execute(`DELETE FROM ${q(t)} WHERE project_id = ?`, [project.id]);
+        await db.execute(`DELETE FROM ${q(t)} WHERE project_id = ?`, [
+          project.id,
+        ]);
       }
       if (opts?.uploadDir) {
         const dir = path.join(opts.uploadDir, 'projects', project.id);
-        if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
+        if (fs.existsSync(dir))
+          fs.rmSync(dir, { recursive: true, force: true });
       }
       await db.execute('DELETE FROM _lls_projects WHERE id = ?', [project.id]);
       return true;
