@@ -6,7 +6,7 @@ import type { ServerSettings } from '../config.js';
 import { sendSmtpMail } from '../core/mailer.js';
 import { runCronAction } from '../services/crons.js';
 import type { FunctionRuntime } from '../functions/index.js';
-import type { ProjectRecord } from '../services/projects.js';
+import { toPhysicalTable, type ProjectRecord } from '../services/projects.js';
 import { applySchema, planSchema, type SchemaDictionary } from '../db/schema.js';
 import { bucketKey, unscopeBucket } from '../services/storage.js';
 import { fromDbRow } from '../db/tableStorage.js';
@@ -81,15 +81,22 @@ export function createAdminOps(
       return Response.json({ error: 'Method Not Allowed' }, { status: 405 });
     },
 
-    async handleBackups(request: Request) {
-      const dir = path.resolve(settings.backupDir);
+    async handleBackups(request: Request, project?: ProjectRecord | null) {
+      const projectId = project?.id ?? null;
+      const scopeWhere = projectId ? 'project_id = ?' : 'project_id IS NULL';
+      const scopeParams: unknown[] = projectId ? [projectId] : [];
+      const dir = projectId
+        ? path.resolve(settings.backupDir, 'projects', projectId)
+        : path.resolve(settings.backupDir);
       const url = new URL(request.url);
       const method = request.method.toUpperCase();
       if (method === 'GET') {
         const file = url.searchParams.get('file');
         if (!file) {
           const rows = await db.query<any>(
-            'SELECT id, user_id, file_name, status, size_bytes, record_count, created_at FROM _lls_backups ORDER BY created_at DESC LIMIT 50',
+            `SELECT id, user_id, file_name, status, size_bytes, record_count, created_at
+             FROM _lls_backups WHERE ${scopeWhere} ORDER BY created_at DESC LIMIT 50`,
+            scopeParams,
           );
           return Response.json({
             backups: rows.map((b) => ({
@@ -109,15 +116,18 @@ export function createAdminOps(
       }
       if (method === 'POST') {
         fs.mkdirSync(dir, { recursive: true });
+        const activeSchema = project ? project.schema : schema;
         const data: Record<string, unknown[]> = {};
         let recordCount = 0;
-        for (const [table, fields] of Object.entries(schema)) {
-          const rows = await db.query<Record<string, any>>(`SELECT * FROM ${q(table)}`);
+        for (const [table, fields] of Object.entries(activeSchema)) {
+          const phys = toPhysicalTable(projectId, table);
+          const rows = await db.query<Record<string, any>>(`SELECT * FROM ${q(phys)}`);
           data[table] = rows.map((r) => ({ id: String(r.id), ...fromDbRow(fields, r) }));
           recordCount += rows.length;
         }
         const now = Date.now();
-        const fileName = `backup-${settings.db.database}-${now}.json`;
+        const prefix = project ? project.slug : settings.db.database;
+        const fileName = `backup-${prefix}-${now}.json`;
         const json = JSON.stringify({ version: 1, dialect: settings.dialect, exportedAt: now, tables: data }, null, 2);
         fs.writeFileSync(path.join(dir, fileName), json);
         const backup = {
@@ -130,8 +140,8 @@ export function createAdminOps(
           createdAt: now,
         };
         await db.execute(
-          'INSERT INTO _lls_backups (id, user_id, file_name, status, size_bytes, record_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [backup.id, backup.userId, backup.fileName, backup.status, backup.sizeBytes, backup.recordCount, backup.createdAt],
+          'INSERT INTO _lls_backups (id, project_id, user_id, file_name, status, size_bytes, record_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [backup.id, projectId, backup.userId, backup.fileName, backup.status, backup.sizeBytes, backup.recordCount, backup.createdAt],
         );
         return Response.json({ success: true, backup });
       }
@@ -139,7 +149,7 @@ export function createAdminOps(
         const file = path.basename(url.searchParams.get('file') || '');
         const target = path.resolve(dir, file);
         if (fs.existsSync(target)) fs.unlinkSync(target);
-        await db.execute('DELETE FROM _lls_backups WHERE file_name = ?', [file]);
+        await db.execute(`DELETE FROM _lls_backups WHERE file_name = ? AND ${scopeWhere}`, [file, ...scopeParams]);
         return Response.json({ success: true });
       }
       return Response.json({ error: 'Method Not Allowed' }, { status: 405 });
@@ -220,9 +230,12 @@ export function createAdminOps(
       return Response.json({ error: 'Method Not Allowed' }, { status: 405 });
     },
 
-    async handleCrons(request: Request) {
+    async handleCrons(request: Request, project?: ProjectRecord | null) {
+      const projectId = project?.id ?? null;
+      const scopeWhere = projectId ? 'project_id = ?' : 'project_id IS NULL';
+      const scopeParams: unknown[] = projectId ? [projectId] : [];
       const normalizeCronRow = (r: any) => ({
-        job_key: r.job_key,
+        job_key: unscopeBucket(projectId, String(r.job_key)),
         label: r.label,
         action_type: r.action_type,
         cron: r.cron_expr,
@@ -236,7 +249,10 @@ export function createAdminOps(
 
       const method = request.method.toUpperCase();
       if (method === 'GET') {
-        const rows = await db.query<any>('SELECT * FROM _lls_crons ORDER BY job_key ASC');
+        const rows = await db.query<any>(
+          `SELECT * FROM _lls_crons WHERE ${scopeWhere} ORDER BY job_key ASC`,
+          scopeParams,
+        );
         return Response.json({ jobs: rows.map(normalizeCronRow) });
       }
       if (method === 'POST') {
@@ -250,15 +266,16 @@ export function createAdminOps(
           const label = String(body.label ?? '').trim();
           const cronExpr = String(body.cron ?? '').trim();
           const rawKey = String(body.job_key ?? '').trim();
-          const jobKey =
+          const logicalKey =
             rawKey ||
             label
               .toLowerCase()
               .replace(/[^a-z0-9]+/g, '_')
               .replace(/^_+|_+$/g, '');
-          if (!jobKey || !label || !cronExpr) {
+          if (!logicalKey || !label || !cronExpr) {
             return Response.json({ error: 'label and cron are required.' }, { status: 400 });
           }
+          const jobKey = bucketKey(projectId, logicalKey);
           const actionType = String(body.action_type || 'http_webhook');
           const timezone = String(body.timezone || 'UTC');
           const configJson = body.config_json != null ? JSON.stringify(body.config_json) : null;
@@ -266,12 +283,13 @@ export function createAdminOps(
             buildUpsertSql({
               table: '_lls_crons',
               conflictCols: ['job_key'],
-              insertCols: ['job_key', 'label', 'action_type', 'cron_expr', 'timezone', 'enabled', 'config_json'],
-              updateCols: ['label', 'action_type', 'cron_expr', 'timezone', 'enabled', 'config_json'],
+              insertCols: ['job_key', 'project_id', 'label', 'action_type', 'cron_expr', 'timezone', 'enabled', 'config_json'],
+              updateCols: ['project_id', 'label', 'action_type', 'cron_expr', 'timezone', 'enabled', 'config_json'],
               dialect: db.dialect,
             }),
             [
               jobKey,
+              projectId,
               label,
               actionType,
               cronExpr,
@@ -283,12 +301,12 @@ export function createAdminOps(
           const [saved] = await db.query<any>('SELECT * FROM _lls_crons WHERE job_key = ?', [jobKey]);
           return Response.json({ success: true, job: normalizeCronRow(saved) });
         }
-        const jobKey = String(body?.job_key ?? '').trim();
-        if (jobKey === 'all') {
+        const logicalKey = String(body?.job_key ?? '').trim();
+        if (logicalKey === 'all') {
+          const enabledCond = db.dialect === 'postgres' ? 'enabled = TRUE' : 'enabled = 1';
           const enabledRows = await db.query<any>(
-            db.dialect === 'postgres'
-              ? 'SELECT * FROM _lls_crons WHERE enabled = TRUE'
-              : 'SELECT * FROM _lls_crons WHERE enabled = 1',
+            `SELECT * FROM _lls_crons WHERE ${scopeWhere} AND ${enabledCond}`,
+            scopeParams,
           );
           for (const job of enabledRows) {
             try {
@@ -305,7 +323,11 @@ export function createAdminOps(
           }
           return Response.json({ success: true });
         }
-        const rows = await db.query<any>('SELECT * FROM _lls_crons WHERE job_key = ?', [jobKey]);
+        const jobKey = bucketKey(projectId, logicalKey);
+        const rows = await db.query<any>(
+          `SELECT * FROM _lls_crons WHERE job_key = ? AND ${scopeWhere}`,
+          [jobKey, ...scopeParams],
+        );
         const job = rows[0];
         if (!job) return Response.json({ error: 'Schedule not found.' }, { status: 404 });
         try {
@@ -323,8 +345,11 @@ export function createAdminOps(
         }
       }
       if (method === 'DELETE') {
-        const jobKey = new URL(request.url).searchParams.get('job_key') || '';
-        await db.execute('DELETE FROM _lls_crons WHERE job_key = ?', [jobKey]);
+        const logicalKey = new URL(request.url).searchParams.get('job_key') || '';
+        await db.execute(
+          `DELETE FROM _lls_crons WHERE job_key = ? AND ${scopeWhere}`,
+          [bucketKey(projectId, logicalKey), ...scopeParams],
+        );
         return Response.json({ success: true });
       }
       return Response.json({ error: 'Method Not Allowed' }, { status: 405 });

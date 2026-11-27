@@ -244,6 +244,7 @@ export function createProjectService(db: SqlExecutor, opts?: { maxProjectsPerUse
         '_lls_storage_buckets',
         '_lls_storage_files',
         '_lls_env_vars',
+        '_lls_backups',
         '_lls_crons',
         '_server_changes',
       ]) {

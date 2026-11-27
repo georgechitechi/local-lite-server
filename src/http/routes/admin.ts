@@ -47,11 +47,15 @@ export function adminRoutes(deps: {
     '/admin/env': {
       ALL: authCtx.withAdminProject((req, _s, project) => consoleApi.handleEnv(req, project)),
     },
-    '/admin/backups': { ALL: authCtx.withSuperAdmin((req) => consoleApi.handleBackups(req)) },
+    '/admin/backups': {
+      ALL: authCtx.withAdminProject((req, _s, project) => consoleApi.handleBackups(req, project)),
+    },
     '/admin/storage': {
       ALL: authCtx.withAdminProject((req, _s, project) => consoleApi.handleStorage(req, project)),
     },
-    '/admin/crons': { ALL: authCtx.withSuperAdmin((req) => consoleApi.handleCrons(req)) },
+    '/admin/crons': {
+      ALL: authCtx.withAdminProject((req, _s, project) => consoleApi.handleCrons(req, project)),
+    },
     '/admin/settings': { ALL: authCtx.withSuperAdmin((req) => consoleApi.handleSettings(req)) },
     '/admin/api-keys': {
       GET: authCtx.withAdminProject(async (_req, _s, project) =>

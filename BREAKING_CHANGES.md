@@ -7,7 +7,7 @@
 
 2. **Strict `admin` vs `super_admin` Isolation**
    - Console `admin` users (including self-registered accounts via `ALLOW_CONSOLE_SIGNUP=true`) are strictly scoped to projects they own (`owner_user_id === session.userId`).
-   - `admin` users receive `403 Forbidden` on `Default` (root) server tables/env and on `super_admin`-only endpoints (`/admin/backups`, `/admin/crons`, `/admin/settings`, and `set_console_role`). Project-scoped `/admin/env` is available to project owners via `X-Project-Id` without mutating global `process.env`.
+   - `admin` users receive `403 Forbidden` on `Default` (root) server resources and on `super_admin`-only endpoints (`/admin/settings` and `set_console_role`). All project-scoped tabs (`Data`, `Auth & Users`, `API Keys`, `Functions`, `Schedules`, `Backups`, `Storage`, `Sync Logs`, `Environment`) are available to project owners via `X-Project-Id` (project env vars do not mutate global `process.env`).
 
 3. **Consolidated Clean Initial Migration (`0001_init`)**
    - All framework tables (`_lls_projects`, `_local_auth_accounts`, `_lls_api_keys`, `_lls_storage_*`, `_server_changes`, etc.) are created directly with their multi-tenant `project_id` columns, `utf8mb4_general_ci` charset, and indexes in `0001_init` without incremental `ALTER TABLE` migrations. Fresh databases are expected.

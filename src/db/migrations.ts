@@ -102,12 +102,14 @@ export const MIGRATIONS: Migration[] = [
       ) ${MYSQL_OPTS}`,
       `CREATE TABLE IF NOT EXISTS _lls_backups (
         id VARCHAR(64) NOT NULL PRIMARY KEY,
+        project_id VARCHAR(64) NULL,
         user_id VARCHAR(64) NOT NULL,
         file_name VARCHAR(255) NOT NULL,
         status VARCHAR(32) NOT NULL,
         size_bytes BIGINT NOT NULL,
         record_count INT NOT NULL,
-        created_at BIGINT NOT NULL
+        created_at BIGINT NOT NULL,
+        INDEX idx_backups_project (project_id)
       ) ${MYSQL_OPTS}`,
       `CREATE TABLE IF NOT EXISTS _lls_crons (
         job_key VARCHAR(128) NOT NULL PRIMARY KEY,
@@ -233,6 +235,7 @@ export const MIGRATIONS: Migration[] = [
       )`,
       `CREATE TABLE IF NOT EXISTS _lls_backups (
         id VARCHAR(64) NOT NULL PRIMARY KEY,
+        project_id VARCHAR(64) NULL,
         user_id VARCHAR(64) NOT NULL,
         file_name VARCHAR(255) NOT NULL,
         status VARCHAR(32) NOT NULL,
@@ -240,6 +243,7 @@ export const MIGRATIONS: Migration[] = [
         record_count INT NOT NULL,
         created_at BIGINT NOT NULL
       )`,
+      `CREATE INDEX IF NOT EXISTS idx_backups_project ON _lls_backups (project_id)`,
       `CREATE TABLE IF NOT EXISTS _lls_crons (
         job_key VARCHAR(128) NOT NULL PRIMARY KEY,
         project_id VARCHAR(64) NULL,
