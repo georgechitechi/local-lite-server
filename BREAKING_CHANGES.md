@@ -9,8 +9,11 @@
    - Console `admin` users (including self-registered accounts via `ALLOW_CONSOLE_SIGNUP=true`) are strictly scoped to projects they own (`owner_user_id === session.userId`).
    - `admin` users receive `403 Forbidden` on `Default` (root) server tables and on `super_admin`-only endpoints (`/admin/env`, `/admin/backups`, `/admin/crons`, `/admin/settings`, and `set_console_role`).
 
-3. **Project-Scoped End-User Auth (`/p/:slug/auth/*`)**
-   - `_local_auth_accounts` and `_local_auth_reset_otps` are now scoped by `project_id`, and migration `0005_drop_global_email_unique` drops the legacy single-column unique constraint on `email` so different projects can independently register the same user email.
+3. **Consolidated Clean Initial Migration (`0001_init`)**
+   - All framework tables (`_lls_projects`, `_local_auth_accounts`, `_lls_api_keys`, `_lls_storage_*`, `_server_changes`, etc.) are created directly with their multi-tenant `project_id` columns, `utf8mb4_general_ci` charset, and indexes in `0001_init` without incremental `ALTER TABLE` migrations. Fresh databases are expected.
+
+4. **Project-Scoped End-User Auth (`/p/:slug/auth/*`)**
+   - `_local_auth_accounts` and `_local_auth_reset_otps` are scoped by `project_id` (`idx_auth_project_email`), allowing different projects to independently register the same user email.
 
 4. **Project-Namespaced SSE Sync Events**
    - `SyncEventBroker` events are isolated per project via `scopeBroker()`. A write on Project A no longer wakes SSE subscribers on Project B or the root server.
