@@ -1,7 +1,6 @@
-import { pathToFileURL } from 'node:url';
 import type { SqlExecutor, SyncEventBroker } from 'local-lite/server';
 import type { ServerSettings } from '../config.js';
-import { resolveProjectFile } from '../core/resolve.js';
+import { importUserModule, resolveProjectFile } from '../core/resolve.js';
 import type { FunctionAuth } from '../functions/index.js';
 import type { SchemaDictionary } from '../db/schema.js';
 
@@ -37,7 +36,7 @@ export function resolveRoutesFile(
 export async function loadRoutesFile(
   file: string,
 ): Promise<CustomRoutesMap | CustomRoutesFactory> {
-  const loaded = await import(pathToFileURL(file).href);
+  const loaded = await importUserModule(file);
   const mod = loaded.default;
   if (
     !mod ||

@@ -75,6 +75,12 @@ export async function buildCpanelBundle(
       format: 'esm',
       treeShaking: true,
       legalComments: 'none',
+      alias: {
+        nodemailer: nodemailerDir,
+      },
+      banner: {
+        js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);",
+      },
       outfile,
       minify: true,
       logLevel: 'info',
@@ -120,7 +126,25 @@ export async function buildCpanelBundle(
         ? rootFns
         : null;
   if (fnsDir) {
-    fs.cpSync(fnsDir, path.join(absOut, 'functions'), { recursive: true });
+    const fnOutDir = path.join(absOut, 'functions');
+    fs.mkdirSync(fnOutDir, { recursive: true });
+    const fnExts = ['.ts', '.mts', '.mjs', '.js'];
+    for (const entry of fs.readdirSync(fnsDir, { withFileTypes: true })) {
+      if (
+        !entry.isFile() ||
+        entry.name.startsWith('_') ||
+        entry.name.endsWith('.d.ts')
+      ) {
+        continue;
+      }
+      const ext = fnExts.find((e) => entry.name.endsWith(e));
+      if (!ext) continue;
+      const baseName = entry.name.slice(0, -ext.length);
+      await bundleSingle(
+        path.join(fnsDir, entry.name),
+        path.join(fnOutDir, `${baseName}.mjs`),
+      );
+    }
   }
 
   const adminDist = path.resolve(pkgRoot, 'admin/dist');

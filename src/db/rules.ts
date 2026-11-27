@@ -1,5 +1,4 @@
-import { pathToFileURL } from 'node:url';
-import { resolveProjectFile } from '../core/resolve.js';
+import { importUserModule, resolveProjectFile } from '../core/resolve.js';
 
 export interface RuleContext {
   isAdmin: boolean;
@@ -91,7 +90,7 @@ export function resolveRulesFile(
 }
 
 export async function loadRulesFile(file: string): Promise<RulesDictionary> {
-  const loaded = await import(pathToFileURL(file).href);
+  const loaded = await importUserModule(file);
   const mod = loaded.default;
   if (!mod || typeof mod !== 'object' || Array.isArray(mod)) {
     throw new Error(

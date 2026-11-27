@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { importUserModule } from '../core/resolve.js';
 import type { FunctionDef, FunctionRegistry } from './types.js';
 
 const EXTENSIONS = ['.ts', '.mts', '.mjs', '.js'];
@@ -38,10 +38,10 @@ export async function loadFunctionsDir(
     const ext = EXTENSIONS.find((e) => entry.name.endsWith(e));
     if (!ext) continue;
     const modName = entry.name.slice(0, -ext.length);
-    const url =
-      pathToFileURL(path.join(abs, entry.name)).href +
-      (bustCache ? `?t=${Date.now()}` : '');
-    const mod = await import(url);
+    const mod = await importUserModule(
+      path.join(abs, entry.name),
+      bustCache ? `?t=${Date.now()}` : '',
+    );
     for (const [expName, val] of Object.entries(mod)) {
       if (
         val &&
