@@ -115,6 +115,7 @@ export function createAdminSession(settings: ServerSettings, db: SqlExecutor) {
       const session = await authenticate(request).catch(() => null);
       return Response.json({
         hasConsoleAdmins: Number(rows[0]?.n ?? 0) > 0,
+        allowConsoleSignup: settings.allowConsoleSignup,
         authenticated: Boolean(session),
         consoleRole: session?.consoleRole ?? null,
       });
@@ -126,6 +127,40 @@ export function createAdminSession(settings: ServerSettings, db: SqlExecutor) {
       const password = String(body?.password ?? '');
       if (!email || !password) {
         return Response.json({ error: 'Email and password are required.' }, { status: 400 });
+      }
+
+      if (body?.action === 'signup') {
+        if (!settings.allowConsoleSignup) {
+          return Response.json({ error: 'Console self-signup is disabled.' }, { status: 403 });
+        }
+        if (password.length < 8) {
+          return Response.json({ error: 'Password must be at least 8 characters.' }, { status: 400 });
+        }
+        const existing = await db.query<any>('SELECT id FROM _local_auth_accounts WHERE email = ? LIMIT 1', [email]);
+        if (existing[0]) {
+          return Response.json({ error: 'An account with this email already exists.' }, { status: 409 });
+        }
+        const now = Date.now();
+        const userId = crypto.randomUUID();
+        const displayName = String(body?.displayName ?? '').trim() || email.split('@')[0];
+        const hashed = await hashPassword(password, { iterations: 100_000 });
+        await db.execute(
+          `INSERT INTO _local_auth_accounts (id, email, display_name, password_hash, salt, iterations, algorithm, failed_login_attempts, locked_until, token_version, console_role, console_active, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 0, NULL, 1, 'admin', ?, ?, ?)`,
+          [
+            userId, email, displayName, hashed.hash, hashed.salt, hashed.iterations,
+            hashed.algorithm, db.dialect === 'postgres' ? true : 1, now, now,
+          ],
+        );
+        const token = createSignedToken({
+          secret: sessionSecret,
+          expiresInMs: SESSION_TTL_MS,
+          payload: { sub: userId, email, consoleRole: 'admin', tv: 1 },
+        });
+        return Response.json(
+          { ok: true, success: true, consoleRole: 'admin' },
+          { headers: { 'Set-Cookie': makeCookie(request, token, SESSION_TTL_MS / 1000) } },
+        );
       }
 
       if (body?.action === 'bootstrap') {

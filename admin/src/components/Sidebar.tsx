@@ -1,15 +1,23 @@
 import { pillCountStyle } from '@/styles/adminStyles';
-import { NAV_ITEMS, type NavTab, type OverviewData } from '@/types/admin';
+import {
+  NAV_ITEMS,
+  type NavTab,
+  type OverviewData,
+} from '@/types/admin';
 
 export function Sidebar({
   activeTab,
   overview,
+  onLogout,
   onSelectTab,
 }: {
   activeTab: NavTab;
   overview: OverviewData | null;
+  onLogout: () => void;
   onSelectTab: (tab: NavTab) => void;
 }) {
+  const isSuperAdmin = overview?.consoleRole === 'super_admin';
+
   return (
     <aside className="sidebar">
       <div>
@@ -43,8 +51,7 @@ export function Sidebar({
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {NAV_ITEMS.filter(
-            (item) =>
-              !item.superAdminOnly || overview?.consoleRole === 'super_admin',
+            (item) => !item.superAdminOnly || isSuperAdmin,
           ).map((item) => (
             <button
               key={item.id}
@@ -77,13 +84,23 @@ export function Sidebar({
           gap: 6,
         }}
       >
-        <button
-          type="button"
-          className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
-          onClick={() => onSelectTab('settings')}
-        >
-          Settings
-        </button>
+        {isSuperAdmin ? (
+          <button
+            type="button"
+            className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
+            onClick={() => onSelectTab('settings')}
+          >
+            Settings
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="nav-item"
+            onClick={onLogout}
+          >
+            Sign Out
+          </button>
+        )}
       </div>
     </aside>
   );

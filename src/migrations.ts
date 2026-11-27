@@ -249,6 +249,37 @@ export const MIGRATIONS: Migration[] = [
     ].map((t) => `ALTER TABLE ${t} CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci`),
     postgres: [],
   },
+  {
+    id: '0004_projects',
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS _lls_projects (
+        id VARCHAR(64) NOT NULL PRIMARY KEY,
+        slug VARCHAR(64) NOT NULL UNIQUE,
+        name VARCHAR(128) NOT NULL,
+        owner_user_id VARCHAR(64) NULL,
+        schema_json LONGTEXT NULL,
+        schema_state_json LONGTEXT NULL,
+        rules_json LONGTEXT NULL,
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        INDEX idx_projects_owner (owner_user_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci`,
+    ],
+    postgres: [
+      `CREATE TABLE IF NOT EXISTS _lls_projects (
+        id VARCHAR(64) NOT NULL PRIMARY KEY,
+        slug VARCHAR(64) NOT NULL UNIQUE,
+        name VARCHAR(128) NOT NULL,
+        owner_user_id VARCHAR(64) NULL,
+        schema_json TEXT NULL,
+        schema_state_json TEXT NULL,
+        rules_json TEXT NULL,
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_projects_owner ON _lls_projects (owner_user_id)`,
+    ],
+  },
 ];
 
 export async function runMigrations(db: SqlExecutor): Promise<{ applied: string[] }> {
@@ -274,6 +305,16 @@ export async function runMigrations(db: SqlExecutor): Promise<{ applied: string[
     'console_active',
     db.dialect === 'postgres' ? 'BOOLEAN NOT NULL DEFAULT FALSE' : 'TINYINT(1) NOT NULL DEFAULT 0',
   );
+  for (const t of [
+    '_lls_api_keys',
+    '_lls_storage_buckets',
+    '_lls_storage_files',
+    '_lls_env_vars',
+    '_lls_crons',
+    '_server_changes',
+  ]) {
+    await ensureColumn(db, t, 'project_id', 'VARCHAR(64) NULL');
+  }
   return { applied };
 }
 

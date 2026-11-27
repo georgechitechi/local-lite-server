@@ -6,6 +6,7 @@ import type { ServerSettings } from '../config.js';
 import { sendSmtpMail } from '../core/mailer.js';
 import { runCronAction } from '../crons.js';
 import type { FunctionRuntime } from '../functions/index.js';
+import type { ProjectRecord } from '../projects.js';
 import { applySchema, planSchema, type SchemaDictionary } from '../schema.js';
 import { fromDbRow } from '../tableStorage.js';
 import { clampInt } from './console.js';
@@ -129,16 +130,27 @@ export function createAdminOps(
       return Response.json({ error: 'Method Not Allowed' }, { status: 405 });
     },
 
-    async handleStorage(request: Request) {
+    async handleStorage(request: Request, project?: ProjectRecord | null) {
       const url = new URL(request.url);
       const method = request.method.toUpperCase();
+      const projectId = project?.id ?? null;
+      const scopeWhere = projectId ? 'project_id = ?' : 'project_id IS NULL';
+      const scopeParams: unknown[] = projectId ? [projectId] : [];
+      const bucketKey = (name: string) => (projectId ? `${projectId}:${name}` : name);
+      const unscopeBucket = (raw: string) =>
+        projectId && raw.startsWith(`${projectId}:`) ? raw.slice(projectId.length + 1) : raw;
+
       if (method === 'GET') {
         const bucket = url.searchParams.get('bucket');
         const limit = clampInt(url.searchParams.get('limit'), 30, 1, 200);
         const offset = clampInt(url.searchParams.get('offset'), 0, 0, 10_000_000);
-        const buckets = await db.query<any>('SELECT * FROM _lls_storage_buckets ORDER BY name ASC');
-        const where = bucket ? 'WHERE bucket = ?' : '';
-        const params = bucket ? [bucket] : [];
+        const rawBuckets = await db.query<any>(
+          `SELECT * FROM _lls_storage_buckets WHERE ${scopeWhere} ORDER BY name ASC`,
+          scopeParams,
+        );
+        const buckets = rawBuckets.map((b) => ({ ...b, name: unscopeBucket(String(b.name)) }));
+        const where = bucket ? `WHERE ${scopeWhere} AND bucket = ?` : `WHERE ${scopeWhere}`;
+        const params = bucket ? [...scopeParams, bucket] : scopeParams;
         const files = await db.query<any>(
           `SELECT * FROM _lls_storage_files ${where} ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`,
           params,
@@ -163,11 +175,11 @@ export function createAdminOps(
           buildUpsertSql({
             table: '_lls_storage_buckets',
             conflictCols: ['name'],
-            insertCols: ['name', 'visibility', 'created_at'],
-            updateCols: ['visibility'],
+            insertCols: ['name', 'visibility', 'project_id', 'created_at'],
+            updateCols: ['visibility', 'project_id'],
             dialect: db.dialect,
           }),
-          [name, vis, Date.now()],
+          [bucketKey(name), vis, projectId, Date.now()],
         );
         return Response.json({ success: true, name, visibility: vis }, { status: 201 });
       }
@@ -175,13 +187,20 @@ export function createAdminOps(
         const bucket = url.searchParams.get('bucket');
         const key = url.searchParams.get('key');
         if (bucket) {
-          await db.execute('DELETE FROM _lls_storage_buckets WHERE name = ?', [bucket]);
+          await db.execute(
+            `DELETE FROM _lls_storage_buckets WHERE name = ? AND ${scopeWhere}`,
+            [bucketKey(bucket), ...scopeParams],
+          );
           return Response.json({ success: true });
         }
         if (key) {
-          const target = path.resolve(settings.uploadDir, key);
+          const uploadRoot = projectId ? path.join(settings.uploadDir, 'projects', projectId) : settings.uploadDir;
+          const target = path.resolve(uploadRoot, key);
           if (fs.existsSync(target)) fs.unlinkSync(target);
-          await db.execute('DELETE FROM _lls_storage_files WHERE storage_key = ?', [key]);
+          await db.execute(
+            `DELETE FROM _lls_storage_files WHERE storage_key = ? AND ${scopeWhere}`,
+            [key, ...scopeParams],
+          );
           return Response.json({ success: true });
         }
         return Response.json({ error: 'bucket or key required.' }, { status: 400 });

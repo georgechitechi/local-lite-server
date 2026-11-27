@@ -11,6 +11,7 @@ import {
   setRowDeleted,
   upsertTableRow,
 } from './core/changes.js';
+import { toPhysicalTable } from './projects.js';
 import type { RuleContext, RulesDictionary } from './rules.js';
 import type { SchemaDictionary, SchemaFieldType } from './schema.js';
 
@@ -96,6 +97,8 @@ export interface TableSyncStorageOptions {
   clockTable?: string;
   /** Column used as the realtime event scope when a payload has it. */
   scopeField?: string;
+  /** Optional project id for physically isolated `p_<shortId>_<table>` tables. */
+  projectId?: string | null;
 }
 
 /**
@@ -110,6 +113,7 @@ export class TableSyncStorage implements ServerSyncStorage {
   private changes: string;
   private clock: string;
   private scopeField: string;
+  private projectId: string | null;
 
   constructor(db: SqlExecutor, opts: TableSyncStorageOptions) {
     this.db = db;
@@ -119,6 +123,7 @@ export class TableSyncStorage implements ServerSyncStorage {
     this.changes = opts.changesTable ?? '_server_changes';
     this.clock = opts.clockTable ?? '_server_sync_clock';
     this.scopeField = opts.scopeField ?? 'scope_id';
+    this.projectId = opts.projectId ?? null;
   }
 
   get tables(): string[] {
@@ -126,6 +131,10 @@ export class TableSyncStorage implements ServerSyncStorage {
   }
 
   private q = (name: string) => quoteIdent(name, this.db.dialect);
+
+  private sqlTable(logicalTable: string): string {
+    return toPhysicalTable(this.projectId, logicalTable);
+  }
 
   private fields(table: string): Record<string, SchemaFieldType> {
     const f = Object.hasOwn(this.schema, table) ? this.schema[table] : undefined;
@@ -170,7 +179,7 @@ export class TableSyncStorage implements ServerSyncStorage {
           for (let i = 0; i < ids.length; i += 400) {
             const chunk = ids.slice(i, i + 400);
             const found = await tx.query<Record<string, any>>(
-              `SELECT * FROM ${this.q(table)} WHERE ${this.q('id')} IN (${chunk.map(() => '?').join(', ')})`,
+              `SELECT * FROM ${this.q(this.sqlTable(table))} WHERE ${this.q('id')} IN (${chunk.map(() => '?').join(', ')})`,
               chunk,
             );
             for (const r of found) {
@@ -207,13 +216,14 @@ export class TableSyncStorage implements ServerSyncStorage {
         }
 
         cursor = Math.max(Date.now(), cursor + 1);
+        const physicalTable = this.sqlTable(op.tableName);
         if (op.operation === 'DELETE') {
-          await setRowDeleted(tx, op.tableName, op.rowId, true, cursor);
+          await setRowDeleted(tx, physicalTable, op.rowId, true, cursor);
         } else {
-          await upsertTableRow(tx, op.tableName, fields, op.rowId, payload, cursor);
+          await upsertTableRow(tx, physicalTable, fields, op.rowId, payload, cursor);
           existingByKey.set(`${op.tableName}\u0000${op.rowId}`, { id: op.rowId, ...payload });
         }
-        await appendChangeLog(tx, op.tableName, op.rowId, cursor, this.changes);
+        await appendChangeLog(tx, op.tableName, op.rowId, cursor, this.changes, this.projectId);
 
         const scope = payload[this.scopeField];
         emitted.push({
@@ -251,11 +261,13 @@ export class TableSyncStorage implements ServerSyncStorage {
     };
     if (!names.length) return empty;
 
+    const projectWhere = this.projectId ? 'project_id = ?' : 'project_id IS NULL';
+    const projectParams = this.projectId ? [this.projectId] : [];
     const raw = await this.db.query<{ table_name: string; row_id: string; ts: number }>(
       `SELECT table_name, row_id, ${this.q('timestamp')} AS ts FROM ${this.q(this.changes)} ` +
-        `WHERE ${this.q('timestamp')} > ? AND table_name IN (${names.map(() => '?').join(', ')}) ` +
+        `WHERE ${this.q('timestamp')} > ? AND ${projectWhere} AND table_name IN (${names.map(() => '?').join(', ')}) ` +
         `ORDER BY ${this.q('timestamp')} ASC LIMIT ${safeLimit + 1}`,
-      [checkpoint, ...names],
+      [checkpoint, ...projectParams, ...names],
     );
     const hasMore = raw.length > safeLimit;
     const page = hasMore ? raw.slice(0, safeLimit) : raw;
@@ -280,7 +292,7 @@ export class TableSyncStorage implements ServerSyncStorage {
       for (let i = 0; i < ids.length; i += 400) {
         const chunk = ids.slice(i, i + 400);
         const found = await this.db.query<Record<string, any>>(
-          `SELECT * FROM ${this.q(table)} WHERE ${this.q('id')} IN (${chunk.map(() => '?').join(', ')})`,
+          `SELECT * FROM ${this.q(this.sqlTable(table))} WHERE ${this.q('id')} IN (${chunk.map(() => '?').join(', ')})`,
           chunk,
         );
         for (const r of found) rows.set(`${table}\u0000${r.id}`, r);

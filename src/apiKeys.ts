@@ -10,6 +10,7 @@ export interface ApiKeyRecord {
   keyPrefix: string;
   role: ApiKeyRole;
   userId: string | null;
+  projectId: string | null;
   createdBy: string | null;
   lastUsedAt: number | null;
   expiresAt: number | null;
@@ -21,6 +22,7 @@ export interface VerifiedApiKey {
   id: string;
   isAdmin: boolean;
   userId?: string;
+  projectId?: string | null;
 }
 
 const numOrNull = (v: unknown): number | null => (v == null ? null : Number(v));
@@ -32,6 +34,7 @@ function toRecord(r: any): ApiKeyRecord {
     keyPrefix: String(r.key_prefix),
     role: r.role === 'user' ? 'user' : 'admin',
     userId: r.user_id ?? null,
+    projectId: r.project_id ?? null,
     createdBy: r.created_by ?? null,
     lastUsedAt: numOrNull(r.last_used_at),
     expiresAt: numOrNull(r.expires_at),
@@ -42,11 +45,15 @@ function toRecord(r: any): ApiKeyRecord {
 
 export function createApiKeyService(db: SqlExecutor) {
   return {
-    async listKeys(): Promise<ApiKeyRecord[]> {
+    async listKeys(projectId?: string | null): Promise<ApiKeyRecord[]> {
+      const where = projectId ? 'WHERE project_id = ?' : 'WHERE project_id IS NULL';
+      const params = projectId ? [projectId] : [];
       const rows = await db.query<any>(
-        `SELECT id, name, key_prefix, role, user_id, created_by, last_used_at, expires_at, revoked_at, created_at
+        `SELECT id, name, key_prefix, role, user_id, project_id, created_by, last_used_at, expires_at, revoked_at, created_at
          FROM _lls_api_keys
+         ${where}
          ORDER BY created_at DESC`,
+        params,
       );
       return rows.map(toRecord);
     },
@@ -55,6 +62,7 @@ export function createApiKeyService(db: SqlExecutor) {
       name: string;
       role?: ApiKeyRole;
       userId?: string | null;
+      projectId?: string | null;
       createdBy?: string | null;
       expiresAt?: number | null;
     }): Promise<{ key: string; record: ApiKeyRecord }> {
@@ -70,13 +78,14 @@ export function createApiKeyService(db: SqlExecutor) {
       const keyHash = generated.keyHash;
       const now = Date.now();
       const userId = role === 'user' ? (input.userId?.trim() || `api_key:${id}`) : null;
+      const projectId = input.projectId?.trim() || null;
       const expiresAt = input.expiresAt && input.expiresAt > now ? Math.floor(input.expiresAt) : null;
 
       await db.execute(
         `INSERT INTO _lls_api_keys
-         (id, name, key_prefix, key_hash, role, user_id, created_by, last_used_at, expires_at, revoked_at, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?)`,
-        [id, name, keyPrefix, keyHash, role, userId, input.createdBy ?? null, expiresAt, now],
+         (id, name, key_prefix, key_hash, role, user_id, project_id, created_by, last_used_at, expires_at, revoked_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?)`,
+        [id, name, keyPrefix, keyHash, role, userId, projectId, input.createdBy ?? null, expiresAt, now],
       );
 
       return {
@@ -87,6 +96,7 @@ export function createApiKeyService(db: SqlExecutor) {
           keyPrefix,
           role,
           userId,
+          projectId,
           createdBy: input.createdBy ?? null,
           lastUsedAt: null,
           expiresAt,
@@ -96,16 +106,20 @@ export function createApiKeyService(db: SqlExecutor) {
       };
     },
 
-    async revokeKey(id: string): Promise<boolean> {
+    async revokeKey(id: string, projectId?: string | null): Promise<boolean> {
+      const scope = projectId ? ' AND project_id = ?' : ' AND project_id IS NULL';
+      const params: unknown[] = projectId ? [Date.now(), id, projectId] : [Date.now(), id];
       const res = await db.execute(
-        'UPDATE _lls_api_keys SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL',
-        [Date.now(), id],
+        `UPDATE _lls_api_keys SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL${scope}`,
+        params,
       );
       return (res?.affectedRows ?? 0) > 0;
     },
 
-    async deleteKey(id: string): Promise<boolean> {
-      const res = await db.execute('DELETE FROM _lls_api_keys WHERE id = ?', [id]);
+    async deleteKey(id: string, projectId?: string | null): Promise<boolean> {
+      const scope = projectId ? ' AND project_id = ?' : ' AND project_id IS NULL';
+      const params: unknown[] = projectId ? [id, projectId] : [id];
+      const res = await db.execute(`DELETE FROM _lls_api_keys WHERE id = ?${scope}`, params);
       return (res?.affectedRows ?? 0) > 0;
     },
 
@@ -113,7 +127,7 @@ export function createApiKeyService(db: SqlExecutor) {
       if (!verifyApiKeyFormat(rawKey, 'lls')) return null;
       const keyHash = hashApiKey(rawKey);
       const [row] = await db.query<any>(
-        'SELECT id, role, user_id, last_used_at, expires_at, revoked_at FROM _lls_api_keys WHERE key_hash = ? LIMIT 1',
+        'SELECT id, role, user_id, project_id, last_used_at, expires_at, revoked_at FROM _lls_api_keys WHERE key_hash = ? LIMIT 1',
         [keyHash],
       );
       if (!row || row.revoked_at != null) return null;
@@ -132,6 +146,7 @@ export function createApiKeyService(db: SqlExecutor) {
         id: String(row.id),
         isAdmin,
         userId: row.user_id ? String(row.user_id) : undefined,
+        ...(row.project_id ? { projectId: String(row.project_id) } : {}),
       };
     },
   };

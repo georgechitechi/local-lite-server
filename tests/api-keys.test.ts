@@ -39,11 +39,12 @@ function apiKeysExecutor() {
           key_hash: params[3],
           role: params[4],
           user_id: params[5],
-          created_by: params[6],
+          project_id: params[6],
+          created_by: params[7],
           last_used_at: null,
-          expires_at: params[7],
+          expires_at: params[8],
           revoked_at: null,
-          created_at: params[8],
+          created_at: params[9],
         });
         return { affectedRows: 1 };
       }

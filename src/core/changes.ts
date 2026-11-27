@@ -24,12 +24,20 @@ export async function appendChangeLog(
   rowId: string,
   timestamp: number,
   changesTable = '_server_changes',
+  projectId?: string | null,
 ): Promise<void> {
   const q = (n: string) => quoteIdent(n, tx.dialect);
-  await tx.execute(
-    `INSERT INTO ${q(changesTable)} (table_name, row_id, ${q('timestamp')}) VALUES (?, ?, ?)`,
-    [table, rowId, timestamp],
-  );
+  if (projectId) {
+    await tx.execute(
+      `INSERT INTO ${q(changesTable)} (table_name, row_id, ${q('timestamp')}, project_id) VALUES (?, ?, ?, ?)`,
+      [table, rowId, timestamp, projectId],
+    );
+  } else {
+    await tx.execute(
+      `INSERT INTO ${q(changesTable)} (table_name, row_id, ${q('timestamp')}) VALUES (?, ?, ?)`,
+      [table, rowId, timestamp],
+    );
+  }
 }
 
 /** Updates `_server_sync_clock` to `timestamp`. */
@@ -49,10 +57,11 @@ export async function recordChange(
   rowId: string,
   changesTable = '_server_changes',
   clockTable = '_server_sync_clock',
+  projectId?: string | null,
 ): Promise<number> {
   const prev = await lockClock(tx, clockTable);
   const ts = Math.max(Date.now(), prev + 1);
-  await appendChangeLog(tx, table, rowId, ts, changesTable);
+  await appendChangeLog(tx, table, rowId, ts, changesTable, projectId);
   await commitClock(tx, ts, clockTable);
   return ts;
 }

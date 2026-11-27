@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { LoginGate } from '@/components/LoginGate';
+import { ProjectsDrawer } from '@/components/ProjectsDrawer';
 import { Sidebar } from '@/components/Sidebar';
 import {
   ToastContainer,
@@ -17,7 +18,11 @@ import { OverviewTab } from '@/components/tabs/OverviewTab';
 import { SchedulesTab } from '@/components/tabs/SchedulesTab';
 import { SettingsTab } from '@/components/tabs/SettingsTab';
 import { SyncLogsTab } from '@/components/tabs/SyncLogsTab';
-import { adminFetch } from '@/lib/api';
+import {
+  adminFetch,
+  getActiveProjectId,
+  setActiveProjectId as persistActiveProjectId,
+} from '@/lib/api';
 import { secondaryBtnStyle } from '@/styles/adminStyles';
 import {
   NAV_ITEMS,
@@ -26,6 +31,7 @@ import {
   type LocalAuthAccount,
   type NavTab,
   type OverviewData,
+  type ProjectItem,
 } from '@/types/admin';
 
 export function AdminDashboard() {
@@ -38,6 +44,11 @@ export function AdminDashboard() {
   const [endpoints, setEndpoints] = useState<EndpointItem[]>([]);
   const [selectedTable, setSelectedTable] = useState<string>('');
   const [refreshTick, setRefreshTick] = useState(0);
+  const [projects, setProjects] = useState<ProjectItem[]>([]);
+  const [activeProjectId, setActiveProjectIdState] = useState<string | null>(() =>
+    getActiveProjectId(),
+  );
+  const [projectsDrawerOpen, setProjectsDrawerOpen] = useState(false);
   const [showDeletedRows, setShowDeletedRows] = useState<boolean>(() => {
     try {
       return localStorage.getItem('lls_show_deleted_rows') === '1';
@@ -72,14 +83,42 @@ export function AdminDashboard() {
     return () => window.removeEventListener('lls:unauthorized', onUnauthorized);
   }, []);
 
+  const selectProject = useCallback((id: string | null) => {
+    persistActiveProjectId(id);
+    setActiveProjectIdState(id);
+    setSelectedTable('');
+    setRefreshTick((n) => n + 1);
+  }, []);
+
+  const loadProjects = useCallback(async (role?: string | null) => {
+    const res = await adminFetch('/projects', { cache: 'no-store' });
+    if (!res.ok) return;
+    const d = (await res.json()) as { projects?: ProjectItem[] };
+    const list = d.projects ?? [];
+    setProjects(list);
+    const current = getActiveProjectId();
+    const stillExists = current && list.some((p) => p.id === current);
+    if (current && !stillExists) {
+      selectProject(role !== 'super_admin' && list[0] ? list[0].id : null);
+    } else if (!current && role !== 'super_admin' && list[0]) {
+      selectProject(list[0].id);
+    }
+  }, [selectProject]);
+
   const loadOverview = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await adminFetch('/admin/overview', { cache: 'no-store' });
+      let res = await adminFetch('/admin/overview', { cache: 'no-store' });
+      if ((res.status === 403 || res.status === 404) && getActiveProjectId()) {
+        persistActiveProjectId(null);
+        setActiveProjectIdState(null);
+        res = await adminFetch('/admin/overview', { cache: 'no-store' });
+      }
       if (res.ok) {
         const data = (await res.json()) as OverviewData;
         setOverview(data);
         setAuthenticated(true);
+        void loadProjects(data.consoleRole);
         setSelectedTable((prev) =>
           data.tableCounts.length > 0 && !data.tableCounts.some((t) => t.table === prev)
             ? data.tableCounts[0].table
@@ -91,7 +130,7 @@ export function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadProjects]);
 
   const loadTabDetails = useCallback(async (tab: NavTab) => {
     if (tab === 'auth') {
@@ -151,6 +190,8 @@ export function AdminDashboard() {
     } catch {
       // Clear local session regardless of network state
     }
+    persistActiveProjectId(null);
+    setActiveProjectIdState(null);
     setAuthenticated(false);
     setOverview(null);
   };
@@ -176,14 +217,70 @@ export function AdminDashboard() {
   };
 
   useEffect(() => {
-    if (
-      activeTab === 'env' &&
-      overview &&
-      overview.consoleRole !== 'super_admin'
-    ) {
+    const isSuperOnly =
+      activeTab === 'settings' ||
+      NAV_ITEMS.some((i) => i.id === activeTab && i.superAdminOnly);
+    if (isSuperOnly && overview && overview.consoleRole !== 'super_admin') {
       setActiveTab('overview');
     }
   }, [activeTab, overview]);
+
+  const handleCreateProject = async (input: {
+    name: string;
+    slug?: string;
+    schema: Record<string, Record<string, string>>;
+  }): Promise<boolean> => {
+    const res = await adminFetch('/projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showToast(data?.error || 'Failed to create project.', 'error');
+      return false;
+    }
+    showToast(`Project "${data.project.name}" created.`, 'info');
+    await loadProjects(overview?.consoleRole);
+    selectProject(data.project.id);
+    void loadOverview();
+    return true;
+  };
+
+  const handleApplyProjectSchema = async (
+    projectId: string,
+    schema: Record<string, Record<string, string>>,
+  ): Promise<boolean> => {
+    const res = await adminFetch(`/projects/${projectId}/schema`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ schema }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showToast(data?.error || 'Failed to apply schema.', 'error');
+      return false;
+    }
+    showToast('Project schema applied.', 'info');
+    await Promise.all([loadProjects(overview?.consoleRole), loadOverview()]);
+    setRefreshTick((n) => n + 1);
+    return true;
+  };
+
+  const handleDeleteProject = async (projectId: string): Promise<boolean> => {
+    const res = await adminFetch(`/projects/${projectId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      showToast(d?.error || 'Failed to delete project.', 'error');
+      return false;
+    }
+    if (activeProjectId === projectId) selectProject(null);
+    showToast('Project deleted.', 'info');
+    await Promise.all([loadProjects(overview?.consoleRole), loadOverview()]);
+    return true;
+  };
 
   if (authenticated === null) {
     return (
@@ -213,6 +310,7 @@ export function AdminDashboard() {
       <Sidebar
         activeTab={activeTab}
         overview={overview}
+        onLogout={() => void handleLogout(false)}
         onSelectTab={setActiveTab}
       />
 
@@ -240,17 +338,30 @@ export function AdminDashboard() {
             </span>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              void loadOverview();
-              setRefreshTick((n) => n + 1);
-            }}
-            disabled={loading}
-            style={secondaryBtnStyle}
-          >
-            {loading ? 'Refreshing...' : 'Refresh'}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => setProjectsDrawerOpen(true)}
+              style={secondaryBtnStyle}
+            >
+              Projects:{' '}
+              {projects.find((p) => p.id === activeProjectId)?.name ??
+                (overview?.consoleRole === 'super_admin'
+                  ? 'Default'
+                  : 'None')}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void loadOverview();
+                setRefreshTick((n) => n + 1);
+              }}
+              disabled={loading}
+              style={secondaryBtnStyle}
+            >
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </button>
+          </div>
         </header>
 
         <div className="content-body">
@@ -331,6 +442,21 @@ export function AdminDashboard() {
           )}
         </div>
       </div>
+
+      <ProjectsDrawer
+        open={projectsDrawerOpen}
+        isSuperAdmin={overview?.consoleRole === 'super_admin'}
+        projects={projects}
+        activeProjectId={activeProjectId}
+        onClose={() => setProjectsDrawerOpen(false)}
+        onSelectProject={(id) => {
+          selectProject(id);
+          void loadOverview();
+        }}
+        onCreateProject={handleCreateProject}
+        onApplySchema={handleApplyProjectSchema}
+        onDeleteProject={handleDeleteProject}
+      />
 
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>

@@ -10,7 +10,6 @@ export interface SmtpSettings {
 }
 
 export interface ServerSettings {
-  /** Number, or a socket path when the host (Passenger/lsnode) provides one. */
   port: number | string;
   dialect: SqlDialect;
   db: {
@@ -35,6 +34,7 @@ export interface ServerSettings {
   appSecret?: string;
   appName: string;
   adminUi: boolean;
+  allowConsoleSignup: boolean;
   smtp?: SmtpSettings;
   corsOrigins: string[];
 }
@@ -74,15 +74,16 @@ export function loadSettings(env: NodeJS.ProcessEnv = process.env): ServerSettin
     appSecret: env.APP_SECRET?.trim() || undefined,
     appName: env.APP_NAME || 'local-lite-server',
     adminUi: env.ADMIN_UI !== 'false',
+    allowConsoleSignup: env.ALLOW_CONSOLE_SIGNUP === 'true',
     smtp: env.SMTP_HOST
       ? {
-          host: env.SMTP_HOST,
-          port: smtpPort,
-          secure: env.SMTP_SECURE ? env.SMTP_SECURE === 'true' : smtpPort === 465,
-          user: env.SMTP_USER || undefined,
-          pass: env.SMTP_PASS || undefined,
-          from: env.SMTP_FROM || env.SMTP_USER || 'no-reply@localhost',
-        }
+        host: env.SMTP_HOST,
+        port: smtpPort,
+        secure: env.SMTP_SECURE ? env.SMTP_SECURE === 'true' : smtpPort === 465,
+        user: env.SMTP_USER || undefined,
+        pass: env.SMTP_PASS || undefined,
+        from: env.SMTP_FROM || env.SMTP_USER || 'no-reply@localhost',
+      }
       : undefined,
     corsOrigins: (env.CORS_ORIGINS ?? '*')
       .split(',')
