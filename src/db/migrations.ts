@@ -1,4 +1,5 @@
 import type { SqlExecutor } from 'local-lite/server';
+import { ensureColumn } from '../core/sql.js';
 
 interface Migration {
   id: string;
@@ -296,6 +297,19 @@ export async function runMigrations(db: SqlExecutor): Promise<{ applied: string[
     for (const stmt of m[db.dialect]) await db.execute(stmt);
     await db.execute('INSERT INTO _lls_migrations (id, applied_at) VALUES (?, ?)', [m.id, Date.now()]);
     applied.push(m.id);
+  }
+  for (const t of [
+    '_server_changes',
+    '_local_auth_accounts',
+    '_local_auth_reset_otps',
+    '_lls_storage_buckets',
+    '_lls_storage_files',
+    '_lls_env_vars',
+    '_lls_backups',
+    '_lls_crons',
+    '_lls_api_keys',
+  ]) {
+    await ensureColumn(db, t, 'project_id', 'VARCHAR(64) NULL');
   }
   return { applied };
 }
