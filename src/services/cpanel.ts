@@ -29,11 +29,11 @@ export async function buildCpanelBundle(
   cwd = process.cwd(),
   outDir = 'dist/cpanel',
 ) {
-  const pkgRoot = path.resolve(import.meta.dirname, '..');
+  const pkgRoot = path.resolve(import.meta.dirname, '../..');
   const isOwnRepo = fs.existsSync(path.resolve(cwd, 'src/cli.ts'));
   const entryPoint = isOwnRepo
     ? path.resolve(cwd, 'src/app.ts')
-    : path.resolve(import.meta.dirname, 'app.js');
+    : path.resolve(import.meta.dirname, '../app.js');
   const absOut = path.resolve(cwd, outDir);
   const nodemailerDir = path.dirname(
     require.resolve('nodemailer/package.json'),
