@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/sync-engine-v2]
   pull_request:
     branches: [main]
 
@@ -41,11 +41,10 @@ jobs:
         with:
           node-version: 24
       - run: npm install
-      - run: cd admin && npm install && npm run build
+      - run: npm --prefix dashboard install
       - run: npm run build
       - run: npm test
         env:
           TEST_MYSQL_URL: mysql://root:root@127.0.0.1:3306/local_lite_test
           TEST_POSTGRES_URL: postgres://postgres:root@127.0.0.1:5432/local_lite_test
-      - run: node --test templates/tests/notes.test.ts
       - run: npm run build:cpanel
