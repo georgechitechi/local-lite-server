@@ -22,6 +22,7 @@ export interface ServerSettings {
     poolSize: number;
   };
   autoMigrate: boolean;
+  dashboard: boolean;
   schemaPath?: string;
   rulesPath?: string;
   commandsDir?: string;
@@ -66,6 +67,7 @@ export function loadSettings(
       poolSize: Number(env.DB_POOL_SIZE || 5),
     },
     autoMigrate: env.AUTO_MIGRATE !== 'false',
+    dashboard: env.DASHBOARD_ENABLED !== 'false',
     schemaPath: env.SCHEMA_PATH || undefined,
     rulesPath: env.RULES_PATH || undefined,
     commandsDir: env.COMMANDS_DIR || undefined,

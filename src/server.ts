@@ -20,6 +20,7 @@ import type { RulesDictionary } from './db/rules.js';
 import type { SchemaDictionary } from './db/schema.js';
 import { TableSyncStorage } from './db/tableStorage.js';
 import { createAuthContext } from './http/authContext.js';
+import { dashboardRoutes } from './http/routes/dashboard.js';
 import { syncRoutes } from './http/routes/sync.js';
 import { createWsUpgradeHandler, PresenceHub } from './http/ws.js';
 import type {
@@ -70,6 +71,18 @@ export function createApp(
             authCtx.resolveAuth(req, allowQuery),
         })
       : (customRoutesInput ?? {});
+
+  const presence = new PresenceHub();
+  const handleUpgrade = createWsUpgradeHandler({
+    authCtx,
+    db: executor,
+    schema,
+    rules,
+    lenses,
+    broker,
+    cmdRuntime,
+    presence,
+  });
 
   const api = createServer({
     config: {},
@@ -140,19 +153,21 @@ export function createApp(
         broker,
         cmdRuntime,
       }),
+      ...(settings.dashboard
+        ? dashboardRoutes({
+            authCtx,
+            db: executor,
+            settings,
+            schema,
+            broker,
+            apiKeys,
+            cmdRuntime,
+            lenses,
+            projections,
+            getWsStats: handleUpgrade.getStats,
+          })
+        : {}),
     },
-  });
-
-  const presence = new PresenceHub();
-  const handleUpgrade = createWsUpgradeHandler({
-    authCtx,
-    db: executor,
-    schema,
-    rules,
-    lenses,
-    broker,
-    cmdRuntime,
-    presence,
   });
 
   return {

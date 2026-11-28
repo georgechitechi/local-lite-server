@@ -20,15 +20,18 @@
   },
   "files": [
     "dist",
+    "dashboard/dist",
     "skills",
     "templates",
     "docs",
     "README.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && npm --prefix dashboard run build",
+    "build:dashboard": "npm --prefix dashboard run build",
     "prestart": "npm run build",
     "dev": "node scripts/dev.mjs",
+    "dev:dashboard": "npm --prefix dashboard run dev",
     "start": "node --env-file-if-exists=.env dist/cli.js start",
     "migrate": "node --env-file-if-exists=.env dist/cli.js migrate",
     "test": "vitest run"

@@ -126,6 +126,12 @@ export class PresenceHub {
     }
   }
 
+  getStats() {
+    let members = 0;
+    for (const room of this.rooms.values()) members += room.size;
+    return { rooms: this.rooms.size, members };
+  }
+
   private emitState(room: string) {
     const members = this.rooms.get(room);
     if (!members) return;
@@ -137,6 +143,13 @@ export class PresenceHub {
       m.send({ type: 'presence.state', room, members: snapshot });
     }
   }
+}
+
+export interface WsStats {
+  connectedClients: number;
+  activeLensSubs: number;
+  presenceRooms: number;
+  presenceMembers: number;
 }
 
 export function createWsUpgradeHandler(deps: {
@@ -151,8 +164,10 @@ export function createWsUpgradeHandler(deps: {
 }) {
   const { authCtx, db, schema, rules, lenses, broker, cmdRuntime } = deps;
   const presence = deps.presence ?? new PresenceHub();
+  const activeSubs = new Map<string, Set<string>>();
+  let connectedClients = 0;
 
-  return async (
+  const handler = async (
     req: http.IncomingMessage,
     socket: Duplex,
     _head: Buffer,
@@ -188,6 +203,7 @@ export function createWsUpgradeHandler(deps: {
     );
 
     const clientId = crypto.randomUUID();
+    connectedClients += 1;
     const sendJson = (obj: unknown) => {
       if (socket.destroyed) return;
       socket.write(encodeWsFrame(0x1, Buffer.from(JSON.stringify(obj))));
@@ -328,6 +344,12 @@ export function createWsUpgradeHandler(deps: {
           columns: lens.columns,
           timer: null,
         });
+        let clientSubs = activeSubs.get(clientId);
+        if (!clientSubs) {
+          clientSubs = new Set();
+          activeSubs.set(clientId, clientSubs);
+        }
+        clientSubs.add(id);
         sendJson({ type: 'deltas', id, ...initial });
         return;
       }
@@ -337,6 +359,7 @@ export function createWsUpgradeHandler(deps: {
         const existing = subs.get(id);
         if (existing?.timer) clearTimeout(existing.timer);
         subs.delete(id);
+        activeSubs.get(clientId)?.delete(id);
         return;
       }
 
@@ -414,7 +437,12 @@ export function createWsUpgradeHandler(deps: {
       }
     });
 
+    let cleaned = false;
     const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      connectedClients = Math.max(0, connectedClients - 1);
+      activeSubs.delete(clientId);
       unsubBroker();
       presence.leaveAll(clientId);
       for (const sub of subs.values()) {
@@ -425,4 +453,18 @@ export function createWsUpgradeHandler(deps: {
     socket.on('close', cleanup);
     socket.on('error', cleanup);
   };
+
+  const getStats = (): WsStats => {
+    let activeLensSubs = 0;
+    for (const s of activeSubs.values()) activeLensSubs += s.size;
+    const p = presence.getStats();
+    return {
+      connectedClients,
+      activeLensSubs,
+      presenceRooms: p.rooms,
+      presenceMembers: p.members,
+    };
+  };
+
+  return Object.assign(handler, { getStats });
 }

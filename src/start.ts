@@ -55,13 +55,19 @@ async function tryCreateDatabase(s: ServerSettings): Promise<boolean> {
 
 function friendlyDbError(err: unknown, s: ServerSettings): unknown {
   const code = (err as { code?: string }).code;
+  const msg = err instanceof Error ? err.message : String(err);
+  if (msg.includes('Unknown authenticationOk message type')) {
+    return new Error(
+      `PostgreSQL driver received a non-Postgres handshake on ${s.db.host}:${s.db.port}. Check DB_PORT (5432 for Postgres, 3306 for MySQL).`,
+    );
+  }
   if (code === 'ER_BAD_DB_ERROR' || code === '3D000') {
     return new Error(
       `Database "${s.db.database}" does not exist. Create it first ` +
         (s.dialect === 'mysql'
           ? `(CREATE DATABASE \`${s.db.database}\` CHARACTER SET utf8mb4;)`
           : `(CREATE DATABASE "${s.db.database}";)`) +
-        ', or on cPanel create it in "MySQL Databases" and grant your user access.',
+        ' and grant your user access.',
     );
   }
   return err;
