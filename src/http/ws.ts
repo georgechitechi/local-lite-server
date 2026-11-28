@@ -3,7 +3,11 @@ import type http from 'node:http';
 import type { Duplex } from 'node:stream';
 import type { SqlExecutor, SyncChangeEvent, SyncEventBroker } from 'local-lite/server';
 import type { CommandRuntime } from '../commands/index.js';
-import { getLensDeltas, type LensRegistry } from '../db/lenses.js';
+import {
+  getLensDeltas,
+  matchesLensEvent,
+  type LensRegistry,
+} from '../db/lenses.js';
 import type { RulesDictionary } from '../db/rules.js';
 import type { SchemaDictionary } from '../db/schema.js';
 import type { AuthContext, ResolvedAuth } from './authContext.js';
@@ -245,18 +249,14 @@ export function createWsUpgradeHandler(deps: {
 
     const unsubBroker = broker.subscribe((ev: SyncChangeEvent) => {
       for (const sub of subs.values()) {
-        if (sub.table !== ev.tableName) continue;
         if (
-          ev.op === 'patch' &&
-          ev.changedCols &&
-          sub.filterCols.length > 0 &&
-          sub.columns &&
-          sub.columns.length > 0
+          !matchesLensEvent(
+            { table: sub.table, columns: sub.columns },
+            sub.filterCols,
+            ev,
+          )
         ) {
-          const relevant = ev.changedCols.some(
-            (c) => sub.filterCols.includes(c) || sub.columns!.includes(c),
-          );
-          if (!relevant) continue;
+          continue;
         }
         if (!sub.timer) {
           sub.timer = setTimeout(() => void flushSub(sub), 15);

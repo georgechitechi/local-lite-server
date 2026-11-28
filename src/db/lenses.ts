@@ -200,8 +200,6 @@ export async function getLensDeltas(opts: {
   since: number;
   limit?: number;
   auth: RuleContext;
-  projectId?: string | null;
-  projectSlug?: string | null;
   changesTable?: string;
 }): Promise<LensDeltasResult> {
   const { db, schema, rules, lens, args, since, auth } = opts;
@@ -253,8 +251,6 @@ export async function getLensDeltas(opts: {
 
   const q = (name: string) => quoteIdent(name, db.dialect);
   const changesTable = opts.changesTable ?? '_server_changes';
-  const projectWhere = opts.projectId ? 'project_id = ?' : 'project_id IS NULL';
-  const projectParams = opts.projectId ? [opts.projectId] : [];
 
   const raw = await db.query<{
     table_name: string;
@@ -262,9 +258,9 @@ export async function getLensDeltas(opts: {
     ts: number;
   }>(
     `SELECT table_name, row_id, ${q('timestamp')} AS ts FROM ${q(changesTable)} ` +
-      `WHERE ${q('timestamp')} > ? AND ${projectWhere} AND table_name = ? ` +
+      `WHERE ${q('timestamp')} > ? AND project_id IS NULL AND table_name = ? ` +
       `ORDER BY ${q('timestamp')} ASC LIMIT ${safeLimit + 1}`,
-    [checkpoint, ...projectParams, lens.table],
+    [checkpoint, lens.table],
   );
   const hasMore = raw.length > safeLimit;
   const page = hasMore ? raw.slice(0, safeLimit) : raw;
@@ -449,6 +445,27 @@ function limitOrDefault(limit?: number): number {
   return limit ?? 500;
 }
 
+/** Returns true if a `SyncChangeEvent` can affect a lens with `filterCols`. */
+export function matchesLensEvent(
+  lens: Pick<LensDefinition<any>, 'table' | 'columns'>,
+  filterCols: string[],
+  ev: SyncChangeEvent,
+): boolean {
+  if (ev.tableName !== lens.table) return false;
+  if (
+    ev.op === 'patch' &&
+    ev.changedCols &&
+    filterCols.length > 0 &&
+    lens.columns &&
+    lens.columns.length > 0
+  ) {
+    return ev.changedCols.some(
+      (c) => filterCols.includes(c) || lens.columns!.includes(c),
+    );
+  }
+  return true;
+}
+
 /**
  * Streams live delta batches over SSE for a Sync Lens, coalescing bursts
  * and skipping events that cannot affect the lens's static filter.
@@ -462,8 +479,6 @@ export async function subscribeLens(opts: {
   args: Record<string, unknown>;
   since: number;
   auth: RuleContext;
-  projectId?: string | null;
-  projectSlug?: string | null;
 }): Promise<Response> {
   const { lens, auth, args, broker } = opts;
   const initial = await getLensDeltas({ ...opts });
@@ -522,25 +537,8 @@ export async function subscribeLens(opts: {
         flushTimer = setTimeout(() => void flush(), 15);
       };
 
-      const shouldNotify = (ev: SyncChangeEvent) => {
-        if (ev.tableName !== lens.table) return false;
-        if (
-          ev.op === 'patch' &&
-          ev.changedCols &&
-          filterCols.length > 0 &&
-          lens.columns &&
-          lens.columns.length > 0
-        ) {
-          const touchesFilterOrProjected = ev.changedCols.some(
-            (c) => filterCols.includes(c) || lens.columns!.includes(c),
-          );
-          if (!touchesFilterOrProjected) return false;
-        }
-        return true;
-      };
-
       const unsub = broker.subscribe((ev) => {
-        if (shouldNotify(ev)) scheduleFlush();
+        if (matchesLensEvent(lens, filterCols, ev)) scheduleFlush();
       });
       const heartbeat = setInterval(() => send(': keep-alive\n\n'), 25_000);
 

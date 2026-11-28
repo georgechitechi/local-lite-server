@@ -68,13 +68,10 @@ export function createCommandRuntime(opts: {
   broker: SyncEventBroker;
   projections?: ProjectionRegistry;
   scopeField?: string;
-  projectId?: string | null;
-  projectSlug?: string | null;
 }): CommandRuntime {
   const { registry, db, schema, broker } = opts;
   const projections = opts.projections ?? new Map();
   const scopeField = opts.scopeField ?? 'scope_id';
-  const projectId = opts.projectId ?? null;
   const idempotencyCache = new Map<string, CommandRunResult>();
 
   const runOnce = async (
@@ -115,7 +112,6 @@ export function createCommandRuntime(opts: {
           id,
           '_server_changes',
           '_server_sync_clock',
-          projectId,
         );
         latestCheckpoint = Math.max(latestCheckpoint, ts);
         emitted.push({
@@ -315,7 +311,7 @@ export function createCommandRuntime(opts: {
 
       const idemKey = runOpts.idempotencyKey?.trim();
       if (idemKey) {
-        const scopedKey = `${projectId ?? 'root'}\u0000${name}\u0000${idemKey}`;
+        const scopedKey = `${name}\u0000${idemKey}`;
         const cached = idempotencyCache.get(scopedKey);
         if (cached) return { ...cached, deduplicated: true };
       }
@@ -345,7 +341,7 @@ export function createCommandRuntime(opts: {
           );
           for (const ev of emitted) broker.publish(ev);
           if (idemKey) {
-            const scopedKey = `${projectId ?? 'root'}\u0000${name}\u0000${idemKey}`;
+            const scopedKey = `${name}\u0000${idemKey}`;
             if (idempotencyCache.size > 5000) idempotencyCache.clear();
             idempotencyCache.set(scopedKey, runRes);
           }
