@@ -28,6 +28,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json && npm --prefix dashboard run build",
+    "build:cpanel": "npm run build && node scripts/build-cpanel.mjs",
     "build:dashboard": "npm --prefix dashboard run build",
     "prestart": "npm run build",
     "dev": "node scripts/dev.mjs",
@@ -46,6 +47,7 @@
     "@types/node": "^26.6.11",
     "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.23.1",
+    "esbuild": "^0.28.2",
     "typescript": "^7.0.2",
     "vitest": "^5.1.2"
   }

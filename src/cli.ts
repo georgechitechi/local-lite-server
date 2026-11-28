@@ -136,16 +136,15 @@ if (cmd === 'init') {
     console.log(`installed ${path.relative(process.cwd(), dest) || dest}`);
   }
 } else if (cmd === '-v' || cmd === '--version') {
-  const pkg = JSON.parse(
-    fs.readFileSync(
-      path.resolve(import.meta.dirname, '../package.json'),
-      'utf8',
-    ),
-  );
+  const pkgPath = [
+    path.resolve(import.meta.dirname, 'package.json'),
+    path.resolve(import.meta.dirname, '../package.json'),
+  ].find((p) => fs.existsSync(p));
+  const pkg = pkgPath ? JSON.parse(fs.readFileSync(pkgPath, 'utf8')) : { version: '0.0.0' };
   console.log(pkg.version);
 } else {
   console.log(
-    'Usage: local-lite-server <init [dir] [--force] | start | migrate [status|diff] | login [--signup] | logout | projects <list|create|delete> | push --project <slug> | codegen [--project <slug>] [--out file] | install-skills [--dir path] [--global] | build:cpanel [--out dir] | --version>',
+    'Usage: local-lite-server <init [dir] [--force] | start | migrate [status|diff] | codegen [--out file] | install-skills [--dir path] [--global] | --version>',
   );
   process.exit(cmd === '-h' || cmd === '--help' || cmd === 'help' ? 0 : 1);
 }

@@ -66,7 +66,13 @@ export function dashboardRoutes(deps: {
     '.json': 'application/json; charset=utf-8',
   };
 
-  const distDir = path.resolve(import.meta.dirname, '../../../dashboard/dist');
+  const distDir =
+    [
+      path.resolve(import.meta.dirname, 'dashboard/dist'),
+      path.resolve(import.meta.dirname, '../../../dashboard/dist'),
+      path.resolve(process.cwd(), 'dashboard/dist'),
+    ].find((d) => fs.existsSync(path.join(d, 'index.html'))) ??
+    path.resolve(import.meta.dirname, '../../../dashboard/dist');
 
   const serveAsset = async (relPath: string) => {
     const clean = relPath.replace(/^\/+/, '') || 'index.html';
