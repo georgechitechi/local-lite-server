@@ -51,6 +51,15 @@ body {
   align-items: center;
   gap: 10px;
   min-width: 0;
+  overflow: hidden;
+}
+
+.brand-name {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .brand-mark {
@@ -113,6 +122,8 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .header-time {
@@ -465,13 +476,75 @@ body {
   margin-bottom: 16px;
 }
 
-@media (max-width: 800px) {
-  .layout {
-    flex-direction: column;
+.mobile-menu-btn {
+  display: none;
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 860px) {
+  .mobile-menu-btn {
+    display: inline-flex;
   }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 58px 0 0 0;
+    background: rgba(3, 6, 12, 0.65);
+    backdrop-filter: blur(2px);
+    z-index: 35;
+  }
+
   .sidebar {
+    position: fixed;
+    top: 58px;
+    left: 0;
+    bottom: 0;
+    width: 256px;
+    height: calc(100vh - 58px);
+    z-index: 40;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    box-shadow: 12px 0 32px rgba(0, 0, 0, 0.45);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .main {
+    padding: 16px;
     width: 100%;
-    flex-direction: row;
-    flex-wrap: wrap;
+  }
+
+  .table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
+.page-heading {
+  margin: 0 0 16px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+@media (max-width: 640px) {
+  .app-header {
+    padding: 0 12px;
+  }
+
+  .hide-xs {
+    display: none;
+  }
+
+  .header-badge {
+    font-size: 11px;
+    padding: 2px 7px;
   }
 }

@@ -6,12 +6,13 @@ import {
   KeyRound,
   Layers,
   MailCheck,
+  Menu,
   Pause,
   Play,
-  Radio,
   RefreshCw,
   Settings as SettingsIcon,
   Terminal,
+  X,
   Zap,
 } from 'lucide-react';
 import {
@@ -61,26 +62,44 @@ export function App() {
   const [error, setError] = useState<string>('');
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
   const [lastUpdated, setLastUpdated] = useState<string>('');
+  const [mobileNavOpen, setMobileNavOpen] = useState<boolean>(false);
 
-  const loadStats = useCallback(async () => {
-    try {
-      const next = await apiFetch<StatsPayload>('/stats.json', token);
-      setStats(next);
-      setError('');
-      setLastUpdated(new Date().toLocaleTimeString());
-    } catch (e: any) {
-      setStats(null);
-      setError(
-        `${e?.message || 'Unauthorized'} — configure SERVER_API_KEY in Settings.`,
-      );
-    }
-  }, [token]);
+  const loadStats = useCallback(
+    async (force = false) => {
+      try {
+        const next = await apiFetch<StatsPayload>(
+          force ? '/stats.json?force=1' : '/stats.json',
+          token,
+        );
+        setStats(next);
+        setError('');
+        setLastUpdated(new Date().toLocaleTimeString());
+      } catch (e: any) {
+        setStats(null);
+        setError(
+          `${e?.message || 'Unauthorized'} — configure SERVER_API_KEY in Settings.`,
+        );
+      }
+    },
+    [token],
+  );
 
   useEffect(() => {
     void loadStats();
     if (!autoRefresh) return;
-    const timer = setInterval(() => void loadStats(), 5000);
-    return () => clearInterval(timer);
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void loadStats();
+      }
+    }, 15_000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void loadStats();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [loadStats, autoRefresh]);
 
   useEffect(() => {
@@ -92,6 +111,7 @@ export function App() {
   const navigate = (next: PageId) => {
     window.location.hash = `#${next}`;
     setPage(next);
+    setMobileNavOpen(false);
   };
 
   const activeTitle =
@@ -103,49 +123,36 @@ export function App() {
     <div className="app-shell">
       <header className="app-header">
         <div className="header-left">
+          <button
+            className="btn btn-sm mobile-menu-btn"
+            onClick={() => setMobileNavOpen((v) => !v)}
+            aria-label="Toggle navigation"
+          >
+            {mobileNavOpen ? <X size={16} /> : <Menu size={16} />}
+          </button>
           <div className="brand-mark">
             <Zap size={16} />
           </div>
-          <div className="brand-text">
-            <span className="brand-name">local-lite-server</span>
-            <span className="brand-sep">/</span>
-            <span className="brand-crumb">{activeTitle}</span>
-          </div>
-          {stats ? (
-            <span className="header-badge ok">
-              <span className="status-dot" />
-              {stats.server.dialect} · cp #{stats.sync.checkpoint}
-            </span>
-          ) : (
-            <span className="header-badge err">
-              <span className="status-dot err" />
-              Disconnected
-            </span>
-          )}
-          {stats && (
-            <span className="header-badge">
-              <Radio size={12} />
-              {stats.ws.connectedClients} WS
-            </span>
-          )}
+          <span className="brand-name">local-lite-server</span>
+          <span className={`header-badge ${stats ? 'ok' : 'err'}`}>
+            <span className={`status-dot ${stats ? '' : 'err'}`} />
+            {stats ? stats.server.dialect : 'Disconnected'}
+          </span>
         </div>
 
         <div className="header-right">
-          {lastUpdated && (
-            <span className="header-time">Updated {lastUpdated}</span>
-          )}
           <button
             className={`btn btn-sm ${autoRefresh ? 'btn-active' : ''}`}
             onClick={() => setAutoRefresh((v) => !v)}
-            title="Toggle 5s auto-refresh"
+            title="Toggle 15s auto-refresh"
           >
             {autoRefresh ? <Pause size={13} /> : <Play size={13} />}
-            {autoRefresh ? 'Live' : 'Paused'}
+            <span className="hide-xs">{autoRefresh ? 'Live' : 'Paused'}</span>
           </button>
           <button
             className="btn btn-sm"
-            onClick={() => void loadStats()}
-            title="Refresh now"
+            onClick={() => void loadStats(true)}
+            title={lastUpdated ? `Last updated ${lastUpdated}` : 'Refresh now'}
           >
             <RefreshCw size={13} />
           </button>
@@ -153,7 +160,13 @@ export function App() {
       </header>
 
       <div className="layout">
-        <aside className="sidebar">
+        {mobileNavOpen && (
+          <div
+            className="sidebar-backdrop"
+            onClick={() => setMobileNavOpen(false)}
+          />
+        )}
+        <aside className={`sidebar ${mobileNavOpen ? 'open' : ''}`}>
           <div className="sidebar-label">Engine</div>
           <div className="sidebar-nav">
             {NAV.map(({ id, label, icon: Icon }) => (
@@ -180,6 +193,7 @@ export function App() {
         </aside>
 
         <main className="main">
+          <h1 className="page-heading">{activeTitle}</h1>
           {error && page !== 'settings' && (
             <div className="banner-err row" style={{ justifyContent: 'space-between' }}>
               <span>{error}</span>

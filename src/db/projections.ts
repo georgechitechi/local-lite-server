@@ -1,4 +1,5 @@
 import type { CommandAuth, CommandDb } from '../commands/types.js';
+import { importUserModule, resolveProjectFile } from '../core/resolve.js';
 
 export type ProjectionOp = 'insert' | 'patch' | 'remove';
 
@@ -53,4 +54,30 @@ export function defineProjections(
     if (def) registry.set(name, def);
   }
   return registry;
+}
+
+export function resolveProjectionsFile(
+  explicit?: string,
+  cwd = process.cwd(),
+): string | null {
+  return resolveProjectFile(
+    explicit,
+    'PROJECTIONS_PATH',
+    ['projections.mjs', 'src/projections.ts', 'projections.ts'],
+    cwd,
+  );
+}
+
+export async function loadProjectionsFile(
+  file: string,
+): Promise<ProjectionRegistry> {
+  const loaded = await importUserModule(file);
+  const mod = loaded.default;
+  if (mod instanceof Map) return mod as ProjectionRegistry;
+  if (!mod || typeof mod !== 'object' || Array.isArray(mod)) {
+    throw new Error(
+      `${file} must export default defineProjections({ ... }).`,
+    );
+  }
+  return defineProjections(mod as Record<string, ProjectionDef>);
 }

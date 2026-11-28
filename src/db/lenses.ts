@@ -6,6 +6,7 @@ import {
   type SyncEventBroker,
 } from 'local-lite/server';
 import { getCompactedFloor } from '../core/changes.js';
+import { importUserModule, resolveProjectFile } from '../core/resolve.js';
 import type { RuleContext, RowPredicate, RulesDictionary } from './rules.js';
 import type { SchemaDictionary, SchemaFieldType } from './schema.js';
 import { ClientError, fromDbRow, toDbValue } from './tableStorage.js';
@@ -51,6 +52,30 @@ export function defineLenses(
     if (def) registry.set(name, defineLens(def));
   }
   return registry;
+}
+
+export function resolveLensesFile(
+  explicit?: string,
+  cwd = process.cwd(),
+): string | null {
+  return resolveProjectFile(
+    explicit,
+    'LENSES_PATH',
+    ['lenses.mjs', 'src/lenses.ts', 'lenses.ts'],
+    cwd,
+  );
+}
+
+export async function loadLensesFile(file: string): Promise<LensRegistry> {
+  const loaded = await importUserModule(file);
+  const mod = loaded.default;
+  if (mod instanceof Map) return mod as LensRegistry;
+  if (!mod || typeof mod !== 'object' || Array.isArray(mod)) {
+    throw new Error(
+      `${file} must export default defineLenses({ ... }).`,
+    );
+  }
+  return defineLenses(mod as Record<string, LensDefinition<any>>);
 }
 
 export interface CompiledSqlFilter {

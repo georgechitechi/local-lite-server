@@ -50,6 +50,14 @@ export function dashboardRoutes(deps: {
   const q = (n: string) => quoteIdent(n, db.dialect);
   const notDeleted = db.dialect === 'postgres' ? 'FALSE' : '0';
 
+  const STATS_CACHE_TTL_MS = 3_000;
+  let statsCache: {
+    expiresAt: number;
+    sync: { checkpoint: number; compactedFloor: number; changeLogCount: number };
+    outbox: { pending: number; delivered: number; deadLetter: number };
+    tables: Array<{ name: string; count: number }>;
+  } | null = null;
+
   const requireAdmin = async (request: Request) => {
     const auth = await authCtx.resolveAuth(request, true);
     if (!auth) return { error: authCtx.unauthorized() };
@@ -118,6 +126,27 @@ export function dashboardRoutes(deps: {
         const gate = await requireAdmin(request);
         if (gate.error) return gate.error;
 
+        const force = new URL(request.url).searchParams.get('force') === '1';
+        const now = Date.now();
+        if (!force && statsCache && now < statsCache.expiresAt) {
+          return Response.json({
+            server: {
+              uptimeMs: now - startedAt,
+              dialect: settings.dialect,
+              multiInstance: settings.multiInstance,
+              nodeVersion: process.version,
+              memoryMb: Math.round(process.memoryUsage().rss / 1_048_576),
+            },
+            sync: statsCache.sync,
+            outbox: statsCache.outbox,
+            ws: getWsStats(),
+            tables: statsCache.tables,
+            commands: cmdRuntime.list(),
+            lenses: [...lenses.keys()],
+            projections: [...projections.keys()],
+          });
+        }
+
         let checkpoint = 0;
         let compactedFloor = 0;
         let changeLogCount = 0;
@@ -164,6 +193,14 @@ export function dashboardRoutes(deps: {
           }
         }
 
+        const sync = { checkpoint, compactedFloor, changeLogCount };
+        statsCache = {
+          expiresAt: Date.now() + STATS_CACHE_TTL_MS,
+          sync,
+          outbox,
+          tables,
+        };
+
         return Response.json({
           server: {
             uptimeMs: Date.now() - startedAt,
@@ -172,7 +209,7 @@ export function dashboardRoutes(deps: {
             nodeVersion: process.version,
             memoryMb: Math.round(process.memoryUsage().rss / 1_048_576),
           },
-          sync: { checkpoint, compactedFloor, changeLogCount },
+          sync,
           outbox,
           ws: getWsStats(),
           tables,
@@ -229,6 +266,7 @@ export function dashboardRoutes(deps: {
             op: 'insert',
             changedCols: Object.keys(data),
           });
+          statsCache = null;
           return Response.json({ success: true, id, checkpoint: ts });
         }
 
@@ -247,6 +285,7 @@ export function dashboardRoutes(deps: {
             rowId: id,
             op: 'remove',
           });
+          statsCache = null;
           return Response.json({ success: true, checkpoint: ts });
         }
 
@@ -310,6 +349,7 @@ export function dashboardRoutes(deps: {
         const res = await compactChangeLog(db, {
           retentionDays: Number(body.retentionDays ?? 30),
         });
+        statsCache = null;
         return Response.json({ success: true, ...res });
       },
     },

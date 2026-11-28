@@ -13,6 +13,16 @@ import {
   resolveRulesFile,
   type RulesDictionary,
 } from './db/rules.js';
+import {
+  loadLensesFile,
+  resolveLensesFile,
+  type LensRegistry,
+} from './db/lenses.js';
+import {
+  loadProjectionsFile,
+  resolveProjectionsFile,
+  type ProjectionRegistry,
+} from './db/projections.js';
 import { loadRoutesFile, resolveRoutesFile } from './services/routes.js';
 import { loadCommandsDir, watchCommandsDir } from './commands/index.js';
 import { createClusterBroker } from './core/broker.js';
@@ -136,6 +146,14 @@ export async function start() {
     );
   }
   const commands = await loadCommandsDir(settings.commandsDir);
+  const lensesFile = resolveLensesFile();
+  const lenses: LensRegistry = lensesFile
+    ? await loadLensesFile(lensesFile)
+    : new Map();
+  const projectionsFile = resolveProjectionsFile();
+  const projections: ProjectionRegistry = projectionsFile
+    ? await loadProjectionsFile(projectionsFile)
+    : new Map();
   const routesFile = resolveRoutesFile();
   const customRoutes = routesFile
     ? await loadRoutesFile(routesFile)
@@ -169,6 +187,8 @@ export async function start() {
     rules,
     broker,
     customRoutes,
+    lenses,
+    projections,
   );
   const server = createHttpServer(app);
   const host = process.env.SERVER_HOST || '127.0.0.1';

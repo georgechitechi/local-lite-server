@@ -9,6 +9,7 @@ import { coreMigrationStatus } from './db/migrations.js';
 import { planSchema } from './db/schema.js';
 import { loadSchema, migrate, start } from './start.js';
 import { loadCommandsDir } from './commands/index.js';
+import { loadLensesFile, resolveLensesFile } from './db/lenses.js';
 import { writeClientCode } from './services/codegen.js';
 
 if (fs.existsSync('.env')) {
@@ -119,7 +120,9 @@ if (cmd === 'init') {
   const settings = loadSettings();
   const schema = await loadSchema(settings);
   const commands = await loadCommandsDir(settings.commandsDir);
-  const abs = writeClientCode(outFile, schema, commands);
+  const lensesFile = resolveLensesFile();
+  const lenses = lensesFile ? await loadLensesFile(lensesFile) : new Map();
+  const abs = writeClientCode(outFile, schema, commands, lenses);
   console.log(`Generated typed client SDK: ${abs}`);
 } else if (cmd === 'install-skills') {
   const dirIdx = process.argv.indexOf('--dir');
