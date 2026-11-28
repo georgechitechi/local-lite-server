@@ -15,7 +15,7 @@ export function Outbox({
   const load = useCallback(async () => {
     try {
       const res = await apiFetch<{ rows: Array<Record<string, any>> }>(
-        `/dashboard/api/outbox?status=${encodeURIComponent(status)}`,
+        `/api/outbox?status=${encodeURIComponent(status)}`,
         token,
       );
       setRows(res.rows);
@@ -30,7 +30,7 @@ export function Outbox({
   }, [load]);
 
   const retry = async (id: string) => {
-    await apiFetch('/dashboard/api/outbox/retry', token, {
+    await apiFetch('/api/outbox/retry', token, {
       method: 'POST',
       body: JSON.stringify({ id }),
     });
@@ -38,7 +38,7 @@ export function Outbox({
   };
 
   const purgeDelivered = async () => {
-    await apiFetch('/dashboard/api/outbox/purge', token, { method: 'POST' });
+    await apiFetch('/api/outbox/purge', token, { method: 'POST' });
     await load();
   };
 

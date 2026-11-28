@@ -88,6 +88,7 @@ export function createApp(
     config: {},
     middleware: [
       async ({ request }, next) => {
+        const started = performance.now();
         const cors = corsHeaders(request, settings);
         if (request.method === 'OPTIONS') {
           return new Response(null, { status: 204, headers: cors });
@@ -107,6 +108,10 @@ export function createApp(
         }
         const out = new Response(res.body, res);
         for (const [k, v] of Object.entries(cors)) out.headers.set(k, v);
+        out.headers.set(
+          'X-Response-Time',
+          `${(performance.now() - started).toFixed(1)}ms`,
+        );
         return out;
       },
     ],

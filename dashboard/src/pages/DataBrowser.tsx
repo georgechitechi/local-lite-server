@@ -26,7 +26,7 @@ export function DataBrowser({
     if (!table) return;
     try {
       const res = await apiFetch<{ rows: Array<Record<string, any>> }>(
-        `/dashboard/api/rows?table=${encodeURIComponent(table)}&limit=50&includeDeleted=${includeDeleted ? '1' : '0'}`,
+        `/api/rows?table=${encodeURIComponent(table)}&limit=50&includeDeleted=${includeDeleted ? '1' : '0'}`,
         token,
       );
       setRows(res.rows);
@@ -43,7 +43,7 @@ export function DataBrowser({
   const insertRow = async () => {
     try {
       const data = JSON.parse(draftJson);
-      await apiFetch('/dashboard/api/rows', token, {
+      await apiFetch('/api/rows', token, {
         method: 'POST',
         body: JSON.stringify({ action: 'insert', table, data }),
       });
@@ -56,7 +56,7 @@ export function DataBrowser({
 
   const removeRow = async (id: string) => {
     try {
-      await apiFetch('/dashboard/api/rows', token, {
+      await apiFetch('/api/rows', token, {
         method: 'POST',
         body: JSON.stringify({ action: 'remove', table, id }),
       });

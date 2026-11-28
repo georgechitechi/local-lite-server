@@ -69,6 +69,7 @@ await bundleUserFile(['src/schema.ts', 'schema.ts'], 'schema.mjs');
 await bundleUserFile(['src/rules.ts', 'rules.ts'], 'rules.mjs');
 await bundleUserFile(['src/lenses.ts', 'lenses.ts'], 'lenses.mjs');
 await bundleUserFile(['src/projections.ts', 'projections.ts'], 'projections.mjs');
+await bundleUserFile(['src/outbox.ts', 'outbox.ts'], 'outbox.mjs');
 await bundleUserFile(['src/routes.ts', 'routes.ts'], 'routes.mjs');
 
 const cmdsDir = ['commands', 'src/commands']

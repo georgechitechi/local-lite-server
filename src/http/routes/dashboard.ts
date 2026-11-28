@@ -113,8 +113,6 @@ export function dashboardRoutes(deps: {
 
   return {
     '/': { GET: () => serveAsset('index.html') },
-    '/dashboard': { GET: () => serveAsset('index.html') },
-    '/stats': { GET: () => serveAsset('index.html') },
     '/assets/*': {
       GET: ({ request }: { request: Request }) => {
         const pathname = new URL(request.url).pathname;
@@ -219,7 +217,7 @@ export function dashboardRoutes(deps: {
         });
       },
     },
-    '/dashboard/api/rows': {
+    '/api/rows': {
       GET: async ({ request }: { request: Request }) => {
         const gate = await requireAdmin(request);
         if (gate.error) return gate.error;
@@ -292,7 +290,7 @@ export function dashboardRoutes(deps: {
         return Response.json({ error: 'Unsupported action.' }, { status: 400 });
       },
     },
-    '/dashboard/api/outbox': {
+    '/api/outbox': {
       GET: async ({ request }: { request: Request }) => {
         const gate = await requireAdmin(request);
         if (gate.error) return gate.error;
@@ -306,7 +304,7 @@ export function dashboardRoutes(deps: {
         return Response.json({ rows });
       },
     },
-    '/dashboard/api/outbox/retry': {
+    '/api/outbox/retry': {
       POST: async ({ request }: { request: Request }) => {
         const gate = await requireAdmin(request);
         if (gate.error) return gate.error;
@@ -319,7 +317,7 @@ export function dashboardRoutes(deps: {
         return Response.json({ success: true });
       },
     },
-    '/dashboard/api/outbox/purge': {
+    '/api/outbox/purge': {
       POST: async ({ request }: { request: Request }) => {
         const gate = await requireAdmin(request);
         if (gate.error) return gate.error;
@@ -330,7 +328,7 @@ export function dashboardRoutes(deps: {
         return Response.json({ success: true, deleted: Number(res.affectedRows ?? 0) });
       },
     },
-    '/dashboard/api/changes': {
+    '/api/changes': {
       GET: async ({ request }: { request: Request }) => {
         const gate = await requireAdmin(request);
         if (gate.error) return gate.error;
@@ -341,7 +339,7 @@ export function dashboardRoutes(deps: {
         return Response.json({ rows });
       },
     },
-    '/dashboard/api/changes/compact': {
+    '/api/changes/compact': {
       POST: async ({ request }: { request: Request }) => {
         const gate = await requireAdmin(request);
         if (gate.error) return gate.error;
@@ -353,7 +351,7 @@ export function dashboardRoutes(deps: {
         return Response.json({ success: true, ...res });
       },
     },
-    '/dashboard/api/auth': {
+    '/api/auth': {
       GET: async ({ request }: { request: Request }) => {
         const gate = await requireAdmin(request);
         if (gate.error) return gate.error;
@@ -369,7 +367,7 @@ export function dashboardRoutes(deps: {
         return Response.json({ keys, accounts });
       },
     },
-    '/dashboard/api/keys': {
+    '/api/keys': {
       POST: async ({ request }: { request: Request }) => {
         const gate = await requireAdmin(request);
         if (gate.error) return gate.error;
@@ -384,7 +382,7 @@ export function dashboardRoutes(deps: {
         return Response.json({ success: true, ...created });
       },
     },
-    '/dashboard/api/keys/:id': {
+    '/api/keys/:id': {
       DELETE: async ({
         request,
         params,
@@ -396,12 +394,6 @@ export function dashboardRoutes(deps: {
         if (gate.error) return gate.error;
         await apiKeys.deleteKey(params.id);
         return Response.json({ success: true });
-      },
-    },
-    '/dashboard/*': {
-      GET: ({ request }: { request: Request }) => {
-        const pathname = new URL(request.url).pathname;
-        return serveAsset(pathname.slice('/dashboard/'.length));
       },
     },
   };

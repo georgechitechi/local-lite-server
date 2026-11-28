@@ -20,7 +20,7 @@ export function ChangeLog({
   const load = useCallback(async () => {
     try {
       const res = await apiFetch<{ rows: Array<Record<string, any>> }>(
-        '/dashboard/api/changes?limit=50',
+        '/api/changes?limit=50',
         token,
       );
       setRows(res.rows);
@@ -37,7 +37,7 @@ export function ChangeLog({
   const compact = async () => {
     try {
       const out = await apiFetch<{ deleted: number; compactedFloor: number }>(
-        '/dashboard/api/changes/compact',
+        '/api/changes/compact',
         token,
         {
           method: 'POST',

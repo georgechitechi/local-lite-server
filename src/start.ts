@@ -24,6 +24,11 @@ import {
   type ProjectionRegistry,
 } from './db/projections.js';
 import { loadRoutesFile, resolveRoutesFile } from './services/routes.js';
+import {
+  createOutboxWorker,
+  loadOutboxHandlers,
+  resolveOutboxFile,
+} from './services/outbox.js';
 import { loadCommandsDir, watchCommandsDir } from './commands/index.js';
 import { createClusterBroker } from './core/broker.js';
 import { createApp, createHttpServer } from './server.js';
@@ -225,6 +230,18 @@ export async function start() {
     }
     void database.close().finally(() => process.exit(1));
   });
+  const outboxFile = resolveOutboxFile();
+  const outboxHandlers = outboxFile
+    ? await loadOutboxHandlers(outboxFile)
+    : {};
+  const outboxWorker = createOutboxWorker({
+    db: database.executor,
+    handlers: outboxHandlers,
+    onError: (err, rec) =>
+      console.error(`[local-lite-server] outbox "${rec.topic}" failed:`, err),
+  });
+  const stopOutbox = outboxWorker.start();
+
   listen(() => {
     const addr =
       typeof activePort === 'number'
@@ -233,12 +250,19 @@ export async function start() {
     console.log(
       `[local-lite-server] listening on ${addr} (${settings.dialect})`,
     );
+    if (settings.dashboard && typeof activePort === 'number') {
+      console.log(`[local-lite-server] dashboard: ${addr}/`);
+    }
+    console.log(
+      `[local-lite-server] loaded: ${Object.keys(schema).length} table(s), ${lenses.size} lens(es), ${commands.size} command(s), ${projections.size} projection(s)`,
+    );
   });
   const stopWatch =
     process.env.NODE_ENV === 'production'
       ? () => {}
       : watchCommandsDir(settings.commandsDir, commands);
   const shutdown = () => {
+    stopOutbox();
     stopWatch();
     server.close();
     void broker

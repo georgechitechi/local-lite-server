@@ -20,7 +20,7 @@ export function AuthKeys({
       const res = await apiFetch<{
         keys: Array<Record<string, any>>;
         accounts: Array<Record<string, any>>;
-      }>('/dashboard/api/auth', token);
+      }>('/api/auth', token);
       setKeys(res.keys);
       setAccounts(res.accounts);
       onError('');
@@ -35,7 +35,7 @@ export function AuthKeys({
 
   const createKey = async () => {
     if (!name.trim()) return;
-    const res = await apiFetch<{ key: string }>('/dashboard/api/keys', token, {
+    const res = await apiFetch<{ key: string }>('/api/keys', token, {
       method: 'POST',
       body: JSON.stringify({ name: name.trim(), role }),
     });
@@ -45,7 +45,7 @@ export function AuthKeys({
   };
 
   const deleteKey = async (id: string) => {
-    await apiFetch(`/dashboard/api/keys/${encodeURIComponent(id)}`, token, {
+    await apiFetch(`/api/keys/${encodeURIComponent(id)}`, token, {
       method: 'DELETE',
     });
     await load();

@@ -1,4 +1,5 @@
 import { quoteIdent, type SqlExecutor } from 'local-lite/server';
+import { importUserModule, resolveProjectFile } from '../core/resolve.js';
 
 export interface OutboxRecord {
   id: string;
@@ -128,4 +129,29 @@ export function createOutboxWorker(opts: OutboxWorkerOptions): OutboxWorker {
   };
 
   return { processBatch, start, stop };
+}
+
+export function resolveOutboxFile(
+  explicit?: string,
+  cwd = process.cwd(),
+): string | null {
+  return resolveProjectFile(
+    explicit,
+    'OUTBOX_PATH',
+    ['outbox.mjs', 'src/outbox.ts', 'outbox.ts'],
+    cwd,
+  );
+}
+
+export async function loadOutboxHandlers(
+  file: string,
+): Promise<Record<string, OutboxHandler>> {
+  const loaded = await importUserModule(file);
+  const mod = loaded.default;
+  if (!mod || typeof mod !== 'object' || Array.isArray(mod)) {
+    throw new Error(
+      `${file} must export default an object of { [topic]: handler }.`,
+    );
+  }
+  return mod as Record<string, OutboxHandler>;
 }

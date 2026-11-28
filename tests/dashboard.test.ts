@@ -91,21 +91,14 @@ describe('Full v2 Dashboard & APIs', () => {
 
     const authHeader = { Authorization: 'Bearer admin-key' };
 
-    // HTML routes
+    // HTML route at /
     const rootHtml = await app.fetch(new Request('http://localhost/'));
     expect(rootHtml.status).toBe(200);
     expect(await rootHtml.text()).toContain('local-lite-server — Dashboard');
 
-    const dashHtml = await app.fetch(new Request('http://localhost/dashboard'));
-    expect(dashHtml.status).toBe(200);
-    expect(await dashHtml.text()).toContain('local-lite-server — Dashboard');
-
-    const statsHtml = await app.fetch(new Request('http://localhost/stats'));
-    expect(statsHtml.status).toBe(200);
-
     // Unauthorized guard
     expect((await app.fetch(new Request('http://localhost/stats.json'))).status).toBe(401);
-    expect((await app.fetch(new Request('http://localhost/dashboard/api/rows?table=notes'))).status).toBe(401);
+    expect((await app.fetch(new Request('http://localhost/api/rows?table=notes'))).status).toBe(401);
 
     // /stats.json
     const statsJson = (await (await app.fetch(new Request('http://localhost/stats.json', { headers: authHeader }))).json()) as any;
@@ -114,33 +107,33 @@ describe('Full v2 Dashboard & APIs', () => {
 
     // Data browser insert + list + remove
     const ins = await app.fetch(
-      new Request('http://localhost/dashboard/api/rows', {
+      new Request('http://localhost/api/rows', {
         method: 'POST',
         headers: { ...authHeader, 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'insert', table: 'notes', data: { title: 'Inserted' } }),
       }),
     );
     expect(ins.status).toBe(200);
-    const listed = (await (await app.fetch(new Request('http://localhost/dashboard/api/rows?table=notes', { headers: authHeader }))).json()) as any;
+    const listed = (await (await app.fetch(new Request('http://localhost/api/rows?table=notes', { headers: authHeader }))).json()) as any;
     expect(listed.rows).toHaveLength(2);
 
     // Outbox retry + purge
     await app.fetch(
-      new Request('http://localhost/dashboard/api/outbox/retry', {
+      new Request('http://localhost/api/outbox/retry', {
         method: 'POST',
         headers: { ...authHeader, 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: 'ob1' }),
       }),
     );
     expect(outbox.get('ob1').status).toBe('pending');
-    await app.fetch(new Request('http://localhost/dashboard/api/outbox/purge', { method: 'POST', headers: authHeader }));
+    await app.fetch(new Request('http://localhost/api/outbox/purge', { method: 'POST', headers: authHeader }));
     expect(outbox.has('ob2')).toBe(false);
 
     // Change log + compaction
-    const ch = (await (await app.fetch(new Request('http://localhost/dashboard/api/changes', { headers: authHeader }))).json()) as any;
+    const ch = (await (await app.fetch(new Request('http://localhost/api/changes', { headers: authHeader }))).json()) as any;
     expect(ch.rows).toHaveLength(1);
     const cmp = (await (await app.fetch(
-      new Request('http://localhost/dashboard/api/changes/compact', {
+      new Request('http://localhost/api/changes/compact', {
         method: 'POST',
         headers: { ...authHeader, 'Content-Type': 'application/json' },
         body: JSON.stringify({ retentionDays: 1 }),
@@ -149,7 +142,7 @@ describe('Full v2 Dashboard & APIs', () => {
     expect(cmp.success).toBe(true);
 
     // Auth & keys
-    const authData = (await (await app.fetch(new Request('http://localhost/dashboard/api/auth', { headers: authHeader }))).json()) as any;
+    const authData = (await (await app.fetch(new Request('http://localhost/api/auth', { headers: authHeader }))).json()) as any;
     expect(Array.isArray(authData.keys)).toBe(true);
 
     // Disabled via DASHBOARD_ENABLED=false
@@ -159,7 +152,6 @@ describe('Full v2 Dashboard & APIs', () => {
       schema,
     );
     expect((await disabledApp.fetch(new Request('http://localhost/'))).status).toBe(404);
-    expect((await disabledApp.fetch(new Request('http://localhost/dashboard'))).status).toBe(404);
     expect((await disabledApp.fetch(new Request('http://localhost/stats.json', { headers: authHeader }))).status).toBe(404);
   });
 });
