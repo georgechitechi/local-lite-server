@@ -20,6 +20,15 @@ const pipeCompact = (stream, dest) => {
       .replaceAll(cwdPrefix, '')
       .split(/\r?\n/)
       .filter((line) => line.trim() !== '');
+    if (
+      lines.some(
+        (l) =>
+          l.includes('Starting incremental compilation') ||
+          l.includes('Restarting '),
+      )
+    ) {
+      console.clear();
+    }
     if (lines.length) dest.write(`${lines.join('\n')}\n`);
   });
 };

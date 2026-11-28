@@ -247,15 +247,9 @@ export async function start() {
       typeof activePort === 'number'
         ? `http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${activePort}`
         : activePort;
-    console.log(
-      `[local-lite-server] listening on ${addr} (${settings.dialect})`,
-    );
     if (settings.dashboard && typeof activePort === 'number') {
-      console.log(`[local-lite-server] dashboard: ${addr}/`);
+      console.log(`\x1b[32m[local-lite-server] dashboard: ${addr}\x1b[0m`);
     }
-    console.log(
-      `[local-lite-server] loaded: ${Object.keys(schema).length} table(s), ${lenses.size} lens(es), ${commands.size} command(s), ${projections.size} projection(s)`,
-    );
   });
   const stopWatch =
     process.env.NODE_ENV === 'production'
