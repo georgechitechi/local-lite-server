@@ -92,6 +92,10 @@ describe('Full v2 Dashboard & APIs', () => {
     const authHeader = { Authorization: 'Bearer admin-key' };
 
     // HTML routes
+    const rootHtml = await app.fetch(new Request('http://localhost/'));
+    expect(rootHtml.status).toBe(200);
+    expect(await rootHtml.text()).toContain('local-lite-server — Dashboard');
+
     const dashHtml = await app.fetch(new Request('http://localhost/dashboard'));
     expect(dashHtml.status).toBe(200);
     expect(await dashHtml.text()).toContain('local-lite-server — Dashboard');
@@ -154,6 +158,7 @@ describe('Full v2 Dashboard & APIs', () => {
       db,
       schema,
     );
+    expect((await disabledApp.fetch(new Request('http://localhost/'))).status).toBe(404);
     expect((await disabledApp.fetch(new Request('http://localhost/dashboard'))).status).toBe(404);
     expect((await disabledApp.fetch(new Request('http://localhost/stats.json', { headers: authHeader }))).status).toBe(404);
   });

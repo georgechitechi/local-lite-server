@@ -104,8 +104,15 @@ export function dashboardRoutes(deps: {
   };
 
   return {
+    '/': { GET: () => serveAsset('index.html') },
     '/dashboard': { GET: () => serveAsset('index.html') },
     '/stats': { GET: () => serveAsset('index.html') },
+    '/assets/*': {
+      GET: ({ request }: { request: Request }) => {
+        const pathname = new URL(request.url).pathname;
+        return serveAsset(pathname.slice(1));
+      },
+    },
     '/stats.json': {
       GET: async ({ request }: { request: Request }) => {
         const gate = await requireAdmin(request);
