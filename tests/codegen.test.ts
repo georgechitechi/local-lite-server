@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { generateClientCode } from '../src/services/codegen.js';
 import {
-  defineMutation,
-  defineQuery,
-  type FunctionRegistry,
-} from '../src/functions/index.js';
+  defineCommand,
+  type CommandRegistry,
+} from '../src/commands/index.js';
+import { defineLens, defineLenses } from '../src/db/lenses.js';
 import { normalizeSchema } from '../src/db/schema.js';
 
 describe('Client SDK codegen', () => {
-  it('emits typed row interfaces, function callers, and SSE subscribers', () => {
+  it('emits typed row interfaces, command callers, and lens subscribers', () => {
     const schema = normalizeSchema({
       notes: {
         title: 'string',
@@ -17,19 +17,24 @@ describe('Client SDK codegen', () => {
         tags: 'string[] | null',
       },
     });
-    const fns: FunctionRegistry = new Map([
-      ['notes/list', defineQuery({ handler: () => [] })],
-      ['notes/create', defineMutation({ handler: () => ({}) })],
+    const commands: CommandRegistry = new Map([
+      ['notes/create', defineCommand({ handler: () => ({}) })],
     ]);
+    const lenses = defineLenses({
+      userNotes: defineLens({ table: 'notes' }),
+    });
 
-    const code = generateClientCode(schema, fns);
+    const code = generateClientCode(schema, commands, lenses);
     expect(code).toContain('export interface NotesRow');
     expect(code).toContain('body: string | null;');
     expect(code).toContain('tags: string[] | null;');
     expect(code).toContain('notes: {');
-    expect(code).toContain('list: <T = unknown>');
-    expect(code).toContain('subscribeList: <T = unknown>');
     expect(code).toContain('create: <T = unknown>');
-    expect(code).not.toContain('subscribeCreate');
+    expect(code).toContain('runCommand<T>("notes/create"');
+    expect(code).toContain('lenses: {');
+    expect(code).toContain('userNotes: {');
+    expect(code).toContain('pullLens<T>("userNotes"');
+    expect(code).toContain('snapshotLens<T>("userNotes"');
+    expect(code).toContain('subscribeLens<T>("userNotes"');
   });
 });

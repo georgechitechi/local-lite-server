@@ -5,10 +5,10 @@ export interface RuleContext {
   userId?: string;
 }
 
-export type RowPredicate = (
+export type RowPredicate = ((
   ctx: RuleContext,
   row: Record<string, any>,
-) => boolean | Promise<boolean>;
+) => boolean | Promise<boolean>) & { __rulePreset?: RulePreset };
 
 export type RulePreset =
   'authenticated' | 'owner' | `owner:${string}` | 'admin' | 'none';
@@ -30,27 +30,38 @@ export interface TableRule {
 export type RulesInputDictionary = Record<string, TableRuleInput | RulePreset>;
 export type RulesDictionary = Record<string, TableRule>;
 
+function withPreset(preset: RulePreset, fn: RowPredicate): RowPredicate {
+  fn.__rulePreset = preset;
+  return fn;
+}
+
 function compileRule(
   expr: RuleExpression | undefined,
 ): RowPredicate | undefined {
   if (!expr) return undefined;
   if (typeof expr === 'function') return expr;
   if (expr === 'authenticated')
-    return (ctx) => ctx.isAdmin || Boolean(ctx.userId);
-  if (expr === 'admin') return (ctx) => ctx.isAdmin;
-  if (expr === 'none') return () => false;
+    return withPreset(expr, (ctx) => ctx.isAdmin || Boolean(ctx.userId));
+  if (expr === 'admin') return withPreset(expr, (ctx) => ctx.isAdmin);
+  if (expr === 'none') return withPreset(expr, () => false);
   if (expr === 'owner') {
-    return (ctx, row) =>
-      ctx.isAdmin ||
-      (Boolean(ctx.userId) &&
-        (row.owner_id != null
-          ? row.owner_id === ctx.userId
-          : row.user_id === ctx.userId));
+    return withPreset(
+      expr,
+      (ctx, row) =>
+        ctx.isAdmin ||
+        (Boolean(ctx.userId) &&
+          (row.owner_id != null
+            ? row.owner_id === ctx.userId
+            : row.user_id === ctx.userId)),
+    );
   }
   if (expr.startsWith('owner:')) {
     const col = expr.slice(6).trim();
-    return (ctx, row) =>
-      ctx.isAdmin || (Boolean(ctx.userId) && row[col] === ctx.userId);
+    return withPreset(
+      expr,
+      (ctx, row) =>
+        ctx.isAdmin || (Boolean(ctx.userId) && row[col] === ctx.userId),
+    );
   }
   throw new Error(`Unknown rule preset "${String(expr)}".`);
 }

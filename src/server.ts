@@ -4,32 +4,28 @@ import {
   type SqlExecutor,
   type SyncEventBroker,
 } from 'local-lite/server';
-import { createAdminConsole } from './admin/index.js';
 import { createApiKeyService } from './auth/apiKeys.js';
 import { createAuthService } from './auth/auth.js';
-import type { ServerSettings } from './config.js';
-import { scopeBroker } from './core/broker.js';
-import { corsHeaders, createHttpServer } from './core/http.js';
-import {
-  createFunctionRuntime,
-  type FunctionRegistry,
-} from './functions/index.js';
-import { createAuthContext } from './http/authContext.js';
-import { createProjectRuntimeCache } from './http/projectRuntime.js';
-import { adminRoutes } from './http/routes/admin.js';
-import { projectRoutes } from './http/routes/projects.js';
-import { syncAndProjectRoutes } from './http/routes/sync.js';
 import { handleOAuthTokenExchange } from './auth/oauth.js';
-import { createProjectService } from './services/projects.js';
 import { createDistributedRateLimiter } from './auth/rateLimit.js';
+import {
+  createCommandRuntime,
+  type CommandRegistry,
+} from './commands/index.js';
+import type { ServerSettings } from './config.js';
+import { corsHeaders, createHttpServer } from './core/http.js';
+import type { LensRegistry } from './db/lenses.js';
+import type { ProjectionRegistry } from './db/projections.js';
+import type { RulesDictionary } from './db/rules.js';
+import type { SchemaDictionary } from './db/schema.js';
+import { TableSyncStorage } from './db/tableStorage.js';
+import { createAuthContext } from './http/authContext.js';
+import { syncRoutes } from './http/routes/sync.js';
+import { createWsUpgradeHandler, PresenceHub } from './http/ws.js';
 import type {
   CustomRoutesFactory,
   CustomRoutesMap,
 } from './services/routes.js';
-import type { RulesDictionary } from './db/rules.js';
-import type { SchemaDictionary } from './db/schema.js';
-import { createStorageHandler } from './services/storage.js';
-import { TableSyncStorage } from './db/tableStorage.js';
 
 export { createHttpServer };
 
@@ -37,36 +33,23 @@ export function createApp(
   settings: ServerSettings,
   executor: SqlExecutor,
   schema: SchemaDictionary,
-  functions: FunctionRegistry = new Map(),
+  commands: CommandRegistry = new Map(),
   rules: RulesDictionary = {},
   brokerOverride?: SyncEventBroker,
   customRoutesInput?: CustomRoutesMap | CustomRoutesFactory,
+  lenses: LensRegistry = new Map(),
+  projections: ProjectionRegistry = new Map(),
 ) {
-  const rootBroker = brokerOverride ?? createSyncEventBroker();
-  const scopedRootBroker = scopeBroker(rootBroker, null);
-  const rootStorage = new TableSyncStorage(executor, {
-    schema,
-    rules,
-    broker: scopedRootBroker,
-  });
-  const rootAuth = createAuthService(settings, executor, null);
+  const broker = brokerOverride ?? createSyncEventBroker();
+  const storage = new TableSyncStorage(executor, { schema, rules, broker });
+  const auth = createAuthService(settings, executor, null);
   const apiKeys = createApiKeyService(executor);
-  const projects = createProjectService(executor, {
-    maxProjectsPerUser: settings.maxProjectsPerUser,
-    uploadDir: settings.uploadDir,
-  });
-  const fnRuntime = createFunctionRuntime({
-    registry: functions,
+  const cmdRuntime = createCommandRuntime({
+    registry: commands,
     db: executor,
     schema,
-    broker: scopedRootBroker,
-  });
-  const consoleApi = createAdminConsole({
-    settings,
-    db: executor,
-    schema,
-    broker: scopedRootBroker,
-    fnRuntime,
+    broker,
+    projections,
   });
   const authLimiter = createDistributedRateLimiter(
     executor,
@@ -74,37 +57,7 @@ export function createApp(
     60_000,
     settings.multiInstance,
   );
-
-  let runtimeCache: ReturnType<typeof createProjectRuntimeCache>;
-
-  const authCtx = createAuthContext({
-    settings,
-    apiKeys,
-    rootAuth,
-    projects,
-    authenticateAdmin: (req) => consoleApi.authenticate(req),
-    authLimiter,
-    getProjectAuth: (p) => runtimeCache.get(p).auth,
-  });
-
-  runtimeCache = createProjectRuntimeCache({
-    settings,
-    db: executor,
-    rootBroker,
-    rootRules: rules,
-    functions,
-    resolveAuth: (req, allowQuery, projectScope) =>
-      authCtx.resolveAuth(req, allowQuery, projectScope),
-  });
-
-  const rootStorageHandler = createStorageHandler(
-    settings,
-    executor,
-    async (req) => {
-      const a = await authCtx.resolveAuth(req, true);
-      return a ? { userId: a.userId ?? 'admin', isAdmin: a.isAdmin } : null;
-    },
-  );
+  const authCtx = createAuthContext({ settings, apiKeys, auth, authLimiter });
 
   const customRoutes =
     typeof customRoutesInput === 'function'
@@ -112,7 +65,7 @@ export function createApp(
           db: executor,
           settings,
           schema,
-          broker: scopedRootBroker,
+          broker,
           resolveAuth: (req, allowQuery) =>
             authCtx.resolveAuth(req, allowQuery),
         })
@@ -175,27 +128,38 @@ export function createApp(
       },
       '/auth/*': {
         POST: async ({ request }) =>
-          (await authCtx.rateLimited(request)) ?? rootAuth.handler(request),
+          (await authCtx.rateLimited(request)) ?? auth.handler(request),
       },
-      ...projectRoutes({ projects, authCtx, runtimeCache }),
-      ...syncAndProjectRoutes({
+      ...syncRoutes({
         authCtx,
-        projects,
-        runtimeCache,
-        rootStorage,
-        rootBroker: scopedRootBroker,
-        rootFnRuntime: fnRuntime,
-        rootStorageHandler,
+        db: executor,
+        schema,
+        rules,
+        lenses,
+        storage,
+        broker,
+        cmdRuntime,
       }),
-      ...(settings.adminUi
-        ? adminRoutes({ consoleApi, apiKeys, authCtx })
-        : {}),
     },
+  });
+
+  const presence = new PresenceHub();
+  const handleUpgrade = createWsUpgradeHandler({
+    authCtx,
+    db: executor,
+    schema,
+    rules,
+    lenses,
+    broker,
+    cmdRuntime,
+    presence,
   });
 
   return {
     fetch: (req: Request) => api.fetch(req),
-    broker: scopedRootBroker,
-    fnRuntime,
+    handleUpgrade,
+    presence,
+    broker,
+    cmdRuntime,
   };
 }

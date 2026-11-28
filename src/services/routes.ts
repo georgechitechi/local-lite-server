@@ -1,7 +1,7 @@
 import type { SqlExecutor, SyncEventBroker } from 'local-lite/server';
 import type { ServerSettings } from '../config.js';
 import { importUserModule, resolveProjectFile } from '../core/resolve.js';
-import type { FunctionAuth } from '../functions/index.js';
+import type { CommandAuth } from '../commands/index.js';
 import type { SchemaDictionary } from '../db/schema.js';
 
 export interface CustomRoutesContext {
@@ -12,7 +12,7 @@ export interface CustomRoutesContext {
   resolveAuth: (
     request: Request,
     allowQuery?: boolean,
-  ) => Promise<FunctionAuth | null>;
+  ) => Promise<CommandAuth | null>;
 }
 
 export type CustomRoutesMap = Record<

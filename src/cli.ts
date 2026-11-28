@@ -8,16 +8,8 @@ import { createDatabase } from './db/client.js';
 import { coreMigrationStatus } from './db/migrations.js';
 import { planSchema } from './db/schema.js';
 import { loadSchema, migrate, start } from './start.js';
-import { loadFunctionsDir } from './functions/index.js';
+import { loadCommandsDir } from './commands/index.js';
 import { writeClientCode } from './services/codegen.js';
-import { buildCpanelBundle } from './services/cpanel.js';
-import {
-  runCliLogin,
-  runCliLogout,
-  runCliProjects,
-  runCliPush,
-  runCliRemoteCodegen,
-} from './cli/remote.js';
 
 if (fs.existsSync('.env')) {
   (process as { loadEnvFile?: (p?: string) => void }).loadEnvFile?.('.env');
@@ -118,38 +110,17 @@ if (cmd === 'init') {
   } finally {
     await db.close();
   }
-} else if (cmd === 'login') {
-  await runCliLogin(process.argv.slice(3));
-} else if (cmd === 'logout') {
-  runCliLogout();
-} else if (cmd === 'projects') {
-  await runCliProjects(sub, process.argv.slice(4));
-} else if (cmd === 'push') {
-  await runCliPush(process.argv.slice(3));
 } else if (cmd === 'codegen') {
   const outIdx = process.argv.indexOf('--out');
   const outFile =
     outIdx !== -1 && process.argv[outIdx + 1]
       ? process.argv[outIdx + 1]
       : 'src/client.ts';
-  const projIdx = process.argv.indexOf('--project');
-  const projectRef = projIdx !== -1 ? process.argv[projIdx + 1] : undefined;
-  if (projectRef) {
-    await runCliRemoteCodegen(process.argv.slice(3), projectRef, outFile);
-  } else {
-    const settings = loadSettings();
-    const schema = await loadSchema(settings);
-    const functions = await loadFunctionsDir(settings.functionsDir);
-    const abs = writeClientCode(outFile, schema, functions);
-    console.log(`Generated typed client SDK: ${abs}`);
-  }
-} else if (cmd === 'build:cpanel') {
-  const outIdx = process.argv.indexOf('--out');
-  const outDir =
-    outIdx !== -1 && process.argv[outIdx + 1]
-      ? process.argv[outIdx + 1]
-      : 'dist/cpanel';
-  await buildCpanelBundle(process.cwd(), outDir);
+  const settings = loadSettings();
+  const schema = await loadSchema(settings);
+  const commands = await loadCommandsDir(settings.commandsDir);
+  const abs = writeClientCode(outFile, schema, commands);
+  console.log(`Generated typed client SDK: ${abs}`);
 } else if (cmd === 'install-skills') {
   const dirIdx = process.argv.indexOf('--dir');
   const isGlobal = process.argv.includes('--global');

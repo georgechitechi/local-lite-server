@@ -12,8 +12,25 @@ const CORE_TABLES: Record<string, TableDef> = {
   _server_sync_clock: {
     columns: `
       id INT PRIMARY KEY,
-      checkpoint BIGINT NOT NULL
+      checkpoint BIGINT NOT NULL,
+      compacted_floor BIGINT NOT NULL DEFAULT 0
     `,
+  },
+  _server_outbox: {
+    columns: `
+      id VARCHAR(64) NOT NULL PRIMARY KEY,
+      topic VARCHAR(128) NOT NULL,
+      payload_json {LONGTEXT} NOT NULL,
+      status VARCHAR(32) NOT NULL DEFAULT 'pending',
+      attempts INT NOT NULL DEFAULT 0,
+      next_attempt_at BIGINT NOT NULL,
+      last_error TEXT NULL,
+      created_at BIGINT NOT NULL,
+      delivered_at BIGINT NULL
+    `,
+    indexes: {
+      idx_outbox_status_next: 'status, next_attempt_at',
+    },
   },
   _server_changes: {
     columns: `
@@ -221,23 +238,51 @@ const PROJECT_SCOPED_TABLES = [
   '_lls_api_keys',
 ];
 
+async function withMigrationLock<T>(
+  db: SqlExecutor,
+  fn: () => Promise<T>,
+): Promise<T> {
+  if (db.dialect === 'postgres') {
+    await db.query('SELECT pg_advisory_lock(72839104)').catch(() => {});
+    try {
+      return await fn();
+    } finally {
+      await db.query('SELECT pg_advisory_unlock(72839104)').catch(() => {});
+    }
+  }
+  await db.query("SELECT GET_LOCK('lls_migrate', 30)").catch(() => {});
+  try {
+    return await fn();
+  } finally {
+    await db.query("SELECT RELEASE_LOCK('lls_migrate')").catch(() => {});
+  }
+}
+
 export async function runMigrations(db: SqlExecutor): Promise<{ applied: string[] }> {
-  await db.execute(
-    db.dialect === 'postgres'
-      ? 'CREATE TABLE IF NOT EXISTS _lls_migrations (id VARCHAR(128) PRIMARY KEY, applied_at BIGINT NOT NULL)'
-      : `CREATE TABLE IF NOT EXISTS _lls_migrations (id VARCHAR(128) PRIMARY KEY, applied_at BIGINT NOT NULL) ${MYSQL_OPTS}`,
-  );
-  const done = new Set((await db.query<{ id: string }>('SELECT id FROM _lls_migrations')).map((r) => r.id));
-  const applied: string[] = [];
-  if (!done.has(MIGRATIONS[0].id)) {
-    for (const stmt of buildCoreStatements(db.dialect)) await db.execute(stmt);
-    await db.execute('INSERT INTO _lls_migrations (id, applied_at) VALUES (?, ?)', [MIGRATIONS[0].id, Date.now()]);
-    applied.push(MIGRATIONS[0].id);
-  }
-  for (const t of PROJECT_SCOPED_TABLES) {
-    await ensureColumn(db, t, 'project_id', 'VARCHAR(64) NULL');
-  }
-  return { applied };
+  return withMigrationLock(db, async () => {
+    await db.execute(
+      db.dialect === 'postgres'
+        ? 'CREATE TABLE IF NOT EXISTS _lls_migrations (id VARCHAR(128) PRIMARY KEY, applied_at BIGINT NOT NULL)'
+        : `CREATE TABLE IF NOT EXISTS _lls_migrations (id VARCHAR(128) PRIMARY KEY, applied_at BIGINT NOT NULL) ${MYSQL_OPTS}`,
+    );
+    const done = new Set((await db.query<{ id: string }>('SELECT id FROM _lls_migrations')).map((r) => r.id));
+    const applied: string[] = [];
+    if (!done.has(MIGRATIONS[0].id)) {
+      for (const stmt of buildCoreStatements(db.dialect)) await db.execute(stmt);
+      await db.execute('INSERT INTO _lls_migrations (id, applied_at) VALUES (?, ?)', [MIGRATIONS[0].id, Date.now()]);
+      applied.push(MIGRATIONS[0].id);
+    }
+    for (const t of PROJECT_SCOPED_TABLES) {
+      await ensureColumn(db, t, 'project_id', 'VARCHAR(64) NULL');
+    }
+    await ensureColumn(
+      db,
+      '_server_sync_clock',
+      'compacted_floor',
+      'BIGINT NOT NULL DEFAULT 0',
+    );
+    return { applied };
+  });
 }
 
 export async function coreMigrationStatus(db: SqlExecutor) {

@@ -14,9 +14,8 @@ import {
   type RulesDictionary,
 } from './db/rules.js';
 import { loadRoutesFile, resolveRoutesFile } from './services/routes.js';
-import { loadFunctionsDir, watchFunctionsDir } from './functions/index.js';
+import { loadCommandsDir, watchCommandsDir } from './commands/index.js';
 import { createClusterBroker } from './core/broker.js';
-import { startCronScheduler } from './services/crons.js';
 import { createApp, createHttpServer } from './server.js';
 
 async function tryCreateDatabase(s: ServerSettings): Promise<boolean> {
@@ -130,7 +129,7 @@ export async function start() {
       '[local-lite-server] APP_SECRET is set without src/rules.ts; authenticated users can sync all tables.',
     );
   }
-  const functions = await loadFunctionsDir(settings.functionsDir);
+  const commands = await loadCommandsDir(settings.commandsDir);
   const routesFile = resolveRoutesFile();
   const customRoutes = routesFile
     ? await loadRoutesFile(routesFile)
@@ -160,7 +159,7 @@ export async function start() {
     settings,
     database.executor,
     schema,
-    functions,
+    commands,
     rules,
     broker,
     customRoutes,
@@ -208,22 +207,13 @@ export async function start() {
     console.log(
       `[local-lite-server] listening on ${addr} (${settings.dialect})`,
     );
-    if (settings.adminUi && typeof activePort === 'number') {
-      console.log(`[local-lite-server] admin console: ${addr}/admin`);
-    }
   });
   const stopWatch =
     process.env.NODE_ENV === 'production'
       ? () => {}
-      : watchFunctionsDir(settings.functionsDir, functions);
-  const stopCrons = startCronScheduler({
-    settings,
-    db: database.executor,
-    fnRuntime: app.fnRuntime,
-  });
+      : watchCommandsDir(settings.commandsDir, commands);
   const shutdown = () => {
     stopWatch();
-    stopCrons();
     server.close();
     void broker
       .close()

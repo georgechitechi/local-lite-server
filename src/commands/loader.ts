@@ -1,14 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { importUserModule } from '../core/resolve.js';
-import type { FunctionDef, FunctionRegistry } from './types.js';
+import type { CommandDef, CommandRegistry } from './types.js';
 
 const EXTENSIONS = ['.ts', '.mts', '.mjs', '.js'];
 
-function resolveFunctionsDir(dir: string | undefined, cwd: string): string {
+function resolveCommandsDir(dir: string | undefined, cwd: string): string {
   if (dir) return path.resolve(cwd, dir);
-  const inSrc = path.resolve(cwd, 'src/functions');
-  // Avoid loading local-lite-server's own internal src/functions/ runtime when running inside this repo.
+  const inSrc = path.resolve(cwd, 'src/commands');
+  // Avoid loading local-lite-server's own internal src/commands/ runtime when running inside this repo.
   if (
     fs.existsSync(inSrc) &&
     fs.statSync(inSrc).isDirectory() &&
@@ -16,16 +16,16 @@ function resolveFunctionsDir(dir: string | undefined, cwd: string): string {
   ) {
     return inSrc;
   }
-  return path.resolve(cwd, 'functions');
+  return path.resolve(cwd, 'commands');
 }
 
-export async function loadFunctionsDir(
+export async function loadCommandsDir(
   dir?: string,
   cwd = process.cwd(),
   bustCache = false,
-): Promise<FunctionRegistry> {
-  const registry: FunctionRegistry = new Map();
-  const abs = resolveFunctionsDir(dir, cwd);
+): Promise<CommandRegistry> {
+  const registry: CommandRegistry = new Map();
+  const abs = resolveCommandsDir(dir, cwd);
   if (!fs.existsSync(abs) || !fs.statSync(abs).isDirectory()) return registry;
 
   for (const entry of fs.readdirSync(abs, { withFileTypes: true })) {
@@ -46,12 +46,12 @@ export async function loadFunctionsDir(
       if (
         val &&
         typeof val === 'object' &&
-        '__kind' in val &&
+        (val as any).__kind === 'command' &&
         typeof (val as any).handler === 'function'
       ) {
         registry.set(
           `${modName}/${expName}`,
-          val as FunctionDef<any, any, any>,
+          val as CommandDef<any, any>,
         );
       }
     }
@@ -59,29 +59,29 @@ export async function loadFunctionsDir(
   return registry;
 }
 
-/** Hot-reloads `functions/` in place on file edits without dropping SSE connections. */
-export function watchFunctionsDir(
+/** Hot-reloads `commands/` in place on file edits. */
+export function watchCommandsDir(
   dir: string | undefined,
-  registry: FunctionRegistry,
+  registry: CommandRegistry,
   cwd = process.cwd(),
 ): () => void {
-  const abs = resolveFunctionsDir(dir, cwd);
+  const abs = resolveCommandsDir(dir, cwd);
   if (!fs.existsSync(abs)) return () => {};
   let timer: ReturnType<typeof setTimeout> | undefined;
   const watcher = fs.watch(abs, () => {
     clearTimeout(timer);
     timer = setTimeout(async () => {
       try {
-        const next = await loadFunctionsDir(dir, cwd, true);
+        const next = await loadCommandsDir(dir, cwd, true);
         registry.clear();
         for (const [k, v] of next) registry.set(k, v);
         console.log(
-          `[local-lite-server] hot-reloaded ${registry.size} function(s)`,
+          `[local-lite-server] hot-reloaded ${registry.size} command(s)`,
         );
       } catch (err) {
-        console.error('[local-lite-server] function reload failed:', err);
+        console.error('[local-lite-server] command reload failed:', err);
       }
-    }, 120);
+    }, 150);
   });
   return () => {
     clearTimeout(timer);

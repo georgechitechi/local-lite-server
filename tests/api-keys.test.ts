@@ -86,7 +86,7 @@ describe('apiKeys', () => {
 
     // Bearer header works
     const resBearer = await app.fetch(
-      new Request('http://x/fn', {
+      new Request('http://x/cmd', {
         headers: { Authorization: `Bearer ${created.key}` },
       }),
     );
@@ -94,7 +94,7 @@ describe('apiKeys', () => {
 
     // X-API-Key header works
     const resHeader = await app.fetch(
-      new Request('http://x/fn', {
+      new Request('http://x/cmd', {
         headers: { 'X-API-Key': created.key },
       }),
     );
@@ -103,7 +103,7 @@ describe('apiKeys', () => {
     // Revoking immediately blocks access
     expect(await svc.revokeKey(created.record.id)).toBe(true);
     const resRevoked = await app.fetch(
-      new Request('http://x/fn', {
+      new Request('http://x/cmd', {
         headers: { Authorization: `Bearer ${created.key}` },
       }),
     );

@@ -98,7 +98,7 @@ describe('OAuth token exchange and verification', () => {
     const app = createApp(loadSettings(base), db, schema);
 
     const g1 = await app.fetch(
-      new Request('http://x/fn', {
+      new Request('http://x/cmd', {
         headers: { Authorization: 'Bearer ya29.google-token-abcdef' },
       }),
     );
@@ -106,7 +106,7 @@ describe('OAuth token exchange and verification', () => {
 
     // Second call uses cache (no extra fetch)
     const g2 = await app.fetch(
-      new Request('http://x/fn', {
+      new Request('http://x/cmd', {
         headers: { Authorization: 'Bearer ya29.google-token-abcdef' },
       }),
     );
@@ -114,7 +114,7 @@ describe('OAuth token exchange and verification', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     const gh = await app.fetch(
-      new Request('http://x/fn', {
+      new Request('http://x/cmd', {
         headers: { Authorization: 'Bearer gho_github_token_abcdef' },
       }),
     );

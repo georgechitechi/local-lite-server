@@ -7,11 +7,11 @@ import {
 import {
   appendChangeLog,
   commitClock,
+  getCompactedFloor,
   lockClock,
   setRowDeleted,
   upsertTableRow,
 } from '../core/changes.js';
-import { toPhysicalTable } from '../services/projects.js';
 import type { RuleContext, RulesDictionary } from './rules.js';
 import type { SchemaDictionary, SchemaFieldType } from './schema.js';
 
@@ -141,7 +141,7 @@ export class TableSyncStorage implements ServerSyncStorage {
   private q = (name: string) => quoteIdent(name, this.db.dialect);
 
   private sqlTable(logicalTable: string): string {
-    return toPhysicalTable(this.projectSlug ?? this.projectId, logicalTable);
+    return logicalTable;
   }
 
   private fields(table: string): Record<string, SchemaFieldType> {
@@ -163,6 +163,9 @@ export class TableSyncStorage implements ServerSyncStorage {
       scopeId: string;
       tableName: string;
       checkpoint: number;
+      rowId?: string;
+      op?: 'insert' | 'patch' | 'remove';
+      changedCols?: string[];
     }> = [];
     const successfulIds: string[] = [];
     let cursor = 0;
@@ -257,6 +260,9 @@ export class TableSyncStorage implements ServerSyncStorage {
           }
         }
 
+        const hadExisting = existingByKey.has(
+          `${op.tableName}\u0000${op.rowId}`,
+        );
         cursor = Math.max(Date.now(), cursor + 1);
         const physicalTable = this.sqlTable(op.tableName);
         if (op.operation === 'DELETE') {
@@ -289,6 +295,14 @@ export class TableSyncStorage implements ServerSyncStorage {
           scopeId: typeof scope === 'string' && scope ? scope : 'default',
           tableName: op.tableName,
           checkpoint: cursor,
+          rowId: op.rowId,
+          op:
+            op.operation === 'DELETE'
+              ? 'remove'
+              : hadExisting
+                ? 'patch'
+                : 'insert',
+          changedCols: Object.keys(payload),
         });
         successfulIds.push(op.id);
       }
@@ -328,6 +342,18 @@ export class TableSyncStorage implements ServerSyncStorage {
       serverTime: Date.now(),
     };
     if (!names.length) return empty;
+
+    const compactedFloor = await getCompactedFloor(this.db, this.clock);
+    if (compactedFloor > 0 && checkpoint > 0 && checkpoint < compactedFloor) {
+      return {
+        changes: { timestamp: compactedFloor, changes: [] as any[] },
+        cursor: compactedFloor,
+        hasMore: false,
+        resyncRequired: true,
+        minCheckpoint: compactedFloor,
+        serverTime: Date.now(),
+      };
+    }
 
     const projectWhere = this.projectId
       ? 'project_id = ?'

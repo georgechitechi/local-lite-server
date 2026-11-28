@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import http from 'node:http';
+import type { Duplex } from 'node:stream';
 import type { ServerSettings } from '../config.js';
 
 const MAX_BODY_BYTES = 6_000_000;
@@ -24,7 +25,7 @@ export function corsHeaders(
   const h: Record<string, string> = {
     'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
     'Access-Control-Allow-Headers':
-      'Authorization,Content-Type,X-API-Key,X-Captcha-Token',
+      'Authorization,Content-Type,X-API-Key,X-Captcha-Token,Idempotency-Key',
     'Access-Control-Max-Age': '600',
   };
   if (allowed) h['Access-Control-Allow-Origin'] = allowed;
@@ -34,11 +35,16 @@ export function corsHeaders(
   return h;
 }
 
-/** Node `http.Server` -> Web `Request`/`Response` bridge with streaming SSE support. */
+/** Node `http.Server` -> Web `Request`/`Response` bridge with streaming SSE & WebSocket support. */
 export function createHttpServer(app: {
   fetch(req: Request): Promise<Response>;
+  handleUpgrade?(
+    req: http.IncomingMessage,
+    socket: Duplex,
+    head: Buffer,
+  ): Promise<void> | void;
 }) {
-  return http.createServer(async (req, res) => {
+  const server = http.createServer(async (req, res) => {
     try {
       const proto =
         req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
@@ -82,4 +88,12 @@ export function createHttpServer(app: {
       res.end(JSON.stringify({ error: 'Request failed.' }));
     }
   });
+
+  if (app.handleUpgrade) {
+    server.on('upgrade', (req, socket, head) => {
+      void app.handleUpgrade!(req, socket, head);
+    });
+  }
+
+  return server;
 }

@@ -61,7 +61,17 @@ export async function createClusterBroker(
     sub.on('notification', (msg) => {
       if (msg.channel !== 'lls_sync_events' || !msg.payload) return;
       try {
-        local.publish(JSON.parse(msg.payload) as SyncChangeEvent);
+        const raw = JSON.parse(msg.payload) as Record<string, any>;
+        local.publish({
+          scopeId: String(raw.s ?? raw.scopeId ?? 'default'),
+          tableName: String(raw.t ?? raw.tableName ?? ''),
+          checkpoint: Number(raw.ts ?? raw.checkpoint ?? 0),
+          ...(raw.r || raw.rowId ? { rowId: String(raw.r ?? raw.rowId) } : {}),
+          ...(raw.o || raw.op ? { op: raw.o ?? raw.op } : {}),
+          ...(raw.c || raw.changedCols
+            ? { changedCols: raw.c ?? raw.changedCols }
+            : {}),
+        });
       } catch {
         // ignore malformed payload
       }
@@ -70,10 +80,18 @@ export async function createClusterBroker(
 
     return {
       publish(event) {
+        const compact: Record<string, unknown> = {
+          s: event.scopeId,
+          t: event.tableName,
+          ts: event.checkpoint,
+        };
+        if (event.rowId) compact.r = event.rowId;
+        if (event.op) compact.o = event.op;
+        if (event.changedCols?.length) compact.c = event.changedCols;
         void db
           .query('SELECT pg_notify($1, $2)', [
             'lls_sync_events',
-            JSON.stringify(event),
+            JSON.stringify(compact),
           ])
           .catch(() => {
             local.publish(event);
@@ -102,9 +120,10 @@ export async function createClusterBroker(
       const rows = await db.query<{
         id: number;
         table_name: string;
+        row_id?: string;
         ts: number;
       }>(
-        `SELECT id, table_name, ${qTs} AS ts FROM ${qChanges} WHERE id > ? ORDER BY id ASC LIMIT 200`,
+        `SELECT id, table_name, row_id, ${qTs} AS ts FROM ${qChanges} WHERE id > ? ORDER BY id ASC LIMIT 200`,
         [lastId],
       );
       for (const r of rows) {
@@ -113,6 +132,7 @@ export async function createClusterBroker(
           scopeId: 'default',
           tableName: String(r.table_name),
           checkpoint: Number(r.ts),
+          ...(r.row_id ? { rowId: String(r.row_id) } : {}),
         });
       }
     } catch {

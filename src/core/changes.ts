@@ -168,3 +168,68 @@ export function newRowId(raw?: unknown): string {
     ? raw.trim()
     : crypto.randomUUID();
 }
+
+/** Reads the compacted checkpoint floor from `_server_sync_clock` (0 if unset). */
+export async function getCompactedFloor(
+  db: SqlExecutor,
+  clockTable = '_server_sync_clock',
+): Promise<number> {
+  const q = (n: string) => quoteIdent(n, db.dialect);
+  try {
+    const rows = await db.query<{ compacted_floor?: number }>(
+      `SELECT compacted_floor FROM ${q(clockTable)} WHERE id = 1`,
+    );
+    return Number(rows[0]?.compacted_floor ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Prunes `_server_changes` entries older than `cutoffTimestamp` (or `retentionDays`)
+ * and advances `compacted_floor` so stale clients receive `resyncRequired: true`.
+ */
+export async function compactChangeLog(
+  db: SqlExecutor,
+  opts: {
+    retentionDays?: number;
+    cutoffTimestamp?: number;
+    changesTable?: string;
+    clockTable?: string;
+  } = {},
+): Promise<{ deleted: number; compactedFloor: number }> {
+  const changesTable = opts.changesTable ?? '_server_changes';
+  const clockTable = opts.clockTable ?? '_server_sync_clock';
+  const days = Math.max(1, opts.retentionDays ?? 30);
+  const cutoff =
+    opts.cutoffTimestamp ?? Date.now() - days * 86_400_000;
+  const q = (n: string) => quoteIdent(n, db.dialect);
+
+  return db.withTransaction(async (tx) => {
+    const rows = await tx.query<{
+      checkpoint: number;
+      compacted_floor?: number;
+    }>(
+      `SELECT checkpoint, compacted_floor FROM ${q(clockTable)} WHERE id = 1 FOR UPDATE`,
+    );
+    const currentCheckpoint = Number(rows[0]?.checkpoint ?? 0);
+    const prevFloor = Number(rows[0]?.compacted_floor ?? 0);
+    const safeCutoff = Math.min(cutoff, currentCheckpoint);
+    if (safeCutoff <= prevFloor) {
+      return { deleted: 0, compactedFloor: prevFloor };
+    }
+
+    const res = await tx.execute(
+      `DELETE FROM ${q(changesTable)} WHERE ${q('timestamp')} <= ?`,
+      [safeCutoff],
+    );
+    await tx.execute(
+      `UPDATE ${q(clockTable)} SET compacted_floor = ? WHERE id = 1`,
+      [safeCutoff],
+    );
+    return {
+      deleted: Number(res.affectedRows ?? 0),
+      compactedFloor: safeCutoff,
+    };
+  });
+}

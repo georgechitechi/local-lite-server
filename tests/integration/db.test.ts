@@ -2,10 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { loadSettings } from '../../src/config.js';
 import { createDatabase } from '../../src/db/client.js';
 import {
-  defineMutation,
-  defineQuery,
-  type FunctionRegistry,
-} from '../../src/functions/index.js';
+  defineCommand,
+  type CommandRegistry,
+} from '../../src/commands/index.js';
 import { runMigrations } from '../../src/db/migrations.js';
 import { defineRules } from '../../src/db/rules.js';
 import { applySchema, normalizeSchema } from '../../src/db/schema.js';
@@ -41,16 +40,15 @@ async function runEngineSuite(dialect: 'mysql' | 'postgres', rawUrl: string) {
         write: ({ userId }, row) => row.user_id === userId,
       },
     });
-    const fns: FunctionRegistry = new Map([
-      ['notes/list', defineQuery({ handler: ({ db }) => db.list('it_notes') })],
+    const cmds: CommandRegistry = new Map([
       [
         'notes/create',
-        defineMutation({
+        defineCommand({
           handler: ({ db }, args: any) => db.insert('it_notes', args),
         }),
       ],
     ]);
-    const app = createApp(settings, database.executor, schema, fns, rules);
+    const app = createApp(settings, database.executor, schema, cmds, rules);
 
     const signup = await app.fetch(
       new Request('http://x/auth/signup', {
@@ -93,9 +91,9 @@ async function runEngineSuite(dialect: 'mysql' | 'postgres', rawUrl: string) {
     );
     expect(blocked.status).toBe(403);
 
-    // Function mutation + query against real SQL engine
+    // Command execution against real SQL engine
     const created = await app.fetch(
-      new Request('http://x/fn/notes/create', {
+      new Request('http://x/cmd/notes/create', {
         method: 'POST',
         headers: {
           authorization: `Bearer ${token}`,

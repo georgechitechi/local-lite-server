@@ -7,22 +7,44 @@ export type {
   TableRule,
   RulesDictionary,
 } from './db/rules.js';
-export {
-  defineQuery,
-  defineMutation,
-  defineAction,
-  FunctionError,
-} from './functions/index.js';
+export { defineLens, defineLenses } from './db/lenses.js';
 export type {
-  QueryContext,
-  MutationContext,
-  ActionContext,
-  DbReader,
-  DbWriter,
-  FunctionAuth,
-  FunctionKind,
+  LensContext,
+  LensDefinition,
+  LensFilter,
+  LensFilterValue,
+  LensRegistry,
+} from './db/lenses.js';
+export { defineProjection, defineProjections } from './db/projections.js';
+export type {
+  ProjectionChange,
+  ProjectionContext,
+  ProjectionDef,
+  ProjectionOp,
+  ProjectionRegistry,
+} from './db/projections.js';
+export { createOutboxWorker } from './services/outbox.js';
+export type {
+  OutboxHandler,
+  OutboxRecord,
+  OutboxWorker,
+  OutboxWorkerOptions,
+} from './services/outbox.js';
+export {
+  defineCommand,
+  CommandError,
+  CommandRejection,
+} from './commands/index.js';
+export type {
+  CommandContext,
+  CommandDb,
+  CommandAuth,
+  CommandDef,
+  CommandRegistry,
+  CommandRunResult,
+  EmittedOutboxEvent,
   ListOptions,
-} from './functions/index.js';
+} from './commands/index.js';
 export {
   TableSyncStorage,
   ClientError,

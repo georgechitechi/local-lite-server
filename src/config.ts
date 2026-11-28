@@ -24,7 +24,7 @@ export interface ServerSettings {
   autoMigrate: boolean;
   schemaPath?: string;
   rulesPath?: string;
-  functionsDir?: string;
+  commandsDir?: string;
   uploadDir: string;
   backupDir: string;
   internalCrons: boolean;
@@ -74,7 +74,7 @@ export function loadSettings(
     autoMigrate: env.AUTO_MIGRATE !== 'false',
     schemaPath: env.SCHEMA_PATH || undefined,
     rulesPath: env.RULES_PATH || undefined,
-    functionsDir: env.FUNCTIONS_DIR || undefined,
+    commandsDir: env.COMMANDS_DIR || undefined,
     uploadDir: env.UPLOAD_DIR || './uploads',
     backupDir: env.BACKUP_DIR || './backups',
     internalCrons: env.ENABLE_INTERNAL_CRONS === 'true',
