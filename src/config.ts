@@ -25,17 +25,11 @@ export interface ServerSettings {
   schemaPath?: string;
   rulesPath?: string;
   commandsDir?: string;
-  uploadDir: string;
-  backupDir: string;
-  internalCrons: boolean;
   multiInstance: boolean;
   apiKey: string;
   /** Signs user tokens. Enables /auth when set. */
   appSecret?: string;
   appName: string;
-  adminUi: boolean;
-  allowConsoleSignup: boolean;
-  maxProjectsPerUser: number;
   smtp?: SmtpSettings;
   corsOrigins: string[];
 }
@@ -75,16 +69,10 @@ export function loadSettings(
     schemaPath: env.SCHEMA_PATH || undefined,
     rulesPath: env.RULES_PATH || undefined,
     commandsDir: env.COMMANDS_DIR || undefined,
-    uploadDir: env.UPLOAD_DIR || './uploads',
-    backupDir: env.BACKUP_DIR || './backups',
-    internalCrons: env.ENABLE_INTERNAL_CRONS === 'true',
     multiInstance: env.MULTI_INSTANCE === 'true',
     apiKey: env.SERVER_API_KEY!,
     appSecret: env.APP_SECRET?.trim() || undefined,
     appName: env.APP_NAME || 'local-lite-server',
-    adminUi: env.ADMIN_UI !== 'false',
-    allowConsoleSignup: env.ALLOW_CONSOLE_SIGNUP === 'true',
-    maxProjectsPerUser: Math.max(1, Number(env.MAX_PROJECTS_PER_USER || 20)),
     smtp: env.SMTP_HOST
       ? {
           host: env.SMTP_HOST,

@@ -35,7 +35,7 @@ export async function importUserModule(file: string, query = ''): Promise<any> {
       err.message.includes("Cannot find package 'local-lite-server'")
     ) {
       throw new Error(
-        `Cannot find package 'local-lite-server' imported from ${file}. Install dependencies or deploy the bundled .mjs files from dist/cpanel/ (built with build:cpanel) instead of raw .ts files.`,
+        `Cannot find package 'local-lite-server' imported from ${file}. Run "npm install" to install dependencies.`,
         { cause: err },
       );
     }

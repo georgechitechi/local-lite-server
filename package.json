@@ -1,7 +1,7 @@
 {
   "name": "local-lite-server",
   "version": "0.1.10",
-  "description": "Self-hostable local-lite sync server for MySQL or Postgres. Runs on cPanel Node.js apps or any VPS, no Docker.",
+  "description": "Local-first SQL sync & command engine for MySQL and PostgreSQL. Zero Docker.",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -20,8 +20,6 @@
   },
   "files": [
     "dist",
-    "!dist/cpanel/**",
-    "admin/dist",
     "skills",
     "templates",
     "docs",
@@ -29,16 +27,13 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "build:cpanel": "npm run build && node scripts/build-cpanel.mjs",
     "prestart": "npm run build",
     "dev": "node scripts/dev.mjs",
-    "dev:admin": "npm --prefix admin run dev",
     "start": "node --env-file-if-exists=.env dist/cli.js start",
     "migrate": "node --env-file-if-exists=.env dist/cli.js migrate",
     "test": "vitest run"
   },
   "dependencies": {
-    "esbuild": "^0.28.2",
     "local-lite": "^3.3.4",
     "mysql2": "^3.24.6",
     "nodemailer": "^10.6.1",
@@ -50,8 +45,5 @@
     "@types/pg": "^8.23.1",
     "typescript": "^7.0.2",
     "vitest": "^5.1.2"
-  },
-  "allowScripts": {
-    "esbuild@0.28.2": true
   }
 }

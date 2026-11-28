@@ -52,20 +52,6 @@ const CORE_TABLES: Record<string, TableDef> = {
       state {LONGTEXT} NOT NULL
     `,
   },
-  _lls_projects: {
-    columns: `
-      id VARCHAR(64) NOT NULL PRIMARY KEY,
-      slug VARCHAR(64) NOT NULL UNIQUE,
-      name VARCHAR(128) NOT NULL,
-      owner_user_id VARCHAR(64) NULL,
-      schema_json {LONGTEXT} NULL,
-      schema_state_json {LONGTEXT} NULL,
-      rules_json {LONGTEXT} NULL,
-      created_at BIGINT NOT NULL,
-      updated_at BIGINT NOT NULL
-    `,
-    indexes: { idx_projects_owner: 'owner_user_id' },
-  },
   _local_auth_accounts: {
     columns: `
       id VARCHAR(64) NOT NULL PRIMARY KEY,
@@ -99,68 +85,6 @@ const CORE_TABLES: Record<string, TableDef> = {
       created_at BIGINT NOT NULL
     `,
     indexes: { idx_otp_project_email: 'project_id, email' },
-  },
-  _lls_storage_buckets: {
-    columns: `
-      name VARCHAR(128) NOT NULL PRIMARY KEY,
-      project_id VARCHAR(64) NULL,
-      visibility VARCHAR(16) NOT NULL DEFAULT 'private',
-      created_at BIGINT NOT NULL
-    `,
-    indexes: { idx_buckets_project: 'project_id' },
-  },
-  _lls_storage_files: {
-    columns: `
-      id VARCHAR(64) NOT NULL PRIMARY KEY,
-      project_id VARCHAR(64) NULL,
-      storage_key VARCHAR(255) NOT NULL UNIQUE,
-      bucket VARCHAR(128) NOT NULL,
-      name VARCHAR(255) NOT NULL,
-      mime_type VARCHAR(128) NOT NULL,
-      size_bytes BIGINT NOT NULL,
-      created_at BIGINT NOT NULL
-    `,
-    indexes: {
-      idx_files_bucket: 'bucket',
-      idx_files_project: 'project_id',
-    },
-  },
-  _lls_env_vars: {
-    columns: `
-      var_key VARCHAR(128) NOT NULL PRIMARY KEY,
-      project_id VARCHAR(64) NULL,
-      var_value TEXT NOT NULL,
-      is_secret {BOOL_FALSE},
-      updated_at BIGINT NOT NULL
-    `,
-  },
-  _lls_backups: {
-    columns: `
-      id VARCHAR(64) NOT NULL PRIMARY KEY,
-      project_id VARCHAR(64) NULL,
-      user_id VARCHAR(64) NOT NULL,
-      file_name VARCHAR(255) NOT NULL,
-      status VARCHAR(32) NOT NULL,
-      size_bytes BIGINT NOT NULL,
-      record_count INT NOT NULL,
-      created_at BIGINT NOT NULL
-    `,
-    indexes: { idx_backups_project: 'project_id' },
-  },
-  _lls_crons: {
-    columns: `
-      job_key VARCHAR(128) NOT NULL PRIMARY KEY,
-      project_id VARCHAR(64) NULL,
-      label VARCHAR(255) NOT NULL,
-      action_type VARCHAR(64) NOT NULL,
-      cron_expr VARCHAR(64) NOT NULL,
-      timezone VARCHAR(64) NOT NULL DEFAULT 'UTC',
-      enabled {BOOL_TRUE},
-      config_json TEXT NULL,
-      last_run_at BIGINT NULL,
-      last_status VARCHAR(32) NULL,
-      last_summary TEXT NULL
-    `,
   },
   _lls_rate_limits: {
     columns: `
@@ -230,11 +154,6 @@ const PROJECT_SCOPED_TABLES = [
   '_server_changes',
   '_local_auth_accounts',
   '_local_auth_reset_otps',
-  '_lls_storage_buckets',
-  '_lls_storage_files',
-  '_lls_env_vars',
-  '_lls_backups',
-  '_lls_crons',
   '_lls_api_keys',
 ];
 
