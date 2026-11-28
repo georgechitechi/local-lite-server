@@ -7,7 +7,8 @@ function parseBodyParams(rawText: string): Record<string, string> | null {
   if (rawText.trim().startsWith('{')) {
     try {
       const parsed = JSON.parse(rawText);
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+        return null;
       const out: Record<string, string> = {};
       for (const [k, v] of Object.entries(parsed)) {
         if (v != null) out[k] = String(v);
@@ -21,7 +22,9 @@ function parseBodyParams(rawText: string): Record<string, string> | null {
 }
 
 /** Handles `POST /auth/google-token` and `POST /auth/github-token` code exchanges. */
-export async function handleOAuthTokenExchange(request: Request): Promise<Response> {
+export async function handleOAuthTokenExchange(
+  request: Request,
+): Promise<Response> {
   const url = new URL(request.url);
   const rawText = await request.text().catch(() => '');
   const params = parseBodyParams(rawText);
@@ -37,14 +40,27 @@ export async function handleOAuthTokenExchange(request: Request): Promise<Respon
         { status: 503 },
       );
     }
-    if (params.grant_type !== 'authorization_code' && params.grant_type !== 'refresh_token') {
+    if (
+      params.grant_type !== 'authorization_code' &&
+      params.grant_type !== 'refresh_token'
+    ) {
       return Response.json(
-        { error: 'Unsupported grant_type. Expected authorization_code or refresh_token.' },
+        {
+          error:
+            'Unsupported grant_type. Expected authorization_code or refresh_token.',
+        },
         { status: 400 },
       );
     }
     const forwarded = new URLSearchParams();
-    for (const f of ['grant_type', 'client_id', 'code', 'code_verifier', 'redirect_uri', 'refresh_token']) {
+    for (const f of [
+      'grant_type',
+      'client_id',
+      'code',
+      'code_verifier',
+      'redirect_uri',
+      'refresh_token',
+    ]) {
       if (params[f]) forwarded.set(f, params[f]);
     }
     forwarded.set('client_secret', clientSecret);
@@ -57,7 +73,10 @@ export async function handleOAuthTokenExchange(request: Request): Promise<Respon
     });
     return new Response(await gRes.text(), {
       status: gRes.status,
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+      },
     });
   }
 
@@ -71,21 +90,34 @@ export async function handleOAuthTokenExchange(request: Request): Promise<Respon
     }
     const { client_id, code, redirect_uri, state } = params;
     if (!code || !client_id) {
-      return Response.json({ error: 'client_id and code are required' }, { status: 400 });
+      return Response.json(
+        { error: 'client_id and code are required' },
+        { status: 400 },
+      );
     }
-    const forwarded = new URLSearchParams({ client_id, client_secret: clientSecret, code });
+    const forwarded = new URLSearchParams({
+      client_id,
+      client_secret: clientSecret,
+      code,
+    });
     if (redirect_uri) forwarded.set('redirect_uri', redirect_uri);
     if (state) forwarded.set('state', state);
 
     const ghRes = await fetch('https://github.com/login/oauth/access_token', {
       method: 'POST',
       signal: AbortSignal.timeout(10_000),
-      headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
       body: forwarded.toString(),
     });
     return new Response(await ghRes.text(), {
       status: ghRes.status,
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+      },
     });
   }
 
@@ -104,21 +136,26 @@ function toGoogleUserId(info: any): string | null {
     {
       id: info.sub,
       email: info.email,
-      emailVerified: info.email_verified === true || info.email_verified === 'true',
+      emailVerified:
+        info.email_verified === true || info.email_verified === 'true',
     },
     'google',
   );
 }
 
 /** Verifies a Google (ID/access) or GitHub OAuth token and maps it to a unified userId. */
-export async function verifyOAuthToken(token: string): Promise<{ id: string } | null> {
+export async function verifyOAuthToken(
+  token: string,
+): Promise<{ id: string } | null> {
   if (!token || token.length < 16) return null;
   const cached = tokenCache.get(token);
   if (cached && cached.expiresAt > Date.now()) return { id: cached.userId };
 
   try {
     const isGitHubPrefix =
-      token.startsWith('gho_') || token.startsWith('ghu_') || token.startsWith('ghp_');
+      token.startsWith('gho_') ||
+      token.startsWith('ghu_') ||
+      token.startsWith('ghp_');
 
     if (!isGitHubPrefix && token.split('.').length === 3) {
       const gRes = await fetch(
@@ -132,10 +169,13 @@ export async function verifyOAuthToken(token: string): Promise<{ id: string } | 
     }
 
     if (!isGitHubPrefix) {
-      const uRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-        signal: AbortSignal.timeout(8_000),
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const uRes = await fetch(
+        'https://www.googleapis.com/oauth2/v3/userinfo',
+        {
+          signal: AbortSignal.timeout(8_000),
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       if (uRes.ok) {
         const id = toGoogleUserId(await uRes.json());
         if (id) return cacheUser(token, id);
@@ -154,7 +194,11 @@ export async function verifyOAuthToken(token: string): Promise<{ id: string } | 
       const info = (await ghRes.json()) as any;
       if (info?.id != null) {
         const id = resolveUnifiedUserId(
-          { id: String(info.id), email: info.email ?? undefined, emailVerified: Boolean(info.email) },
+          {
+            id: String(info.id),
+            email: info.email ?? undefined,
+            emailVerified: Boolean(info.email),
+          },
           'github',
         );
         return cacheUser(token, id);

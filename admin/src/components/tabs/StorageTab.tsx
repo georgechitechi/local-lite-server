@@ -6,10 +6,7 @@ import { StorageBucketDrawer } from '@/components/StorageBucketDrawer';
 import type { ToastType } from '@/components/Toast';
 import { adminFetch, buildApiUrl } from '@/lib/api';
 import { formatBytes, formatTime } from '@/lib/formatters';
-import {
-  primaryBtnStyle,
-  secondaryBtnStyle,
-} from '@/styles/adminStyles';
+import { primaryBtnStyle, secondaryBtnStyle } from '@/styles/adminStyles';
 
 interface StorageFileRow {
   id: string;
@@ -36,9 +33,11 @@ interface StorageBucket {
 const PAGE_SIZE = 50;
 
 export function StorageTab({
+  activeProjectSlug = null,
   onToast,
   refreshSignal = 0,
 }: {
+  activeProjectSlug?: string | null;
   onToast: (msg: string, type?: ToastType) => void;
   refreshSignal?: number;
 }) {
@@ -153,15 +152,18 @@ export function StorageTab({
   };
 
   const getFileUrl = (row: StorageFileRow) => {
+    const prefix = activeProjectSlug ? `/p/${activeProjectSlug}` : '';
     if (row.source === 'public') {
-      return buildApiUrl(`/public/files/${encodeURI(row.storage_key)}`);
+      return buildApiUrl(
+        `${prefix}/public/files/${encodeURI(row.storage_key)}`,
+      );
     }
     const bucket = row.bucket?.trim();
     const keyPath =
       bucket && !row.storage_key.startsWith(`${bucket}/`)
         ? `${bucket}/${row.storage_key}`
         : row.storage_key;
-    return buildApiUrl(`/storage/files/${encodeURI(keyPath)}`);
+    return buildApiUrl(`${prefix}/storage/files/${encodeURI(keyPath)}`);
   };
 
   const hasPrev = offset > 0;
@@ -196,7 +198,9 @@ export function StorageTab({
       header: 'Actions',
       align: 'right',
       render: (row) => (
-        <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end' }}>
+        <div
+          style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end' }}
+        >
           <a
             href={getFileUrl(row)}
             target="_blank"
@@ -228,8 +232,8 @@ export function StorageTab({
       title="Server Storage"
       subtitle={
         <>
-          {totalFiles} file{totalFiles === 1 ? '' : 's'} • {formatBytes(totalBytes)} total in{' '}
-          <code>server/uploads/</code>
+          {totalFiles} file{totalFiles === 1 ? '' : 's'} •{' '}
+          {formatBytes(totalBytes)} total in <code>server/uploads/</code>
         </>
       }
       actions={

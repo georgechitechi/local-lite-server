@@ -1,13 +1,22 @@
 import { loadSettings, type ServerSettings } from './config.js';
-import { createDatabase, pgClientConfig, type Database } from './db.js';
-import { runMigrations } from './migrations.js';
-import { applySchema, loadSchemaFile, planSchema, resolveSchemaFile } from './schema.js';
-import type { SchemaDictionary } from './schema.js';
-import { loadRulesFile, resolveRulesFile, type RulesDictionary } from './rules.js';
-import { loadRoutesFile, resolveRoutesFile } from './routes.js';
+import { createDatabase, pgClientConfig, type Database } from './db/client.js';
+import { runMigrations } from './db/migrations.js';
+import {
+  applySchema,
+  loadSchemaFile,
+  planSchema,
+  resolveSchemaFile,
+} from './db/schema.js';
+import type { SchemaDictionary } from './db/schema.js';
+import {
+  loadRulesFile,
+  resolveRulesFile,
+  type RulesDictionary,
+} from './db/rules.js';
+import { loadRoutesFile, resolveRoutesFile } from './services/routes.js';
 import { loadFunctionsDir, watchFunctionsDir } from './functions/index.js';
 import { createClusterBroker } from './core/broker.js';
-import { startCronScheduler } from './crons.js';
+import { startCronScheduler } from './services/crons.js';
 import { createApp, createHttpServer } from './server.js';
 
 async function tryCreateDatabase(s: ServerSettings): Promise<boolean> {
@@ -17,7 +26,9 @@ async function tryCreateDatabase(s: ServerSettings): Promise<boolean> {
       const client = new pg.Client(pgClientConfig(s, 'postgres'));
       await client.connect();
       try {
-        await client.query(`CREATE DATABASE "${s.db.database.replace(/"/g, '')}"`);
+        await client.query(
+          `CREATE DATABASE "${s.db.database.replace(/"/g, '')}"`,
+        );
       } finally {
         await client.end();
       }
@@ -58,7 +69,13 @@ function friendlyDbError(err: unknown, s: ServerSettings): unknown {
 }
 
 export async function loadSchema(s: ServerSettings): Promise<SchemaDictionary> {
-  return loadSchemaFile(resolveSchemaFile(s.schemaPath));
+  let file: string | null = null;
+  try {
+    file = resolveSchemaFile(s.schemaPath);
+  } catch (err) {
+    if (s.schemaPath) throw err;
+  }
+  return file ? loadSchemaFile(file) : {};
 }
 
 /** Core + schema migrations. Returns a human-readable log. */
@@ -69,16 +86,29 @@ export async function migrate(
 ): Promise<void> {
   const applyAll = async () => {
     const core = await runMigrations(db.executor);
-    if (core.applied.length) console.log('[local-lite-server] core migrations:', core.applied.join(', '));
-    const plan = await applySchema(db.executor, schema);
-    if (plan.up.length) console.log(`[local-lite-server] schema: applied ${plan.up.length} change(s)`);
-    for (const w of plan.warnings) console.warn('[local-lite-server] schema warning:', w);
+    if (core.applied.length)
+      console.log(
+        '[local-lite-server] core migrations:',
+        core.applied.join(', '),
+      );
+    if (Object.keys(schema).length > 0) {
+      const plan = await applySchema(db.executor, schema);
+      if (plan.up.length)
+        console.log(
+          `[local-lite-server] schema: applied ${plan.up.length} change(s)`,
+        );
+      for (const w of plan.warnings)
+        console.warn('[local-lite-server] schema warning:', w);
+    }
   };
   try {
     await applyAll();
   } catch (err) {
     const code = (err as { code?: string }).code;
-    if ((code === 'ER_BAD_DB_ERROR' || code === '3D000') && (await tryCreateDatabase(s))) {
+    if (
+      (code === 'ER_BAD_DB_ERROR' || code === '3D000') &&
+      (await tryCreateDatabase(s))
+    ) {
       console.log(`[local-lite-server] created database "${s.db.database}"`);
       await applyAll();
       return;
@@ -92,22 +122,32 @@ export async function start() {
   const settings = loadSettings();
   const schema = await loadSchema(settings);
   const rulesFile = resolveRulesFile(settings.rulesPath);
-  const rules: RulesDictionary = rulesFile ? await loadRulesFile(rulesFile) : {};
-  if (settings.appSecret && !rulesFile) {
-    console.warn('[local-lite-server] APP_SECRET is set without src/rules.ts; authenticated users can sync all tables.');
+  const rules: RulesDictionary = rulesFile
+    ? await loadRulesFile(rulesFile)
+    : {};
+  if (Object.keys(schema).length > 0 && settings.appSecret && !rulesFile) {
+    console.warn(
+      '[local-lite-server] APP_SECRET is set without src/rules.ts; authenticated users can sync all tables.',
+    );
   }
   const functions = await loadFunctionsDir(settings.functionsDir);
   const routesFile = resolveRoutesFile();
-  const customRoutes = routesFile ? await loadRoutesFile(routesFile) : undefined;
+  const customRoutes = routesFile
+    ? await loadRoutesFile(routesFile)
+    : undefined;
   const database = await createDatabase(settings);
 
   try {
     if (settings.autoMigrate) {
       await migrate(settings, database, schema);
     } else {
-      const plan = await planSchema(database.executor, schema).catch(() => null);
+      const plan = await planSchema(database.executor, schema).catch(
+        () => null,
+      );
       if (!plan || plan.up.length) {
-        console.warn('[local-lite-server] AUTO_MIGRATE=false and migrations are pending. Run: npm run migrate');
+        console.warn(
+          '[local-lite-server] AUTO_MIGRATE=false and migrations are pending. Run: npm run migrate',
+        );
       }
     }
   } catch (err) {
@@ -116,7 +156,15 @@ export async function start() {
   }
 
   const broker = await createClusterBroker(settings, database.executor);
-  const app = createApp(settings, database.executor, schema, functions, rules, broker, customRoutes);
+  const app = createApp(
+    settings,
+    database.executor,
+    schema,
+    functions,
+    rules,
+    broker,
+    customRoutes,
+  );
   const server = createHttpServer(app);
   const host = process.env.SERVER_HOST || '127.0.0.1';
   let activePort = settings.port;
@@ -128,9 +176,16 @@ export async function start() {
       : server.listen(activePort, onListening);
 
   server.on('error', (err: NodeJS.ErrnoException) => {
-    if (err.code === 'EADDRINUSE' && typeof activePort === 'number' && !process.env.PORT && attempts < 20) {
+    if (
+      err.code === 'EADDRINUSE' &&
+      typeof activePort === 'number' &&
+      !process.env.PORT &&
+      attempts < 20
+    ) {
       const nextPort = activePort + 1;
-      console.warn(`[local-lite-server] port ${activePort} is in use, trying ${nextPort}...`);
+      console.warn(
+        `[local-lite-server] port ${activePort} is in use, trying ${nextPort}...`,
+      );
       activePort = nextPort;
       attempts += 1;
       listen();
@@ -146,8 +201,13 @@ export async function start() {
     void database.close().finally(() => process.exit(1));
   });
   listen(() => {
-    const addr = typeof activePort === 'number' ? `http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${activePort}` : activePort;
-    console.log(`[local-lite-server] listening on ${addr} (${settings.dialect})`);
+    const addr =
+      typeof activePort === 'number'
+        ? `http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${activePort}`
+        : activePort;
+    console.log(
+      `[local-lite-server] listening on ${addr} (${settings.dialect})`,
+    );
     if (settings.adminUi && typeof activePort === 'number') {
       console.log(`[local-lite-server] admin console: ${addr}/admin`);
     }
@@ -165,7 +225,9 @@ export async function start() {
     stopWatch();
     stopCrons();
     server.close();
-    void broker.close().finally(() => void database.close().finally(() => process.exit(0)));
+    void broker
+      .close()
+      .finally(() => void database.close().finally(() => process.exit(0)));
   };
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);

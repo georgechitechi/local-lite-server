@@ -14,11 +14,20 @@ interface ServerFnItem {
   kind: 'query' | 'mutation' | 'action';
 }
 
-export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
+export function FunctionsTab({
+  endpoints,
+  activeProjectSlug = null,
+}: {
+  endpoints: EndpointItem[];
+  activeProjectSlug?: string | null;
+}) {
   const [serverFns, setServerFns] = useState<ServerFnItem[]>([]);
   const [selectedFn, setSelectedFn] = useState<string>('');
   const [fnArgs, setFnArgs] = useState('{\n  \n}');
-  const [fnResult, setFnResult] = useState<{ status: number; body: string } | null>(null);
+  const [fnResult, setFnResult] = useState<{
+    status: number;
+    body: string;
+  } | null>(null);
   const [fnLoading, setFnLoading] = useState(false);
 
   const [subActive, setSubActive] = useState(false);
@@ -28,7 +37,10 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
   const [runnerMethod, setRunnerMethod] = useState<'GET' | 'POST'>('GET');
   const [runnerPath, setRunnerPath] = useState('/health');
   const [runnerBody, setRunnerBody] = useState('{\n  \n}');
-  const [runnerResult, setRunnerResult] = useState<{ status: number; body: string } | null>(null);
+  const [runnerResult, setRunnerResult] = useState<{
+    status: number;
+    body: string;
+  } | null>(null);
   const [runnerLoading, setRunnerLoading] = useState(false);
 
   const stopSub = useCallback(() => {
@@ -41,7 +53,9 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
     void (async () => {
       const res = await adminFetch('/fn', { cache: 'no-store' });
       if (!res.ok) return;
-      const data = (await res.json().catch(() => ({}))) as { functions?: ServerFnItem[] };
+      const data = (await res.json().catch(() => ({}))) as {
+        functions?: ServerFnItem[];
+      };
       const list = Array.isArray(data.functions) ? data.functions : [];
       setServerFns(list);
       if (list.length > 0) setSelectedFn((prev) => prev || list[0].name);
@@ -49,7 +63,8 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
     return () => stopSub();
   }, [stopSub]);
 
-  const currentFn = serverFns.find((f) => f.name === selectedFn) ?? serverFns[0];
+  const currentFn =
+    serverFns.find((f) => f.name === selectedFn) ?? serverFns[0];
 
   const runServerFn = async () => {
     if (!currentFn) return;
@@ -57,7 +72,8 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
     setFnResult(null);
     try {
       const parsed = JSON.parse(fnArgs.trim() || '{}');
-      const res = await adminFetch(`/fn/${currentFn.name}`, {
+      const prefix = activeProjectSlug ? `/p/${activeProjectSlug}` : '';
+      const res = await adminFetch(`${prefix}/fn/${currentFn.name}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ args: parsed }),
@@ -83,8 +99,9 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
     if (!currentFn || currentFn.kind !== 'query') return;
     try {
       const parsed = JSON.parse(fnArgs.trim() || '{}');
+      const prefix = activeProjectSlug ? `/p/${activeProjectSlug}` : '';
       const url = buildApiUrl(
-        `/subscribe/${currentFn.name}?args=${encodeURIComponent(JSON.stringify(parsed))}`,
+        `${prefix}/subscribe/${currentFn.name}?args=${encodeURIComponent(JSON.stringify(parsed))}`,
       );
       const es = new EventSource(url, { withCredentials: true });
       setSubEvents([]);
@@ -93,10 +110,16 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
         try {
           pretty = JSON.stringify(JSON.parse(ev.data), null, 2);
         } catch {}
-        setSubEvents((prev) => [`${new Date().toLocaleTimeString()}\n${pretty}`, ...prev.slice(0, 9)]);
+        setSubEvents((prev) => [
+          `${new Date().toLocaleTimeString()}\n${pretty}`,
+          ...prev.slice(0, 9),
+        ]);
       });
       es.addEventListener('error', () => {
-        setSubEvents((prev) => [`${new Date().toLocaleTimeString()} SSE connection error/closed`, ...prev.slice(0, 9)]);
+        setSubEvents((prev) => [
+          `${new Date().toLocaleTimeString()} SSE connection error/closed`,
+          ...prev.slice(0, 9),
+        ]);
       });
       subRef.current = es;
       setSubActive(true);
@@ -109,11 +132,16 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
     setRunnerLoading(true);
     setRunnerResult(null);
     try {
-      const cleanPath = runnerPath.startsWith('/') ? runnerPath : `/${runnerPath}`;
+      const cleanPath = runnerPath.startsWith('/')
+        ? runnerPath
+        : `/${runnerPath}`;
       const res = await fetch(buildApiUrl(cleanPath), {
         method: runnerMethod,
         credentials: 'include',
-        headers: runnerMethod === 'POST' ? { 'Content-Type': 'application/json' } : undefined,
+        headers:
+          runnerMethod === 'POST'
+            ? { 'Content-Type': 'application/json' }
+            : undefined,
         body: runnerMethod === 'POST' ? runnerBody : undefined,
       });
       const text = await res.text();
@@ -131,9 +159,11 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 320px) 1fr', gap: 16 }}>
+      <div className="split-grid-280">
         <section style={cardStyle}>
-          <h2 style={sectionTitleStyle}>Server Functions ({serverFns.length})</h2>
+          <h2 style={sectionTitleStyle}>
+            Server Functions ({serverFns.length})
+          </h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {serverFns.map((fn) => {
               const active = currentFn?.name === fn.name;
@@ -162,7 +192,13 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
                     textAlign: 'left',
                   }}
                 >
-                  <span style={{ fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <span
+                    style={{
+                      fontFamily: 'monospace',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
                     {fn.name}
                   </span>
                   <span
@@ -190,12 +226,27 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
         </section>
 
         <section style={cardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 12,
+            }}
+          >
             <div>
-              <h2 style={{ ...sectionTitleStyle, margin: 0, fontFamily: 'monospace' }}>
+              <h2
+                style={{
+                  ...sectionTitleStyle,
+                  margin: 0,
+                  fontFamily: 'monospace',
+                }}
+              >
                 {currentFn ? currentFn.name : 'Select a function'}
               </h2>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+              <div
+                style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}
+              >
                 POST /fn/{currentFn?.name || '...'}
               </div>
             </div>
@@ -216,7 +267,9 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
             )}
           </div>
 
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>Arguments (JSON)</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>
+            Arguments (JSON)
+          </div>
           <textarea
             value={fnArgs}
             onChange={(e) => setFnArgs(e.target.value)}
@@ -230,7 +283,9 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
             }}
           />
 
-          <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+          <div
+            style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}
+          >
             <button
               type="button"
               onClick={runServerFn}
@@ -240,7 +295,11 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
               {fnLoading ? 'Running...' : 'Run Function'}
             </button>
             {currentFn?.kind === 'query' && (
-              <button type="button" onClick={toggleSubscribe} style={secondaryBtnStyle}>
+              <button
+                type="button"
+                onClick={toggleSubscribe}
+                style={secondaryBtnStyle}
+              >
                 {subActive ? 'Stop Subscribe' : 'Subscribe (SSE)'}
               </button>
             )}
@@ -248,7 +307,9 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
 
           {fnResult && (
             <div style={{ marginTop: 14 }}>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>
+              <div
+                style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}
+              >
                 Result (HTTP {fnResult.status})
               </div>
               <pre
@@ -270,7 +331,9 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
 
           {subEvents.length > 0 && (
             <div style={{ marginTop: 14 }}>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>
+              <div
+                style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}
+              >
                 Live SSE Updates ({subEvents.length})
               </div>
               <pre
@@ -292,7 +355,14 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
         </section>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns:
+            'repeat(auto-fit, minmax(min(100%, 280px), 1fr))',
+          gap: 16,
+        }}
+      >
         <section style={cardStyle}>
           <h2 style={sectionTitleStyle}>Registered HTTP Endpoints</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -304,7 +374,8 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
                   type="button"
                   onClick={() => {
                     setRunnerPath(epPath);
-                    if (ep.method === 'GET' || ep.method === 'POST') setRunnerMethod(ep.method);
+                    if (ep.method === 'GET' || ep.method === 'POST')
+                      setRunnerMethod(ep.method);
                   }}
                   style={{
                     display: 'flex',
@@ -320,7 +391,14 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
                     textAlign: 'left',
                   }}
                 >
-                  <span style={{ minWidth: 54, fontWeight: 700, color: 'var(--accent)', fontSize: 11 }}>
+                  <span
+                    style={{
+                      minWidth: 54,
+                      fontWeight: 700,
+                      color: 'var(--accent)',
+                      fontSize: 11,
+                    }}
+                  >
                     {ep.method || 'ANY'}
                   </span>
                   <span style={{ fontFamily: 'monospace' }}>{epPath}</span>
@@ -335,7 +413,9 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
           <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
             <select
               value={runnerMethod}
-              onChange={(e) => setRunnerMethod(e.target.value as 'GET' | 'POST')}
+              onChange={(e) =>
+                setRunnerMethod(e.target.value as 'GET' | 'POST')
+              }
               style={{ ...inputStyle, width: 100 }}
             >
               <option value="GET">GET</option>
@@ -347,7 +427,12 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
               placeholder="/health"
               style={{ ...inputStyle, fontFamily: 'monospace' }}
             />
-            <button type="button" onClick={runApiTester} disabled={runnerLoading} style={primaryBtnStyle}>
+            <button
+              type="button"
+              onClick={runApiTester}
+              disabled={runnerLoading}
+              style={primaryBtnStyle}
+            >
               {runnerLoading ? 'Sending...' : 'Send'}
             </button>
           </div>
@@ -356,7 +441,14 @@ export function FunctionsTab({ endpoints }: { endpoints: EndpointItem[] }) {
               value={runnerBody}
               onChange={(e) => setRunnerBody(e.target.value)}
               rows={4}
-              style={{ ...inputStyle, height: 'auto', padding: 12, fontFamily: 'monospace', fontSize: 12.5, marginBottom: 10 }}
+              style={{
+                ...inputStyle,
+                height: 'auto',
+                padding: 12,
+                fontFamily: 'monospace',
+                fontSize: 12.5,
+                marginBottom: 10,
+              }}
             />
           )}
           {runnerResult && (

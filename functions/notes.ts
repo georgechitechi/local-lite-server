@@ -6,7 +6,8 @@ function badRequest(message: string, status = 400): Error {
 
 export const list = {
   __kind: 'query' as const,
-  handler: ({ db }: QueryContext) => db.list('notes', { orderBy: 'updated_at', order: 'desc' }),
+  handler: ({ db }: QueryContext) =>
+    db.list('notes', { orderBy: 'updated_at', order: 'desc' }),
 };
 
 export const create = {
@@ -20,14 +21,17 @@ export const create = {
       pinned: Boolean(raw.pinned),
     };
   },
-  handler: ({ db }: MutationContext, args: { title: string; body: string | null; pinned: boolean }) =>
-    db.insert('notes', args),
+  handler: (
+    { db }: MutationContext,
+    args: { title: string; body: string | null; pinned: boolean },
+  ) => db.insert('notes', args),
 };
 
 export const togglePin = {
   __kind: 'mutation' as const,
   args: (raw: Record<string, unknown>) => {
-    if (typeof raw.id !== 'string' || !raw.id) throw badRequest('id is required.');
+    if (typeof raw.id !== 'string' || !raw.id)
+      throw badRequest('id is required.');
     return { id: raw.id };
   },
   handler: async ({ db }: MutationContext, { id }: { id: string }) => {

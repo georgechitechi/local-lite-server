@@ -1,4 +1,8 @@
-import { quoteIdent, type SqlExecutor, type SyncEventBroker } from 'local-lite/server';
+import {
+  quoteIdent,
+  type SqlExecutor,
+  type SyncEventBroker,
+} from 'local-lite/server';
 import {
   newRowId,
   patchTableRow,
@@ -6,8 +10,9 @@ import {
   setRowDeleted,
   upsertTableRow,
 } from '../core/changes.js';
-import type { SchemaDictionary, SchemaFieldType } from '../schema.js';
-import { fromDbRow, toDbValue } from '../tableStorage.js';
+import { toPhysicalTable } from '../services/projects.js';
+import type { SchemaDictionary, SchemaFieldType } from '../db/schema.js';
+import { fromDbRow, toDbValue } from '../db/tableStorage.js';
 import {
   FunctionError,
   type ActionContext,
@@ -19,8 +24,14 @@ import {
   type FunctionRegistry,
 } from './types.js';
 
-function createReader(db: SqlExecutor, schema: SchemaDictionary, readTables: Set<string>): DbReader {
+function createReader(
+  db: SqlExecutor,
+  schema: SchemaDictionary,
+  readTables: Set<string>,
+  projectSlug: string | null = null,
+): DbReader {
   const q = (n: string) => quoteIdent(n, db.dialect);
+  const phys = (table: string) => toPhysicalTable(projectSlug, table);
   const fieldsOf = (table: string): Record<string, SchemaFieldType> => {
     const f = Object.hasOwn(schema, table) ? schema[table] : undefined;
     if (!f) throw new FunctionError(`Unknown table "${table}".`, 400);
@@ -33,10 +44,12 @@ function createReader(db: SqlExecutor, schema: SchemaDictionary, readTables: Set
       const fields = fieldsOf(table);
       readTables.add(table);
       const rows = await db.query<Record<string, any>>(
-        `SELECT * FROM ${q(table)} WHERE ${q('id')} = ? AND ${q('deleted')} = ${notDeleted} LIMIT 1`,
+        `SELECT * FROM ${q(phys(table))} WHERE ${q('id')} = ? AND ${q('deleted')} = ${notDeleted} LIMIT 1`,
         [id],
       );
-      return rows[0] ? { id: String(rows[0].id), ...fromDbRow(fields, rows[0]) } : null;
+      return rows[0]
+        ? { id: String(rows[0].id), ...fromDbRow(fields, rows[0]) }
+        : null;
     },
 
     async list(table, opts = {}) {
@@ -47,7 +60,8 @@ function createReader(db: SqlExecutor, schema: SchemaDictionary, readTables: Set
       if (!opts.includeDeleted) clauses.push(`${q('deleted')} = ${notDeleted}`);
       if (opts.where) {
         for (const [col, val] of Object.entries(opts.where)) {
-          if (!Object.hasOwn(fields, col)) throw new FunctionError(`Unknown column "${table}.${col}".`, 400);
+          if (!Object.hasOwn(fields, col))
+            throw new FunctionError(`Unknown column "${table}.${col}".`, 400);
           if (val === null) clauses.push(`${q(col)} IS NULL`);
           else {
             clauses.push(`${q(col)} = ?`);
@@ -56,18 +70,25 @@ function createReader(db: SqlExecutor, schema: SchemaDictionary, readTables: Set
         }
       }
       const whereSql = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-      const orderCol = opts.orderBy && Object.hasOwn(fields, opts.orderBy) ? opts.orderBy : 'updated_at';
+      const orderCol =
+        opts.orderBy && Object.hasOwn(fields, opts.orderBy)
+          ? opts.orderBy
+          : 'updated_at';
       const dir = opts.order === 'asc' ? 'ASC' : 'DESC';
       const limit = Math.min(Math.max(Math.floor(opts.limit ?? 100), 1), 1000);
       const offset = Math.max(Math.floor(opts.offset ?? 0), 0);
       const rows = await db.query<Record<string, any>>(
-        `SELECT * FROM ${q(table)} ${whereSql} ORDER BY ${q(orderCol)} ${dir} LIMIT ${limit} OFFSET ${offset}`,
+        `SELECT * FROM ${q(phys(table))} ${whereSql} ORDER BY ${q(orderCol)} ${dir} LIMIT ${limit} OFFSET ${offset}`,
         params,
       );
       return rows.map((r) => ({ id: String(r.id), ...fromDbRow(fields, r) }));
     },
 
-    async sql<T = Record<string, any>>(query: string, params: unknown[] = [], touchesTables?: string[]) {
+    async sql<T = Record<string, any>>(
+      query: string,
+      params: unknown[] = [],
+      touchesTables?: string[],
+    ) {
       if (touchesTables) {
         for (const t of touchesTables) readTables.add(t);
       } else {
@@ -82,8 +103,16 @@ function createReader(db: SqlExecutor, schema: SchemaDictionary, readTables: Set
 
 export interface FunctionRuntime {
   list(): Array<{ name: string; kind: FunctionKind }>;
-  run(name: string, rawArgs: Record<string, unknown>, auth: FunctionAuth): Promise<{ result: unknown; readTables: Set<string> }>;
-  subscribe(name: string, rawArgs: Record<string, unknown>, auth: FunctionAuth): Promise<Response>;
+  run(
+    name: string,
+    rawArgs: Record<string, unknown>,
+    auth: FunctionAuth,
+  ): Promise<{ result: unknown; readTables: Set<string> }>;
+  subscribe(
+    name: string,
+    rawArgs: Record<string, unknown>,
+    auth: FunctionAuth,
+  ): Promise<Response>;
 }
 
 export function createFunctionRuntime(opts: {
@@ -92,9 +121,14 @@ export function createFunctionRuntime(opts: {
   schema: SchemaDictionary;
   broker: SyncEventBroker;
   scopeField?: string;
+  projectId?: string | null;
+  projectSlug?: string | null;
 }): FunctionRuntime {
   const { registry, db, schema, broker } = opts;
   const scopeField = opts.scopeField ?? 'scope_id';
+  const projectId = opts.projectId ?? null;
+  const projectSlug = opts.projectSlug ?? projectId;
+  const phys = (table: string) => toPhysicalTable(projectSlug, table);
 
   const getFn = (name: string) => {
     const fn = registry.get(name);
@@ -102,36 +136,70 @@ export function createFunctionRuntime(opts: {
     return fn;
   };
 
-  const parseArgs = (fn: FunctionDef<any, any, any>, raw: Record<string, unknown>) => {
+  const parseArgs = (
+    fn: FunctionDef<any, any, any>,
+    raw: Record<string, unknown>,
+  ) => {
     if (!fn.args) return raw;
     try {
       return fn.args(raw);
     } catch (err) {
-      throw new FunctionError(err instanceof Error ? err.message : 'Invalid arguments.', 400);
+      throw new FunctionError(
+        err instanceof Error ? err.message : 'Invalid arguments.',
+        400,
+      );
     }
   };
 
-  const runQuery = async (name: string, rawArgs: Record<string, unknown>, auth: FunctionAuth) => {
+  const runQuery = async (
+    name: string,
+    rawArgs: Record<string, unknown>,
+    auth: FunctionAuth,
+  ) => {
     const fn = getFn(name);
-    if (fn.__kind !== 'query') throw new FunctionError(`"${name}" is a ${fn.__kind}, not a query.`, 400);
+    if (fn.__kind !== 'query')
+      throw new FunctionError(`"${name}" is a ${fn.__kind}, not a query.`, 400);
     const readTables = new Set<string>();
-    const result = await fn.handler({ db: createReader(db, schema, readTables), auth }, parseArgs(fn, rawArgs));
+    const result = await fn.handler(
+      { db: createReader(db, schema, readTables, projectSlug), auth },
+      parseArgs(fn, rawArgs),
+    );
     return { result, readTables };
   };
 
-  const runMutation = async (name: string, rawArgs: Record<string, unknown>, auth: FunctionAuth) => {
+  const runMutation = async (
+    name: string,
+    rawArgs: Record<string, unknown>,
+    auth: FunctionAuth,
+  ) => {
     const fn = getFn(name);
-    if (fn.__kind !== 'mutation') throw new FunctionError(`"${name}" is a ${fn.__kind}, not a mutation.`, 400);
+    if (fn.__kind !== 'mutation')
+      throw new FunctionError(
+        `"${name}" is a ${fn.__kind}, not a mutation.`,
+        400,
+      );
     const args = parseArgs(fn, rawArgs);
-    const emitted: Array<{ scopeId: string; tableName: string; checkpoint: number }> = [];
+    const emitted: Array<{
+      scopeId: string;
+      tableName: string;
+      checkpoint: number;
+    }> = [];
     const readTables = new Set<string>();
 
     const result = await db.withTransaction(async (tx) => {
-      const reader = createReader(tx, schema, readTables);
+      const reader = createReader(tx, schema, readTables, projectSlug);
       const track = async (table: string, id: string, scopeVal: unknown) => {
-        const ts = await recordChange(tx, table, id);
+        const ts = await recordChange(
+          tx,
+          table,
+          id,
+          '_server_changes',
+          '_server_sync_clock',
+          projectId,
+        );
         emitted.push({
-          scopeId: typeof scopeVal === 'string' && scopeVal ? scopeVal : 'default',
+          scopeId:
+            typeof scopeVal === 'string' && scopeVal ? scopeVal : 'default',
           tableName: table,
           checkpoint: ts,
         });
@@ -140,28 +208,39 @@ export function createFunctionRuntime(opts: {
       const writer: DbWriter = {
         ...reader,
         async insert(table, data) {
-          const fields = Object.hasOwn(schema, table) ? schema[table] : undefined;
-          if (!fields) throw new FunctionError(`Unknown table "${table}".`, 400);
+          const fields = Object.hasOwn(schema, table)
+            ? schema[table]
+            : undefined;
+          if (!fields)
+            throw new FunctionError(`Unknown table "${table}".`, 400);
           const id = newRowId(data.id);
           const ts = await track(table, id, data[scopeField]);
-          await upsertTableRow(tx, table, fields, id, data, ts);
+          await upsertTableRow(tx, phys(table), fields, id, data, ts);
           return (await reader.get(table, id))!;
         },
         async patch(table, id, patch) {
-          const fields = Object.hasOwn(schema, table) ? schema[table] : undefined;
-          if (!fields) throw new FunctionError(`Unknown table "${table}".`, 400);
+          const fields = Object.hasOwn(schema, table)
+            ? schema[table]
+            : undefined;
+          if (!fields)
+            throw new FunctionError(`Unknown table "${table}".`, 400);
           const existing = await reader.get(table, id);
           if (!existing) return null;
-          const ts = await track(table, id, patch[scopeField] ?? existing[scopeField]);
-          await patchTableRow(tx, table, fields, id, patch, ts);
+          const ts = await track(
+            table,
+            id,
+            patch[scopeField] ?? existing[scopeField],
+          );
+          await patchTableRow(tx, phys(table), fields, id, patch, ts);
           return reader.get(table, id);
         },
         async remove(table, id) {
-          if (!Object.hasOwn(schema, table)) throw new FunctionError(`Unknown table "${table}".`, 400);
+          if (!Object.hasOwn(schema, table))
+            throw new FunctionError(`Unknown table "${table}".`, 400);
           const existing = await reader.get(table, id);
           if (!existing) return false;
           const ts = await track(table, id, existing[scopeField]);
-          await setRowDeleted(tx, table, id, true, ts);
+          await setRowDeleted(tx, phys(table), id, true, ts);
           return true;
         },
       };
@@ -172,19 +251,31 @@ export function createFunctionRuntime(opts: {
     return { result, readTables };
   };
 
-  const run = async (name: string, rawArgs: Record<string, unknown>, auth: FunctionAuth) => {
+  const run = async (
+    name: string,
+    rawArgs: Record<string, unknown>,
+    auth: FunctionAuth,
+  ) => {
     const fn = getFn(name);
     if (fn.__kind === 'query') return runQuery(name, rawArgs, auth);
     if (fn.__kind === 'mutation') return runMutation(name, rawArgs, auth);
     const ctx: ActionContext = {
       auth,
       runQuery: async (n, a = {}) => (await runQuery(n, a, auth)).result as any,
-      runMutation: async (n, a = {}) => (await runMutation(n, a, auth)).result as any,
+      runMutation: async (n, a = {}) =>
+        (await runMutation(n, a, auth)).result as any,
     };
-    return { result: await fn.handler(ctx, parseArgs(fn, rawArgs)), readTables: new Set<string>() };
+    return {
+      result: await fn.handler(ctx, parseArgs(fn, rawArgs)),
+      readTables: new Set<string>(),
+    };
   };
 
-  const subscribe = async (name: string, rawArgs: Record<string, unknown>, auth: FunctionAuth) => {
+  const subscribe = async (
+    name: string,
+    rawArgs: Record<string, unknown>,
+    auth: FunctionAuth,
+  ) => {
     const initial = await runQuery(name, rawArgs, auth);
     let tracked = initial.readTables;
     let lastJson = JSON.stringify(initial.result);
@@ -218,7 +309,9 @@ export function createFunctionRuntime(opts: {
               send(`event: data\ndata: ${nextJson}\n\n`);
             }
           } catch (err) {
-            send(`event: error\ndata: ${JSON.stringify({ error: err instanceof Error ? err.message : 'Query failed.' })}\n\n`);
+            send(
+              `event: error\ndata: ${JSON.stringify({ error: err instanceof Error ? err.message : 'Query failed.' })}\n\n`,
+            );
           } finally {
             running = false;
             if (queued) {
@@ -256,7 +349,11 @@ export function createFunctionRuntime(opts: {
   };
 
   return {
-    list: () => [...registry.entries()].map(([name, def]) => ({ name, kind: def.__kind })),
+    list: () =>
+      [...registry.entries()].map(([name, def]) => ({
+        name,
+        kind: def.__kind,
+      })),
     run,
     subscribe,
   };

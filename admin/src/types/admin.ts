@@ -78,6 +78,17 @@ export interface TableBrowserData {
   rows: Array<Record<string, any>>;
 }
 
+export interface ProjectItem {
+  id: string;
+  slug: string;
+  name: string;
+  ownerUserId: string | null;
+  schema: Record<string, Record<string, string>>;
+  rulesRaw?: Record<string, any>;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export const NAV_ITEMS: Array<{
   id: NavTab;
   label: string;
@@ -92,5 +103,5 @@ export const NAV_ITEMS: Array<{
   { id: 'backups', label: 'Backups' },
   { id: 'storage', label: 'Storage' },
   { id: 'logs', label: 'Sync Logs' },
-  { id: 'env', label: 'Environment', superAdminOnly: true },
+  { id: 'env', label: 'Environment' },
 ];

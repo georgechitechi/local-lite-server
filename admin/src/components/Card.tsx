@@ -2,6 +2,7 @@ import type React from 'react';
 import { cardStyle, sectionTitleStyle } from '@/styles/adminStyles';
 
 export interface CardProps {
+  header?: React.ReactNode;
   title?: React.ReactNode;
   subtitle?: React.ReactNode;
   actions?: React.ReactNode;
@@ -11,6 +12,7 @@ export interface CardProps {
 }
 
 export function Card({
+  header,
   title,
   subtitle,
   actions,
@@ -18,50 +20,64 @@ export function Card({
   style,
   children,
 }: CardProps) {
+  const hasHeader =
+    header != null ||
+    title != null ||
+    subtitle != null ||
+    actions != null ||
+    toolbar != null;
+
   return (
     <section style={{ ...cardStyle, ...style }}>
-      {(title != null || actions != null) && (
-        <div
+      {hasHeader && (
+        <header
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: 14,
-            gap: 10,
+            gap: 12,
             flexWrap: 'wrap',
+            paddingBottom: 12,
+            marginBottom: 14,
+            borderBottom: '1px solid var(--border)',
           }}
         >
-          <div>
-            {title != null && (
-              <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{title}</h2>
-            )}
-            {subtitle != null && (
-              <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--muted)' }}>
-                {subtitle}
-              </p>
-            )}
-          </div>
-          {actions != null && (
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              {actions}
-            </div>
-          )}
-        </div>
-      )}
+          {header ?? (
+            <>
+              <div>
+                {title != null && (
+                  <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{title}</h2>
+                )}
+                {subtitle != null && (
+                  <p
+                    style={{
+                      margin: '4px 0 0',
+                      fontSize: 12.5,
+                      color: 'var(--muted)',
+                    }}
+                  >
+                    {subtitle}
+                  </p>
+                )}
+              </div>
 
-      {toolbar != null && (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 10,
-            marginBottom: 14,
-            flexWrap: 'wrap',
-          }}
-        >
-          {toolbar}
-        </div>
+              {(toolbar != null || actions != null) && (
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 8,
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    marginLeft: 'auto',
+                  }}
+                >
+                  {toolbar}
+                  {actions}
+                </div>
+              )}
+            </>
+          )}
+        </header>
       )}
 
       {children}

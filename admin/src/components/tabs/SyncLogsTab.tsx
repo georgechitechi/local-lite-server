@@ -94,7 +94,13 @@ export function SyncLogsTab({
         <select
           value={logTableFilter}
           onChange={(e) => setLogTableFilter(e.target.value)}
-          style={{ ...inputStyle, width: 180, height: 36 }}
+          style={{
+            ...inputStyle,
+            width: 'auto',
+            minWidth: 140,
+            maxWidth: 200,
+            height: 36,
+          }}
         >
           <option value="ALL">All tables</option>
           {tables.map((t) => (
@@ -113,7 +119,9 @@ export function SyncLogsTab({
         <DataTable
           columns={columns}
           rows={data?.rows ?? []}
-          getRowKey={(c, idx) => `${c.tableName}-${c.rowId}-${c.updatedAt}-${idx}`}
+          getRowKey={(c, idx) =>
+            `${c.tableName}-${c.rowId}-${c.updatedAt}-${idx}`
+          }
           emptyMessage="No sync changes recorded yet."
         />
       )}

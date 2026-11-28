@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { importUserModule } from '../core/resolve.js';
 import type { FunctionDef, FunctionRegistry } from './types.js';
 
 const EXTENSIONS = ['.ts', '.mts', '.mjs', '.js'];
@@ -29,15 +29,30 @@ export async function loadFunctionsDir(
   if (!fs.existsSync(abs) || !fs.statSync(abs).isDirectory()) return registry;
 
   for (const entry of fs.readdirSync(abs, { withFileTypes: true })) {
-    if (!entry.isFile() || entry.name.startsWith('_') || entry.name.endsWith('.d.ts')) continue;
+    if (
+      !entry.isFile() ||
+      entry.name.startsWith('_') ||
+      entry.name.endsWith('.d.ts')
+    )
+      continue;
     const ext = EXTENSIONS.find((e) => entry.name.endsWith(e));
     if (!ext) continue;
     const modName = entry.name.slice(0, -ext.length);
-    const url = pathToFileURL(path.join(abs, entry.name)).href + (bustCache ? `?t=${Date.now()}` : '');
-    const mod = await import(url);
+    const mod = await importUserModule(
+      path.join(abs, entry.name),
+      bustCache ? `?t=${Date.now()}` : '',
+    );
     for (const [expName, val] of Object.entries(mod)) {
-      if (val && typeof val === 'object' && '__kind' in val && typeof (val as any).handler === 'function') {
-        registry.set(`${modName}/${expName}`, val as FunctionDef<any, any, any>);
+      if (
+        val &&
+        typeof val === 'object' &&
+        '__kind' in val &&
+        typeof (val as any).handler === 'function'
+      ) {
+        registry.set(
+          `${modName}/${expName}`,
+          val as FunctionDef<any, any, any>,
+        );
       }
     }
   }
@@ -60,7 +75,9 @@ export function watchFunctionsDir(
         const next = await loadFunctionsDir(dir, cwd, true);
         registry.clear();
         for (const [k, v] of next) registry.set(k, v);
-        console.log(`[local-lite-server] hot-reloaded ${registry.size} function(s)`);
+        console.log(
+          `[local-lite-server] hot-reloaded ${registry.size} function(s)`,
+        );
       } catch (err) {
         console.error('[local-lite-server] function reload failed:', err);
       }

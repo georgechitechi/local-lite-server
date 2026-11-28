@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { loadSettings } from '../../src/config.js';
-import { createDatabase } from '../../src/db.js';
-import { defineMutation, defineQuery, type FunctionRegistry } from '../../src/functions/index.js';
-import { runMigrations } from '../../src/migrations.js';
-import { defineRules } from '../../src/rules.js';
-import { applySchema, normalizeSchema } from '../../src/schema.js';
+import { createDatabase } from '../../src/db/client.js';
+import {
+  defineMutation,
+  defineQuery,
+  type FunctionRegistry,
+} from '../../src/functions/index.js';
+import { runMigrations } from '../../src/db/migrations.js';
+import { defineRules } from '../../src/db/rules.js';
+import { applySchema, normalizeSchema } from '../../src/db/schema.js';
 import { createApp } from '../../src/server.js';
 
 function parseDbUrl(dialect: 'mysql' | 'postgres', rawUrl: string) {
@@ -39,7 +43,12 @@ async function runEngineSuite(dialect: 'mysql' | 'postgres', rawUrl: string) {
     });
     const fns: FunctionRegistry = new Map([
       ['notes/list', defineQuery({ handler: ({ db }) => db.list('it_notes') })],
-      ['notes/create', defineMutation({ handler: ({ db }, args: any) => db.insert('it_notes', args) })],
+      [
+        'notes/create',
+        defineMutation({
+          handler: ({ db }, args: any) => db.insert('it_notes', args),
+        }),
+      ],
     ]);
     const app = createApp(settings, database.executor, schema, fns, rules);
 
@@ -55,18 +64,30 @@ async function runEngineSuite(dialect: 'mysql' | 'postgres', rawUrl: string) {
       }),
     );
     expect(signup.status).toBe(200);
-    const { token, user } = (await signup.json()) as { token: string; user: { id: string } };
+    const { token, user } = (await signup.json()) as {
+      token: string;
+      user: { id: string };
+    };
 
     // RLS blocks writing another user's row
     const blocked = await app.fetch(
       new Request('http://x/sync', {
         method: 'POST',
-        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        headers: {
+          authorization: `Bearer ${token}`,
+          'content-type': 'application/json',
+        },
         body: JSON.stringify({
-          operations: [{
-            id: 'op1', tableName: 'it_notes', rowId: 'r-bad', operation: 'INSERT', timestamp: 1,
-            payload: { title: 'No', user_id: 'other', pinned: false },
-          }],
+          operations: [
+            {
+              id: 'op1',
+              tableName: 'it_notes',
+              rowId: 'r-bad',
+              operation: 'INSERT',
+              timestamp: 1,
+              payload: { title: 'No', user_id: 'other', pinned: false },
+            },
+          ],
         }),
       }),
     );
@@ -76,8 +97,13 @@ async function runEngineSuite(dialect: 'mysql' | 'postgres', rawUrl: string) {
     const created = await app.fetch(
       new Request('http://x/fn/notes/create', {
         method: 'POST',
-        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ args: { title: 'Live DB', user_id: user.id, pinned: true } }),
+        headers: {
+          authorization: `Bearer ${token}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          args: { title: 'Live DB', user_id: user.id, pinned: true },
+        }),
       }),
     );
     expect(created.status).toBe(200);
@@ -89,20 +115,28 @@ async function runEngineSuite(dialect: 'mysql' | 'postgres', rawUrl: string) {
     );
     expect(pull.status).toBe(200);
     const pullData = (await pull.json()) as any;
-    expect(pullData.changes.changes.some((c: any) => c.payload?.title === 'Live DB')).toBe(true);
+    expect(
+      pullData.changes.changes.some((c: any) => c.payload?.title === 'Live DB'),
+    ).toBe(true);
   } finally {
     await database.close();
   }
 }
 
-describe.runIf(Boolean(process.env.TEST_MYSQL_URL))('Live MySQL integration', () => {
-  it('runs migrations, RLS, functions, and sync', async () => {
-    await runEngineSuite('mysql', process.env.TEST_MYSQL_URL!);
-  });
-});
+describe.runIf(Boolean(process.env.TEST_MYSQL_URL))(
+  'Live MySQL integration',
+  () => {
+    it('runs migrations, RLS, functions, and sync', async () => {
+      await runEngineSuite('mysql', process.env.TEST_MYSQL_URL!);
+    });
+  },
+);
 
-describe.runIf(Boolean(process.env.TEST_POSTGRES_URL))('Live PostgreSQL integration', () => {
-  it('runs migrations, RLS, functions, and sync', async () => {
-    await runEngineSuite('postgres', process.env.TEST_POSTGRES_URL!);
-  });
-});
+describe.runIf(Boolean(process.env.TEST_POSTGRES_URL))(
+  'Live PostgreSQL integration',
+  () => {
+    it('runs migrations, RLS, functions, and sync', async () => {
+      await runEngineSuite('postgres', process.env.TEST_POSTGRES_URL!);
+    });
+  },
+);

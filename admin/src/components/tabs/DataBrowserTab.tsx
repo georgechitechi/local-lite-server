@@ -83,23 +83,8 @@ export function DataBrowserTab({
   );
 
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '230px 1fr',
-        gap: 16,
-        alignItems: 'stretch',
-      }}
-    >
-      <div
-        style={{
-          ...cardStyle,
-          minHeight: 'calc(100vh - 130px)',
-          display: 'flex',
-          flexDirection: 'column',
-          overflowY: 'auto',
-        }}
-      >
+    <div className="split-grid-230">
+      <div className="data-table-sidebar" style={cardStyle}>
         <input
           placeholder="Filter tables..."
           value={tableFilter}

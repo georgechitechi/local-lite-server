@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { quoteIdent, type SqlExecutor } from 'local-lite/server';
-import type { ServerSettings } from './config.js';
-import type { FunctionRuntime } from './functions/index.js';
+import type { ServerSettings } from '../config.js';
+import type { FunctionRuntime } from '../functions/index.js';
 
 export interface CronJobRecord {
   job_key: string;
@@ -32,7 +32,11 @@ function matchField(expr: string, value: number): boolean {
   return false;
 }
 
-export function matchesCron(expr: string, date: Date, timeZone = 'UTC'): boolean {
+export function matchesCron(
+  expr: string,
+  date: Date,
+  timeZone = 'UTC',
+): boolean {
   const fields = expr.trim().split(/\s+/);
   if (fields.length !== 5) return false;
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -45,7 +49,15 @@ export function matchesCron(expr: string, date: Date, timeZone = 'UTC'): boolean
     weekday: 'short',
   }).formatToParts(date);
   const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '0';
-  const dowMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const dowMap: Record<string, number> = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  };
   const vals = [
     Number(get('minute')),
     Number(get('hour')) % 24,
@@ -59,7 +71,11 @@ export function matchesCron(expr: string, date: Date, timeZone = 'UTC'): boolean
 export async function runCronAction(
   actionType: string,
   configJson: string | null | undefined,
-  deps: { settings: ServerSettings; db: SqlExecutor; fnRuntime?: FunctionRuntime },
+  deps: {
+    settings: ServerSettings;
+    db: SqlExecutor;
+    fnRuntime?: FunctionRuntime;
+  },
 ): Promise<string> {
   const cfg = configJson ? (JSON.parse(configJson) as Record<string, any>) : {};
 
@@ -69,7 +85,9 @@ export async function runCronAction(
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...(cfg.headers || {}) },
-      body: cfg.body ? JSON.stringify(cfg.body) : JSON.stringify({ timestamp: Date.now() }),
+      body: cfg.body
+        ? JSON.stringify(cfg.body)
+        : JSON.stringify({ timestamp: Date.now() }),
       signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) throw new Error(`Webhook returned HTTP ${res.status}`);
@@ -95,15 +113,21 @@ export async function runCronAction(
   }
 
   if (actionType === 'storage_orphan_prune') {
-    const rows = await deps.db.query<{ id: string; bucket?: string; storage_key: string }>(
-      'SELECT id, bucket, storage_key FROM _lls_storage_files',
-    );
+    const rows = await deps.db.query<{
+      id: string;
+      bucket?: string;
+      storage_key: string;
+    }>('SELECT id, bucket, storage_key FROM _lls_storage_files');
     let removedDbRows = 0;
     for (const r of rows) {
-      const inBucket = r.bucket ? path.resolve(deps.settings.uploadDir, r.bucket, r.storage_key) : '';
+      const inBucket = r.bucket
+        ? path.resolve(deps.settings.uploadDir, r.bucket, r.storage_key)
+        : '';
       const direct = path.resolve(deps.settings.uploadDir, r.storage_key);
       if ((!inBucket || !fs.existsSync(inBucket)) && !fs.existsSync(direct)) {
-        await deps.db.execute('DELETE FROM _lls_storage_files WHERE id = ?', [r.id]);
+        await deps.db.execute('DELETE FROM _lls_storage_files WHERE id = ?', [
+          r.id,
+        ]);
         removedDbRows += 1;
       }
     }
@@ -123,14 +147,27 @@ export function startCronScheduler(deps: {
     const now = new Date();
     const currentMinute = Math.floor(now.getTime() / 60_000);
     try {
-      const jobs = await deps.db.query<CronJobRecord>('SELECT * FROM _lls_crons');
+      const jobs = await deps.db.query<CronJobRecord>(
+        'SELECT * FROM _lls_crons',
+      );
       for (const job of jobs) {
-        if (!job.enabled || !matchesCron(job.cron_expr, now, job.timezone || 'UTC')) continue;
-        if (job.last_run_at && Math.floor(Number(job.last_run_at) / 60_000) === currentMinute) {
+        if (
+          !job.enabled ||
+          !matchesCron(job.cron_expr, now, job.timezone || 'UTC')
+        )
+          continue;
+        if (
+          job.last_run_at &&
+          Math.floor(Number(job.last_run_at) / 60_000) === currentMinute
+        ) {
           continue;
         }
         try {
-          const summary = await runCronAction(job.action_type, job.config_json, deps);
+          const summary = await runCronAction(
+            job.action_type,
+            job.config_json,
+            deps,
+          );
           await deps.db.execute(
             'UPDATE _lls_crons SET last_run_at = ?, last_status = ?, last_summary = ? WHERE job_key = ?',
             [Date.now(), 'ok', summary, job.job_key],
@@ -138,7 +175,12 @@ export function startCronScheduler(deps: {
         } catch (err) {
           await deps.db.execute(
             'UPDATE _lls_crons SET last_run_at = ?, last_status = ?, last_summary = ? WHERE job_key = ?',
-            [Date.now(), 'error', err instanceof Error ? err.message : 'Failed', job.job_key],
+            [
+              Date.now(),
+              'error',
+              err instanceof Error ? err.message : 'Failed',
+              job.job_key,
+            ],
           );
         }
       }

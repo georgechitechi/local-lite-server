@@ -18,9 +18,11 @@ type DrawerState =
 
 export function AuthUsersTab({
   accounts,
+  isSuperAdmin = false,
   onAction,
 }: {
   accounts: LocalAuthAccount[];
+  isSuperAdmin?: boolean;
   onAction: (
     payload: Record<string, any>,
     successMsg: string,
@@ -123,7 +125,9 @@ export function AuthUsersTab({
         <>
           <div style={{ fontWeight: 500 }}>{acc.email}</div>
           {acc.displayName && (
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>{acc.displayName}</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+              {acc.displayName}
+            </div>
           )}
         </>
       ),
@@ -143,7 +147,9 @@ export function AuthUsersTab({
               color: 'var(--accent)',
             }}
           >
-            {acc.consoleRole === 'super_admin' ? 'Super Admin' : 'Console Admin'}
+            {acc.consoleRole === 'super_admin'
+              ? 'Super Admin'
+              : 'Console Admin'}
           </span>
         ) : (
           <span style={{ color: 'var(--muted)', fontSize: 12 }}>App User</span>
@@ -188,38 +194,14 @@ export function AuthUsersTab({
       <Card
         title="Users & Access"
         actions={
-          <button type="button" onClick={openCreate} style={primaryBtnStyle}>
-            + New Console Admin
-          </button>
+          isSuperAdmin ? (
+            <button type="button" onClick={openCreate} style={primaryBtnStyle}>
+              + New Console Admin
+            </button>
+          ) : undefined
         }
         toolbar={
           <>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {(
-                [
-                  ['all', 'All'],
-                  ['console', 'Console Admins'],
-                  ['app', 'App Users'],
-                ] as Array<[UserFilter, string]>
-              ).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => {
-                    setFilter(key);
-                    setOffset(0);
-                  }}
-                  style={{
-                    ...secondaryBtnStyle,
-                    background: filter === key ? 'var(--accent-soft)' : 'transparent',
-                    color: filter === key ? 'var(--accent)' : 'var(--muted)',
-                    borderColor: filter === key ? 'var(--accent)' : 'var(--border)',
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
             <input
               type="text"
               placeholder="Search email or name..."
@@ -228,8 +210,32 @@ export function AuthUsersTab({
                 setSearch(e.target.value);
                 setOffset(0);
               }}
-              style={{ ...inputStyle, maxWidth: 260, padding: '7px 12px' }}
+              style={{
+                ...inputStyle,
+                flex: '1 1 180px',
+                minWidth: 0,
+                maxWidth: 240,
+                padding: '7px 12px',
+              }}
             />
+            <select
+              aria-label="Filter users"
+              value={filter}
+              onChange={(e) => {
+                setFilter(e.target.value as UserFilter);
+                setOffset(0);
+              }}
+              style={{
+                ...inputStyle,
+                width: 'auto',
+                minWidth: 140,
+                padding: '7px 10px',
+              }}
+            >
+              <option value="all">All Users</option>
+              <option value="console">Console Admins</option>
+              <option value="app">App Users</option>
+            </select>
           </>
         }
       >

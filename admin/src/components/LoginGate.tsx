@@ -7,7 +7,7 @@ import {
   secondaryBtnStyle,
 } from '@/styles/adminStyles';
 
-type ViewMode = 'login' | 'forgot' | 'reset' | 'bootstrap';
+type ViewMode = 'login' | 'signup' | 'forgot' | 'reset' | 'bootstrap';
 
 const linkBtnStyle: React.CSSProperties = {
   background: 'transparent',
@@ -24,7 +24,9 @@ export function LoginGate({ onSuccess }: { onSuccess: () => void }) {
   const [hasConsoleAdmins, setHasConsoleAdmins] = useState<boolean | null>(
     null,
   );
+  const [allowConsoleSignup, setAllowConsoleSignup] = useState(false);
   const [email, setEmail] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
   const [secretInput, setSecretInput] = useState('');
@@ -39,9 +41,19 @@ export function LoginGate({ onSuccess }: { onSuccess: () => void }) {
         if (!res.ok) return;
         const data = (await res.json().catch(() => ({}))) as {
           hasConsoleAdmins?: boolean;
+          allowConsoleSignup?: boolean;
         };
         if (typeof data.hasConsoleAdmins === 'boolean') {
           setHasConsoleAdmins(data.hasConsoleAdmins);
+        }
+        if (typeof data.allowConsoleSignup === 'boolean') {
+          setAllowConsoleSignup(data.allowConsoleSignup);
+          if (
+            data.allowConsoleSignup &&
+            new URLSearchParams(window.location.search).get('signup') === '1'
+          ) {
+            setView('signup');
+          }
         }
       } catch {
         // Ignore probe error
@@ -64,7 +76,9 @@ export function LoginGate({ onSuccess }: { onSuccess: () => void }) {
       const payload =
         view === 'bootstrap'
           ? { action: 'bootstrap', secret: secretInput, email, password }
-          : { email, password };
+          : view === 'signup'
+            ? { action: 'signup', email, password, displayName }
+            : { email, password };
       const res = await fetch(buildApiUrl('/admin/login'), {
         method: 'POST',
         credentials: 'include',
@@ -160,7 +174,9 @@ export function LoginGate({ onSuccess }: { onSuccess: () => void }) {
         ? 'Enter Verification Code'
         : view === 'bootstrap'
           ? 'First-Time Setup'
-          : 'Server Console';
+          : view === 'signup'
+            ? 'Create Account'
+            : 'Server Console';
 
   const subtitle =
     view === 'forgot'
@@ -169,7 +185,9 @@ export function LoginGate({ onSuccess }: { onSuccess: () => void }) {
         ? 'Enter the 6-digit code sent to your email and choose a new password.'
         : view === 'bootstrap'
           ? 'Create your first admin account using your server APP_SECRET.'
-          : 'Sign in with your admin email and password.';
+          : view === 'signup'
+            ? 'Create an account to launch and manage your own projects.'
+            : 'Sign in with your admin email and password.';
 
   return (
     <main
@@ -270,7 +288,20 @@ export function LoginGate({ onSuccess }: { onSuccess: () => void }) {
           />
         )}
 
-        {(view === 'login' || view === 'reset' || view === 'bootstrap') && (
+        {view === 'signup' && (
+          <input
+            type="text"
+            placeholder="Name (optional)"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            style={inputStyle}
+          />
+        )}
+
+        {(view === 'login' ||
+          view === 'signup' ||
+          view === 'reset' ||
+          view === 'bootstrap') && (
           <PasswordInput
             placeholder={view === 'reset' ? 'New password' : 'Password'}
             value={password}
@@ -300,7 +331,9 @@ export function LoginGate({ onSuccess }: { onSuccess: () => void }) {
                 ? 'Reset Password'
                 : view === 'bootstrap'
                   ? 'Create Admin & Sign In'
-                  : 'Sign In'}
+                  : view === 'signup'
+                    ? 'Create Account'
+                    : 'Sign In'}
         </button>
 
         <div
@@ -322,15 +355,26 @@ export function LoginGate({ onSuccess }: { onSuccess: () => void }) {
               >
                 Forgot password?
               </button>
-              {hasConsoleAdmins === false && (
-                <button
-                  type="button"
-                  onClick={() => switchView('bootstrap')}
-                  style={linkBtnStyle}
-                >
-                  First-time setup
-                </button>
-              )}
+              <div style={{ display: 'flex', gap: 10 }}>
+                {allowConsoleSignup && (
+                  <button
+                    type="button"
+                    onClick={() => switchView('signup')}
+                    style={linkBtnStyle}
+                  >
+                    Create account
+                  </button>
+                )}
+                {hasConsoleAdmins === false && (
+                  <button
+                    type="button"
+                    onClick={() => switchView('bootstrap')}
+                    style={linkBtnStyle}
+                  >
+                    First-time setup
+                  </button>
+                )}
+              </div>
             </>
           ) : (
             <button

@@ -1,15 +1,23 @@
 #!/usr/bin/env node
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { loadSettings } from './config.js';
-import { createDatabase } from './db.js';
-import { coreMigrationStatus } from './migrations.js';
-import { planSchema } from './schema.js';
+import { createDatabase } from './db/client.js';
+import { coreMigrationStatus } from './db/migrations.js';
+import { planSchema } from './db/schema.js';
 import { loadSchema, migrate, start } from './start.js';
 import { loadFunctionsDir } from './functions/index.js';
-import { writeClientCode } from './codegen.js';
-import { buildCpanelBundle } from './cpanel.js';
+import { writeClientCode } from './services/codegen.js';
+import { buildCpanelBundle } from './services/cpanel.js';
+import {
+  runCliLogin,
+  runCliLogout,
+  runCliProjects,
+  runCliPush,
+  runCliRemoteCodegen,
+} from './cli/remote.js';
 
 if (fs.existsSync('.env')) {
   (process as { loadEnvFile?: (p?: string) => void }).loadEnvFile?.('.env');
@@ -18,7 +26,10 @@ if (fs.existsSync('.env')) {
 const cmd = process.argv[2] ?? 'start';
 const sub = process.argv[3];
 
-function resolveInitDir(targetDir: string | undefined, force: boolean): { cwd: string; relLabel?: string } {
+function resolveInitDir(
+  targetDir: string | undefined,
+  force: boolean,
+): { cwd: string; relLabel?: string } {
   if (targetDir) {
     return { cwd: path.resolve(process.cwd(), targetDir), relLabel: targetDir };
   }
@@ -27,7 +38,8 @@ function resolveInitDir(targetDir: string | undefined, force: boolean): { cwd: s
   if (!hasFiles || force) return { cwd: here };
   let name = 'local-lite-server';
   let n = 2;
-  while (fs.existsSync(path.join(here, name))) name = `local-lite-server-${n++}`;
+  while (fs.existsSync(path.join(here, name)))
+    name = `local-lite-server-${n++}`;
   console.log(`Current directory is not empty; creating ./${name}/`);
   return { cwd: path.join(here, name), relLabel: name };
 }
@@ -47,7 +59,11 @@ function runInit(targetDir: string | undefined, force: boolean) {
   fs.mkdirSync(cwd, { recursive: true });
   const tplRoot = path.resolve(import.meta.dirname, '../templates');
   const vars: Record<string, string> = {
-    PKG_NAME: path.basename(cwd).toLowerCase().replace(/[^a-z0-9-_]/g, '-') || 'my-local-lite-server',
+    PKG_NAME:
+      path
+        .basename(cwd)
+        .toLowerCase()
+        .replace(/[^a-z0-9-_]/g, '-') || 'my-local-lite-server',
     API_KEY: crypto.randomBytes(24).toString('hex'),
     APP_SECRET: crypto.randomBytes(32).toString('hex'),
   };
@@ -56,11 +72,14 @@ function runInit(targetDir: string | undefined, force: boolean) {
     const outRel = rel === 'gitignore' ? '.gitignore' : rel;
     const dest = path.join(cwd, outRel);
     if (fs.existsSync(dest) && !force) {
-      console.log(`skip  ${relLabel ? path.join(relLabel, outRel) : outRel} (already exists)`);
+      console.log(
+        `skip  ${relLabel ? path.join(relLabel, outRel) : outRel} (already exists)`,
+      );
       continue;
     }
     let content = fs.readFileSync(path.join(tplRoot, rel), 'utf8');
-    for (const [k, v] of Object.entries(vars)) content = content.replaceAll(`{{${k}}}`, v);
+    for (const [k, v] of Object.entries(vars))
+      content = content.replaceAll(`{{${k}}}`, v);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.writeFileSync(dest, content);
     console.log(`write ${relLabel ? path.join(relLabel, outRel) : outRel}`);
@@ -99,26 +118,63 @@ if (cmd === 'init') {
   } finally {
     await db.close();
   }
+} else if (cmd === 'login') {
+  await runCliLogin(process.argv.slice(3));
+} else if (cmd === 'logout') {
+  runCliLogout();
+} else if (cmd === 'projects') {
+  await runCliProjects(sub, process.argv.slice(4));
+} else if (cmd === 'push') {
+  await runCliPush(process.argv.slice(3));
 } else if (cmd === 'codegen') {
   const outIdx = process.argv.indexOf('--out');
-  const outFile = outIdx !== -1 && process.argv[outIdx + 1] ? process.argv[outIdx + 1] : 'src/client.ts';
-  const settings = loadSettings();
-  const schema = await loadSchema(settings);
-  const functions = await loadFunctionsDir(settings.functionsDir);
-  const abs = writeClientCode(outFile, schema, functions);
-  console.log(`Generated typed client SDK: ${abs}`);
+  const outFile =
+    outIdx !== -1 && process.argv[outIdx + 1]
+      ? process.argv[outIdx + 1]
+      : 'src/client.ts';
+  const projIdx = process.argv.indexOf('--project');
+  const projectRef = projIdx !== -1 ? process.argv[projIdx + 1] : undefined;
+  if (projectRef) {
+    await runCliRemoteCodegen(process.argv.slice(3), projectRef, outFile);
+  } else {
+    const settings = loadSettings();
+    const schema = await loadSchema(settings);
+    const functions = await loadFunctionsDir(settings.functionsDir);
+    const abs = writeClientCode(outFile, schema, functions);
+    console.log(`Generated typed client SDK: ${abs}`);
+  }
 } else if (cmd === 'build:cpanel') {
   const outIdx = process.argv.indexOf('--out');
-  const outDir = outIdx !== -1 && process.argv[outIdx + 1] ? process.argv[outIdx + 1] : 'dist/cpanel';
+  const outDir =
+    outIdx !== -1 && process.argv[outIdx + 1]
+      ? process.argv[outIdx + 1]
+      : 'dist/cpanel';
   await buildCpanelBundle(process.cwd(), outDir);
+} else if (cmd === 'install-skills') {
+  const dirIdx = process.argv.indexOf('--dir');
+  const isGlobal = process.argv.includes('--global');
+  const targetBase =
+    dirIdx !== -1 && process.argv[dirIdx + 1]
+      ? path.resolve(process.cwd(), process.argv[dirIdx + 1])
+      : path.join(isGlobal ? os.homedir() : process.cwd(), '.agents', 'skills');
+  const srcRoot = path.resolve(import.meta.dirname, '../skills');
+  for (const rel of collectTemplates(srcRoot)) {
+    const dest = path.join(targetBase, rel);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(path.join(srcRoot, rel), dest);
+    console.log(`installed ${path.relative(process.cwd(), dest) || dest}`);
+  }
 } else if (cmd === '-v' || cmd === '--version') {
   const pkg = JSON.parse(
-    fs.readFileSync(path.resolve(import.meta.dirname, '../package.json'), 'utf8'),
+    fs.readFileSync(
+      path.resolve(import.meta.dirname, '../package.json'),
+      'utf8',
+    ),
   );
   console.log(pkg.version);
 } else {
   console.log(
-    'Usage: local-lite-server <init [dir] [--force] | start | migrate [status|diff] | codegen [--out file] | build:cpanel [--out dir] | --version>',
+    'Usage: local-lite-server <init [dir] [--force] | start | migrate [status|diff] | login [--signup] | logout | projects <list|create|delete> | push --project <slug> | codegen [--project <slug>] [--out file] | install-skills [--dir path] [--global] | build:cpanel [--out dir] | --version>',
   );
   process.exit(cmd === '-h' || cmd === '--help' || cmd === 'help' ? 0 : 1);
 }

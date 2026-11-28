@@ -277,107 +277,130 @@ export function TableRowDrawer({
             </div>
           </>
         ) : (
-        <form
-          onSubmit={(e) => void handleSubmit(e)}
-          style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
-        >
-          {editableCols.map((col) => {
-            const val = fields[col] ?? '';
-            const isMultiline =
-              val.includes('\n') ||
-              val.length > 80 ||
-              col === 'metadata';
-
-            if (col === 'deleted') {
-              return (
-                <ToggleSlider
-                  key={col}
-                  checked={val === '1' || val === 'true'}
-                  onChange={(checked) =>
-                    setFields((prev) => ({
-                      ...prev,
-                      [col]: checked ? '1' : '0',
-                    }))
-                  }
-                  label={
-                    <>
-                      Soft-deleted (<code>deleted = 1</code>)
-                    </>
-                  }
-                />
-              );
-            }
-
-            return (
-              <div key={col}>
-                <label style={labelStyle}>{col}</label>
-                {isMultiline ? (
-                  <textarea
-                    rows={3}
-                    value={val}
-                    disabled={isEdit && col === 'id'}
-                    onChange={(e) =>
-                      setFields((prev) => ({ ...prev, [col]: e.target.value }))
-                    }
-                    style={{
-                      ...inputStyle,
-                      fontFamily: 'monospace',
-                      fontSize: 12.5,
-                      resize: 'vertical',
-                      opacity: isEdit && col === 'id' ? 0.7 : 1,
-                    }}
-                  />
-                ) : (
-                  <input
-                    type="text"
-                    value={val}
-                    placeholder={
-                      !isEdit && col === 'id'
-                        ? 'Auto-generated UUID if empty'
-                        : ''
-                    }
-                    disabled={isEdit && col === 'id'}
-                    onChange={(e) =>
-                      setFields((prev) => ({ ...prev, [col]: e.target.value }))
-                    }
-                    style={{
-                      ...inputStyle,
-                      fontFamily: 'monospace',
-                      fontSize: 12.5,
-                      opacity: isEdit && col === 'id' ? 0.7 : 1,
-                    }}
-                  />
-                )}
-              </div>
-            );
-          })}
-
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              gap: 8,
-              marginTop: 8,
-              borderTop: '1px solid var(--border)',
-              paddingTop: 14,
-            }}
+          <form
+            onSubmit={(e) => void handleSubmit(e)}
+            style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
           >
-            {isEdit && drawer.row.id ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => void handleDelete()}
-                  disabled={saving}
-                  style={{
-                    ...secondaryBtnStyle,
-                    color: 'var(--danger)',
-                    borderColor: 'rgba(248, 113, 113, 0.35)',
-                  }}
-                >
-                  Soft Delete
-                </button>
-                <div style={{ display: 'flex', gap: 8 }}>
+            {editableCols.map((col) => {
+              const val = fields[col] ?? '';
+              const isMultiline =
+                val.includes('\n') || val.length > 80 || col === 'metadata';
+
+              if (col === 'deleted') {
+                return (
+                  <ToggleSlider
+                    key={col}
+                    checked={val === '1' || val === 'true'}
+                    onChange={(checked) =>
+                      setFields((prev) => ({
+                        ...prev,
+                        [col]: checked ? '1' : '0',
+                      }))
+                    }
+                    label={
+                      <>
+                        Soft-deleted (<code>deleted = 1</code>)
+                      </>
+                    }
+                  />
+                );
+              }
+
+              return (
+                <div key={col}>
+                  <label style={labelStyle}>{col}</label>
+                  {isMultiline ? (
+                    <textarea
+                      rows={3}
+                      value={val}
+                      disabled={isEdit && col === 'id'}
+                      onChange={(e) =>
+                        setFields((prev) => ({
+                          ...prev,
+                          [col]: e.target.value,
+                        }))
+                      }
+                      style={{
+                        ...inputStyle,
+                        fontFamily: 'monospace',
+                        fontSize: 12.5,
+                        resize: 'vertical',
+                        opacity: isEdit && col === 'id' ? 0.7 : 1,
+                      }}
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      value={val}
+                      placeholder={
+                        !isEdit && col === 'id'
+                          ? 'Auto-generated UUID if empty'
+                          : ''
+                      }
+                      disabled={isEdit && col === 'id'}
+                      onChange={(e) =>
+                        setFields((prev) => ({
+                          ...prev,
+                          [col]: e.target.value,
+                        }))
+                      }
+                      style={{
+                        ...inputStyle,
+                        fontFamily: 'monospace',
+                        fontSize: 12.5,
+                        opacity: isEdit && col === 'id' ? 0.7 : 1,
+                      }}
+                    />
+                  )}
+                </div>
+              );
+            })}
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 8,
+                marginTop: 8,
+                borderTop: '1px solid var(--border)',
+                paddingTop: 14,
+              }}
+            >
+              {isEdit && drawer.row.id ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => void handleDelete()}
+                    disabled={saving}
+                    style={{
+                      ...secondaryBtnStyle,
+                      color: 'var(--danger)',
+                      borderColor: 'rgba(248, 113, 113, 0.35)',
+                    }}
+                  >
+                    Soft Delete
+                  </button>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      disabled={saving}
+                      style={secondaryBtnStyle}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      style={primaryBtnStyle}
+                    >
+                      {saving ? 'Saving...' : 'Save & Broadcast'}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
                   <button
                     type="button"
                     onClick={onClose}
@@ -393,29 +416,10 @@ export function TableRowDrawer({
                   >
                     {saving ? 'Saving...' : 'Save & Broadcast'}
                   </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  disabled={saving}
-                  style={secondaryBtnStyle}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  style={primaryBtnStyle}
-                >
-                  {saving ? 'Saving...' : 'Save & Broadcast'}
-                </button>
-              </>
-            )}
-          </div>
-        </form>
+                </>
+              )}
+            </div>
+          </form>
         )}
       </aside>
     </div>

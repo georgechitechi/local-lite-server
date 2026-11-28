@@ -10,10 +10,7 @@ import {
 import type { ToastType } from '@/components/Toast';
 import { adminFetch } from '@/lib/api';
 import { formatTime } from '@/lib/formatters';
-import {
-  primaryBtnStyle,
-  secondaryBtnStyle,
-} from '@/styles/adminStyles';
+import { primaryBtnStyle, secondaryBtnStyle } from '@/styles/adminStyles';
 
 const PAGE_SIZE = 30;
 
@@ -191,7 +188,13 @@ export function SchedulesTab({
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: 'var(--muted)',
+                      marginTop: 6,
+                    }}
+                  >
                     Action: <code>{job.action_type}</code>
                     {' · '}
                     Last run:{' '}

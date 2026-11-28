@@ -1,3 +1,3 @@
-import { buildCpanelBundle } from '../dist/cpanel.js';
+import { buildCpanelBundle } from '../dist/services/cpanel.js';
 
 await buildCpanelBundle();

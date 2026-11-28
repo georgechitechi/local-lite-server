@@ -10,7 +10,8 @@ import {
   lockClock,
   setRowDeleted,
   upsertTableRow,
-} from './core/changes.js';
+} from '../core/changes.js';
+import { toPhysicalTable } from '../services/projects.js';
 import type { RuleContext, RulesDictionary } from './rules.js';
 import type { SchemaDictionary, SchemaFieldType } from './schema.js';
 
@@ -34,7 +35,11 @@ const MAX_BATCH = 1000;
 const baseType = (t: SchemaFieldType) => t.replace(' | null', '');
 
 /** Client value -> DB parameter. */
-export function toDbValue(type: SchemaFieldType, value: unknown, dialect: string): unknown {
+export function toDbValue(
+  type: SchemaFieldType,
+  value: unknown,
+  dialect: string,
+): unknown {
   if (value === undefined || value === null) return null;
   switch (baseType(type)) {
     case 'boolean':
@@ -96,6 +101,10 @@ export interface TableSyncStorageOptions {
   clockTable?: string;
   /** Column used as the realtime event scope when a payload has it. */
   scopeField?: string;
+  /** Optional project id for `_server_changes.project_id` scoping. */
+  projectId?: string | null;
+  /** Optional project slug for physically isolated `p_<slug>_<table>` tables. */
+  projectSlug?: string | null;
 }
 
 /**
@@ -110,6 +119,8 @@ export class TableSyncStorage implements ServerSyncStorage {
   private changes: string;
   private clock: string;
   private scopeField: string;
+  private projectId: string | null;
+  private projectSlug: string | null;
 
   constructor(db: SqlExecutor, opts: TableSyncStorageOptions) {
     this.db = db;
@@ -119,6 +130,8 @@ export class TableSyncStorage implements ServerSyncStorage {
     this.changes = opts.changesTable ?? '_server_changes';
     this.clock = opts.clockTable ?? '_server_sync_clock';
     this.scopeField = opts.scopeField ?? 'scope_id';
+    this.projectId = opts.projectId ?? null;
+    this.projectSlug = opts.projectSlug ?? null;
   }
 
   get tables(): string[] {
@@ -127,8 +140,14 @@ export class TableSyncStorage implements ServerSyncStorage {
 
   private q = (name: string) => quoteIdent(name, this.db.dialect);
 
+  private sqlTable(logicalTable: string): string {
+    return toPhysicalTable(this.projectSlug ?? this.projectId, logicalTable);
+  }
+
   private fields(table: string): Record<string, SchemaFieldType> {
-    const f = Object.hasOwn(this.schema, table) ? this.schema[table] : undefined;
+    const f = Object.hasOwn(this.schema, table)
+      ? this.schema[table]
+      : undefined;
     if (!f) throw new ClientError(`Unknown table "${table}".`);
     return f;
   }
@@ -138,8 +157,13 @@ export class TableSyncStorage implements ServerSyncStorage {
     _serverTime?: number,
     auth: RuleContext = { isAdmin: true },
   ) {
-    if (operations.length > MAX_BATCH) throw new ClientError('Batch is too large.');
-    const emitted: Array<{ scopeId: string; tableName: string; checkpoint: number }> = [];
+    if (operations.length > MAX_BATCH)
+      throw new ClientError('Batch is too large.');
+    const emitted: Array<{
+      scopeId: string;
+      tableName: string;
+      checkpoint: number;
+    }> = [];
     const successfulIds: string[] = [];
     let cursor = 0;
 
@@ -151,13 +175,22 @@ export class TableSyncStorage implements ServerSyncStorage {
       if (!auth.isAdmin) {
         const idsByTable = new Map<string, Set<string>>();
         for (const op of operations as Op[]) {
-          if (!op || typeof op.rowId !== 'string' || !op.rowId || op.rowId.length > 128) {
-            throw new ClientError('Each operation needs a rowId string (max 128 chars).');
+          if (
+            !op ||
+            typeof op.rowId !== 'string' ||
+            !op.rowId ||
+            op.rowId.length > 128
+          ) {
+            throw new ClientError(
+              'Each operation needs a rowId string (max 128 chars).',
+            );
           }
           this.fields(op.tableName);
-          const tableRule = this.rules[op.tableName];
+          const tableRule = this.rules[op.tableName] ?? this.rules['*'];
           const needsCheck =
-            op.operation === 'DELETE' ? (tableRule?.delete ?? tableRule?.write) : tableRule?.write;
+            op.operation === 'DELETE'
+              ? (tableRule?.delete ?? tableRule?.write)
+              : tableRule?.write;
           if (needsCheck) {
             const set = idsByTable.get(op.tableName) ?? new Set<string>();
             set.add(op.rowId);
@@ -170,7 +203,7 @@ export class TableSyncStorage implements ServerSyncStorage {
           for (let i = 0; i < ids.length; i += 400) {
             const chunk = ids.slice(i, i + 400);
             const found = await tx.query<Record<string, any>>(
-              `SELECT * FROM ${this.q(table)} WHERE ${this.q('id')} IN (${chunk.map(() => '?').join(', ')})`,
+              `SELECT * FROM ${this.q(this.sqlTable(table))} WHERE ${this.q('id')} IN (${chunk.map(() => '?').join(', ')})`,
               chunk,
             );
             for (const r of found) {
@@ -184,36 +217,72 @@ export class TableSyncStorage implements ServerSyncStorage {
       }
 
       for (const op of operations as Op[]) {
-        if (!op || typeof op.rowId !== 'string' || !op.rowId || op.rowId.length > 128) {
-          throw new ClientError('Each operation needs a rowId string (max 128 chars).');
+        if (
+          !op ||
+          typeof op.rowId !== 'string' ||
+          !op.rowId ||
+          op.rowId.length > 128
+        ) {
+          throw new ClientError(
+            'Each operation needs a rowId string (max 128 chars).',
+          );
         }
         const fields = this.fields(op.tableName);
-        const payload = op.payload && typeof op.payload === 'object' ? op.payload : {};
-        const tableRule = !auth.isAdmin ? this.rules[op.tableName] : undefined;
+        const payload =
+          op.payload && typeof op.payload === 'object' ? op.payload : {};
+        const tableRule = !auth.isAdmin
+          ? (this.rules[op.tableName] ?? this.rules['*'])
+          : undefined;
         const writeRule =
-          op.operation === 'DELETE' ? (tableRule?.delete ?? tableRule?.write) : tableRule?.write;
+          op.operation === 'DELETE'
+            ? (tableRule?.delete ?? tableRule?.write)
+            : tableRule?.write;
         if (writeRule) {
-          const existing = existingByKey.get(`${op.tableName}\u0000${op.rowId}`);
+          const existing = existingByKey.get(
+            `${op.tableName}\u0000${op.rowId}`,
+          );
           if (existing) {
             if (!(await writeRule(auth, existing))) {
-              throw new ForbiddenError(`Write denied on ${op.tableName}/${op.rowId}.`);
+              throw new ForbiddenError(
+                `Write denied on ${op.tableName}/${op.rowId}.`,
+              );
             }
           }
           if (!existing || op.operation !== 'DELETE') {
             if (!(await writeRule(auth, { id: op.rowId, ...payload }))) {
-              throw new ForbiddenError(`Write denied on ${op.tableName}/${op.rowId}.`);
+              throw new ForbiddenError(
+                `Write denied on ${op.tableName}/${op.rowId}.`,
+              );
             }
           }
         }
 
         cursor = Math.max(Date.now(), cursor + 1);
+        const physicalTable = this.sqlTable(op.tableName);
         if (op.operation === 'DELETE') {
-          await setRowDeleted(tx, op.tableName, op.rowId, true, cursor);
+          await setRowDeleted(tx, physicalTable, op.rowId, true, cursor);
         } else {
-          await upsertTableRow(tx, op.tableName, fields, op.rowId, payload, cursor);
-          existingByKey.set(`${op.tableName}\u0000${op.rowId}`, { id: op.rowId, ...payload });
+          await upsertTableRow(
+            tx,
+            physicalTable,
+            fields,
+            op.rowId,
+            payload,
+            cursor,
+          );
+          existingByKey.set(`${op.tableName}\u0000${op.rowId}`, {
+            id: op.rowId,
+            ...payload,
+          });
         }
-        await appendChangeLog(tx, op.tableName, op.rowId, cursor, this.changes);
+        await appendChangeLog(
+          tx,
+          op.tableName,
+          op.rowId,
+          cursor,
+          this.changes,
+          this.projectId,
+        );
 
         const scope = payload[this.scopeField];
         emitted.push({
@@ -230,7 +299,12 @@ export class TableSyncStorage implements ServerSyncStorage {
     });
 
     for (const e of emitted) this.broker?.publish(e);
-    return { applied: successfulIds.length, successfulIds, serverTime: Date.now(), cursor };
+    return {
+      applied: successfulIds.length,
+      successfulIds,
+      serverTime: Date.now(),
+      cursor,
+    };
   }
 
   async getDeltas(
@@ -241,8 +315,12 @@ export class TableSyncStorage implements ServerSyncStorage {
   ) {
     const names = tables.length ? tables : this.tables;
     for (const t of names) this.fields(t);
-    const checkpoint = Number.isFinite(since) && since >= 0 ? Math.floor(since) : 0;
-    const safeLimit = Math.max(1, Math.min(2000, Math.floor(Number(limit) || 500)));
+    const checkpoint =
+      Number.isFinite(since) && since >= 0 ? Math.floor(since) : 0;
+    const safeLimit = Math.max(
+      1,
+      Math.min(2000, Math.floor(Number(limit) || 500)),
+    );
     const empty = {
       changes: { timestamp: checkpoint, changes: [] as any[] },
       cursor: checkpoint,
@@ -251,11 +329,19 @@ export class TableSyncStorage implements ServerSyncStorage {
     };
     if (!names.length) return empty;
 
-    const raw = await this.db.query<{ table_name: string; row_id: string; ts: number }>(
+    const projectWhere = this.projectId
+      ? 'project_id = ?'
+      : 'project_id IS NULL';
+    const projectParams = this.projectId ? [this.projectId] : [];
+    const raw = await this.db.query<{
+      table_name: string;
+      row_id: string;
+      ts: number;
+    }>(
       `SELECT table_name, row_id, ${this.q('timestamp')} AS ts FROM ${this.q(this.changes)} ` +
-        `WHERE ${this.q('timestamp')} > ? AND table_name IN (${names.map(() => '?').join(', ')}) ` +
+        `WHERE ${this.q('timestamp')} > ? AND ${projectWhere} AND table_name IN (${names.map(() => '?').join(', ')}) ` +
         `ORDER BY ${this.q('timestamp')} ASC LIMIT ${safeLimit + 1}`,
-      [checkpoint, ...names],
+      [checkpoint, ...projectParams, ...names],
     );
     const hasMore = raw.length > safeLimit;
     const page = hasMore ? raw.slice(0, safeLimit) : raw;
@@ -266,7 +352,11 @@ export class TableSyncStorage implements ServerSyncStorage {
     for (const c of page) {
       const key = `${c.table_name}\u0000${c.row_id}`;
       latest.delete(key);
-      latest.set(key, { table: c.table_name, id: String(c.row_id), ts: Number(c.ts) });
+      latest.set(key, {
+        table: c.table_name,
+        id: String(c.row_id),
+        ts: Number(c.ts),
+      });
     }
 
     const byTable = new Map<string, string[]>();
@@ -280,7 +370,7 @@ export class TableSyncStorage implements ServerSyncStorage {
       for (let i = 0; i < ids.length; i += 400) {
         const chunk = ids.slice(i, i + 400);
         const found = await this.db.query<Record<string, any>>(
-          `SELECT * FROM ${this.q(table)} WHERE ${this.q('id')} IN (${chunk.map(() => '?').join(', ')})`,
+          `SELECT * FROM ${this.q(this.sqlTable(table))} WHERE ${this.q('id')} IN (${chunk.map(() => '?').join(', ')})`,
           chunk,
         );
         for (const r of found) rows.set(`${table}\u0000${r.id}`, r);
@@ -301,7 +391,9 @@ export class TableSyncStorage implements ServerSyncStorage {
 
     const changes = [];
     for (const c of allChanges) {
-      const readRule = !auth.isAdmin ? this.rules[c.tableName]?.read : undefined;
+      const readRule = !auth.isAdmin
+        ? (this.rules[c.tableName] ?? this.rules['*'])?.read
+        : undefined;
       if (!readRule) {
         changes.push(c);
         continue;

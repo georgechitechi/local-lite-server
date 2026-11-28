@@ -1,7 +1,11 @@
 import crypto from 'node:crypto';
-import { buildUpsertSql, quoteIdent, type SqlExecutor } from 'local-lite/server';
-import type { SchemaFieldType } from '../schema.js';
-import { toDbValue } from '../tableStorage.js';
+import {
+  buildUpsertSql,
+  quoteIdent,
+  type SqlExecutor,
+} from 'local-lite/server';
+import type { SchemaFieldType } from '../db/schema.js';
+import { toDbValue } from '../db/tableStorage.js';
 
 const SYSTEM_COLS = new Set(['id', 'updated_at', 'deleted']);
 
@@ -24,12 +28,20 @@ export async function appendChangeLog(
   rowId: string,
   timestamp: number,
   changesTable = '_server_changes',
+  projectId?: string | null,
 ): Promise<void> {
   const q = (n: string) => quoteIdent(n, tx.dialect);
-  await tx.execute(
-    `INSERT INTO ${q(changesTable)} (table_name, row_id, ${q('timestamp')}) VALUES (?, ?, ?)`,
-    [table, rowId, timestamp],
-  );
+  if (projectId) {
+    await tx.execute(
+      `INSERT INTO ${q(changesTable)} (table_name, row_id, ${q('timestamp')}, project_id) VALUES (?, ?, ?, ?)`,
+      [table, rowId, timestamp, projectId],
+    );
+  } else {
+    await tx.execute(
+      `INSERT INTO ${q(changesTable)} (table_name, row_id, ${q('timestamp')}) VALUES (?, ?, ?)`,
+      [table, rowId, timestamp],
+    );
+  }
 }
 
 /** Updates `_server_sync_clock` to `timestamp`. */
@@ -39,7 +51,9 @@ export async function commitClock(
   clockTable = '_server_sync_clock',
 ): Promise<void> {
   const q = (n: string) => quoteIdent(n, tx.dialect);
-  await tx.execute(`UPDATE ${q(clockTable)} SET checkpoint = ? WHERE id = 1`, [timestamp]);
+  await tx.execute(`UPDATE ${q(clockTable)} SET checkpoint = ? WHERE id = 1`, [
+    timestamp,
+  ]);
 }
 
 /** Advances `_server_sync_clock` inside an active transaction and logs to `_server_changes`. */
@@ -49,10 +63,11 @@ export async function recordChange(
   rowId: string,
   changesTable = '_server_changes',
   clockTable = '_server_sync_clock',
+  projectId?: string | null,
 ): Promise<number> {
   const prev = await lockClock(tx, clockTable);
   const ts = Math.max(Date.now(), prev + 1);
-  await appendChangeLog(tx, table, rowId, ts, changesTable);
+  await appendChangeLog(tx, table, rowId, ts, changesTable, projectId);
   await commitClock(tx, ts, clockTable);
   return ts;
 }
@@ -88,7 +103,11 @@ export async function upsertTableRow(
     timestamp,
     dialect === 'postgres' ? Boolean(data.deleted) : data.deleted ? 1 : 0,
     ...(autoCreatedAt
-      ? [fields.created_at.startsWith('number') ? timestamp : new Date(timestamp).toISOString()]
+      ? [
+          fields.created_at.startsWith('number')
+            ? timestamp
+            : new Date(timestamp).toISOString(),
+        ]
       : []),
   ];
   await tx.execute(
@@ -113,10 +132,19 @@ export async function patchTableRow(
   timestamp: number,
 ): Promise<void> {
   const q = (n: string) => quoteIdent(n, tx.dialect);
-  const cols = Object.keys(fields).filter((c) => !SYSTEM_COLS.has(c) && Object.hasOwn(patch, c));
+  const cols = Object.keys(fields).filter(
+    (c) => !SYSTEM_COLS.has(c) && Object.hasOwn(patch, c),
+  );
   const sets = [...cols.map((c) => `${q(c)} = ?`), `${q('updated_at')} = ?`];
-  const params = [...cols.map((c) => toDbValue(fields[c], patch[c], tx.dialect)), timestamp, rowId];
-  await tx.execute(`UPDATE ${q(table)} SET ${sets.join(', ')} WHERE ${q('id')} = ?`, params);
+  const params = [
+    ...cols.map((c) => toDbValue(fields[c], patch[c], tx.dialect)),
+    timestamp,
+    rowId,
+  ];
+  await tx.execute(
+    `UPDATE ${q(table)} SET ${sets.join(', ')} WHERE ${q('id')} = ?`,
+    params,
+  );
 }
 
 /** Soft-deletes or restores a row in a schema-defined table. */
@@ -136,5 +164,7 @@ export async function setRowDeleted(
 }
 
 export function newRowId(raw?: unknown): string {
-  return typeof raw === 'string' && raw.trim() ? raw.trim() : crypto.randomUUID();
+  return typeof raw === 'string' && raw.trim()
+    ? raw.trim()
+    : crypto.randomUUID();
 }

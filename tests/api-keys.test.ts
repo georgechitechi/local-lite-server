@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createApiKeyService } from '../src/apiKeys.js';
+import { createApiKeyService } from '../src/auth/apiKeys.js';
 import { loadSettings } from '../src/config.js';
-import { normalizeSchema } from '../src/schema.js';
+import { normalizeSchema } from '../src/db/schema.js';
 import { createApp } from '../src/server.js';
 
 const base = {
@@ -12,7 +12,9 @@ const base = {
   SERVER_API_KEY: 'master-secret',
 } as NodeJS.ProcessEnv;
 
-const schema = normalizeSchema({ notes: { title: 'string', owner_id: 'string' } });
+const schema = normalizeSchema({
+  notes: { title: 'string', owner_id: 'string' },
+});
 
 function apiKeysExecutor() {
   const keys = new Map<string, any>();
@@ -26,7 +28,9 @@ function apiKeysExecutor() {
         return [];
       }
       if (sql.includes('FROM _lls_api_keys')) {
-        return Array.from(keys.values()).sort((a, b) => b.created_at - a.created_at);
+        return Array.from(keys.values()).sort(
+          (a, b) => b.created_at - a.created_at,
+        );
       }
       return [];
     },
@@ -39,11 +43,12 @@ function apiKeysExecutor() {
           key_hash: params[3],
           role: params[4],
           user_id: params[5],
-          created_by: params[6],
+          project_id: params[6],
+          created_by: params[7],
           last_used_at: null,
-          expires_at: params[7],
+          expires_at: params[8],
           revoked_at: null,
-          created_at: params[8],
+          created_at: params[9],
         });
         return { affectedRows: 1 };
       }
@@ -119,7 +124,11 @@ describe('apiKeys', () => {
       userId: 'user_42',
     });
     const verified = await svc.verifyKey(userKey.key);
-    expect(verified).toEqual({ id: userKey.record.id, isAdmin: false, userId: 'user_42' });
+    expect(verified).toEqual({
+      id: userKey.record.id,
+      isAdmin: false,
+      userId: 'user_42',
+    });
 
     // Expired key cannot verify
     const now = Date.now();

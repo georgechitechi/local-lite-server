@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { loadSettings } from '../src/config.js';
-import { normalizeSchema } from '../src/schema.js';
+import { normalizeSchema } from '../src/db/schema.js';
 import { createApp } from '../src/server.js';
-import { defineRules } from '../src/rules.js';
+import { defineRules } from '../src/db/rules.js';
 
 const env = {
   DB_DIALECT: 'mysql',
@@ -53,9 +53,18 @@ function rlsDb() {
     execute: async (sql: string, p: any[] = []) => {
       if (sql.startsWith('INSERT INTO _local_auth_accounts')) {
         accounts.set(p[1], {
-          id: p[0], email: p[1], display_name: p[2], password_hash: p[3], salt: p[4],
-          iterations: p[5], algorithm: p[6], failed_login_attempts: p[7], locked_until: p[8],
-          token_version: p[9], created_at: p[10], updated_at: p[11],
+          id: p[0],
+          email: p[1],
+          display_name: p[2],
+          password_hash: p[3],
+          salt: p[4],
+          iterations: p[5],
+          algorithm: p[6],
+          failed_login_attempts: p[7],
+          locked_until: p[8],
+          token_version: p[9],
+          created_at: p[10],
+          updated_at: p[11],
         });
       } else if (sql.startsWith('INSERT INTO `notes`')) {
         const [id, title, user_id, is_public, updated_at, deleted] = p;
@@ -97,12 +106,25 @@ describe('Row-Level Access Control (RLS)', () => {
     const denied = await app.fetch(
       new Request('http://x/sync', {
         method: 'POST',
-        headers: { authorization: `Bearer ${u1.token}`, 'content-type': 'application/json' },
+        headers: {
+          authorization: `Bearer ${u1.token}`,
+          'content-type': 'application/json',
+        },
         body: JSON.stringify({
-          operations: [{
-            id: 'op1', tableName: 'notes', rowId: 'n1', operation: 'INSERT', timestamp: 1,
-            payload: { title: 'Spoofed', user_id: u2.user.id, is_public: false },
-          }],
+          operations: [
+            {
+              id: 'op1',
+              tableName: 'notes',
+              rowId: 'n1',
+              operation: 'INSERT',
+              timestamp: 1,
+              payload: {
+                title: 'Spoofed',
+                user_id: u2.user.id,
+                is_public: false,
+              },
+            },
+          ],
         }),
       }),
     );
@@ -112,13 +134,36 @@ describe('Row-Level Access Control (RLS)', () => {
     const ok = await app.fetch(
       new Request('http://x/sync', {
         method: 'POST',
-        headers: { authorization: `Bearer ${u1.token}`, 'content-type': 'application/json' },
+        headers: {
+          authorization: `Bearer ${u1.token}`,
+          'content-type': 'application/json',
+        },
         body: JSON.stringify({
           operations: [
-            { id: 'op2', tableName: 'notes', rowId: 'n-priv', operation: 'INSERT', timestamp: 1,
-              payload: { title: 'Private', user_id: u1.user.id, is_public: false } },
-            { id: 'op3', tableName: 'notes', rowId: 'n-pub', operation: 'INSERT', timestamp: 2,
-              payload: { title: 'Public', user_id: u1.user.id, is_public: true } },
+            {
+              id: 'op2',
+              tableName: 'notes',
+              rowId: 'n-priv',
+              operation: 'INSERT',
+              timestamp: 1,
+              payload: {
+                title: 'Private',
+                user_id: u1.user.id,
+                is_public: false,
+              },
+            },
+            {
+              id: 'op3',
+              tableName: 'notes',
+              rowId: 'n-pub',
+              operation: 'INSERT',
+              timestamp: 2,
+              payload: {
+                title: 'Public',
+                user_id: u1.user.id,
+                is_public: true,
+              },
+            },
           ],
         }),
       }),
@@ -129,9 +174,20 @@ describe('Row-Level Access Control (RLS)', () => {
     const delDenied = await app.fetch(
       new Request('http://x/sync', {
         method: 'POST',
-        headers: { authorization: `Bearer ${u2.token}`, 'content-type': 'application/json' },
+        headers: {
+          authorization: `Bearer ${u2.token}`,
+          'content-type': 'application/json',
+        },
         body: JSON.stringify({
-          operations: [{ id: 'op4', tableName: 'notes', rowId: 'n-priv', operation: 'DELETE', timestamp: 3 }],
+          operations: [
+            {
+              id: 'op4',
+              tableName: 'notes',
+              rowId: 'n-priv',
+              operation: 'DELETE',
+              timestamp: 3,
+            },
+          ],
         }),
       }),
     );
@@ -139,19 +195,26 @@ describe('Row-Level Access Control (RLS)', () => {
 
     // u2 pull only sees public row
     const u2Pull = (await (
-      await app.fetch(new Request('http://x/sync?tables=notes&since=0', {
-        headers: { authorization: `Bearer ${u2.token}` },
-      }))
+      await app.fetch(
+        new Request('http://x/sync?tables=notes&since=0', {
+          headers: { authorization: `Bearer ${u2.token}` },
+        }),
+      )
     ).json()) as any;
     expect(u2Pull.changes.changes.map((c: any) => c.rowId)).toEqual(['n-pub']);
 
     // admin key sees both rows
     const adminPull = (await (
-      await app.fetch(new Request('http://x/sync?tables=notes&since=0', {
-        headers: { authorization: 'Bearer admin-key' },
-      }))
+      await app.fetch(
+        new Request('http://x/sync?tables=notes&since=0', {
+          headers: { authorization: 'Bearer admin-key' },
+        }),
+      )
     ).json()) as any;
-    expect(adminPull.changes.changes.map((c: any) => c.rowId)).toEqual(['n-priv', 'n-pub']);
+    expect(adminPull.changes.changes.map((c: any) => c.rowId)).toEqual([
+      'n-priv',
+      'n-pub',
+    ]);
   });
 
   it('supports a dedicated delete rule distinct from write', async () => {
@@ -162,21 +225,32 @@ describe('Row-Level Access Control (RLS)', () => {
         delete: ({ isAdmin }) => isAdmin,
       },
     });
-    const app = createApp(loadSettings(env), db, schema, new Map(), deleteRules);
+    const app = createApp(
+      loadSettings(env),
+      db,
+      schema,
+      new Map(),
+      deleteRules,
+    );
     const u1 = await signup(app, 'u1@example.com');
 
     // User can create their own note
     const createRes = await app.fetch(
       new Request('http://x/sync', {
         method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${u1.token}` },
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${u1.token}`,
+        },
         body: JSON.stringify({
-          operations: [{
-            tableName: 'notes',
-            rowId: 'n-1',
-            operation: 'INSERT',
-            payload: { title: 'mine', user_id: u1.user.id, is_public: false },
-          }],
+          operations: [
+            {
+              tableName: 'notes',
+              rowId: 'n-1',
+              operation: 'INSERT',
+              payload: { title: 'mine', user_id: u1.user.id, is_public: false },
+            },
+          ],
         }),
       }),
     );
@@ -186,9 +260,19 @@ describe('Row-Level Access Control (RLS)', () => {
     const delUser = await app.fetch(
       new Request('http://x/sync', {
         method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${u1.token}` },
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${u1.token}`,
+        },
         body: JSON.stringify({
-          operations: [{ tableName: 'notes', rowId: 'n-1', operation: 'DELETE', payload: {} }],
+          operations: [
+            {
+              tableName: 'notes',
+              rowId: 'n-1',
+              operation: 'DELETE',
+              payload: {},
+            },
+          ],
         }),
       }),
     );
@@ -198,9 +282,19 @@ describe('Row-Level Access Control (RLS)', () => {
     const delAdmin = await app.fetch(
       new Request('http://x/sync', {
         method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: 'Bearer admin-key' },
+        headers: {
+          'content-type': 'application/json',
+          authorization: 'Bearer admin-key',
+        },
         body: JSON.stringify({
-          operations: [{ tableName: 'notes', rowId: 'n-1', operation: 'DELETE', payload: {} }],
+          operations: [
+            {
+              tableName: 'notes',
+              rowId: 'n-1',
+              operation: 'DELETE',
+              payload: {},
+            },
+          ],
         }),
       }),
     );
@@ -216,7 +310,13 @@ describe('Row-Level Access Control (RLS)', () => {
         delete: 'admin',
       },
     });
-    const app = createApp(loadSettings(env), db, schema, new Map(), presetRules);
+    const app = createApp(
+      loadSettings(env),
+      db,
+      schema,
+      new Map(),
+      presetRules,
+    );
     const u1 = await signup(app, 'u1@example.com');
     const u2 = await signup(app, 'u2@example.com');
 
@@ -224,14 +324,23 @@ describe('Row-Level Access Control (RLS)', () => {
     const okInsert = await app.fetch(
       new Request('http://x/sync', {
         method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${u1.token}` },
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${u1.token}`,
+        },
         body: JSON.stringify({
-          operations: [{
-            tableName: 'notes',
-            rowId: 'n-preset',
-            operation: 'INSERT',
-            payload: { title: 'hello', user_id: u1.user.id, is_public: false },
-          }],
+          operations: [
+            {
+              tableName: 'notes',
+              rowId: 'n-preset',
+              operation: 'INSERT',
+              payload: {
+                title: 'hello',
+                user_id: u1.user.id,
+                is_public: false,
+              },
+            },
+          ],
         }),
       }),
     );
@@ -241,14 +350,23 @@ describe('Row-Level Access Control (RLS)', () => {
     const deniedWrite = await app.fetch(
       new Request('http://x/sync', {
         method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${u2.token}` },
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${u2.token}`,
+        },
         body: JSON.stringify({
-          operations: [{
-            tableName: 'notes',
-            rowId: 'n-preset',
-            operation: 'UPDATE',
-            payload: { title: 'hijack', user_id: u2.user.id, is_public: false },
-          }],
+          operations: [
+            {
+              tableName: 'notes',
+              rowId: 'n-preset',
+              operation: 'UPDATE',
+              payload: {
+                title: 'hijack',
+                user_id: u2.user.id,
+                is_public: false,
+              },
+            },
+          ],
         }),
       }),
     );
@@ -256,19 +374,33 @@ describe('Row-Level Access Control (RLS)', () => {
 
     // u2 can read because read is 'authenticated'
     const u2Pull = (await (
-      await app.fetch(new Request('http://x/sync?tables=notes&since=0', {
-        headers: { authorization: `Bearer ${u2.token}` },
-      }))
+      await app.fetch(
+        new Request('http://x/sync?tables=notes&since=0', {
+          headers: { authorization: `Bearer ${u2.token}` },
+        }),
+      )
     ).json()) as any;
-    expect(u2Pull.changes.changes.map((c: any) => c.rowId)).toEqual(['n-preset']);
+    expect(u2Pull.changes.changes.map((c: any) => c.rowId)).toEqual([
+      'n-preset',
+    ]);
 
     // u1 cannot delete because delete is 'admin'
     const deniedDel = await app.fetch(
       new Request('http://x/sync', {
         method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${u1.token}` },
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${u1.token}`,
+        },
         body: JSON.stringify({
-          operations: [{ tableName: 'notes', rowId: 'n-preset', operation: 'DELETE', payload: {} }],
+          operations: [
+            {
+              tableName: 'notes',
+              rowId: 'n-preset',
+              operation: 'DELETE',
+              payload: {},
+            },
+          ],
         }),
       }),
     );

@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { loadSettings } from '../src/config.js';
 import { createClusterBroker } from '../src/core/broker.js';
-import { createDistributedRateLimiter } from '../src/rateLimit.js';
+import { createDistributedRateLimiter } from '../src/auth/rateLimit.js';
 
 describe('Multi-instance broker & distributed rate limiter', () => {
   it('uses in-memory broker when MULTI_INSTANCE is false', async () => {
     const settings = loadSettings({
-      DB_DIALECT: 'mysql', DB_HOST: 'h', DB_USER: 'u', DB_NAME: 'n', SERVER_API_KEY: 'k',
+      DB_DIALECT: 'mysql',
+      DB_HOST: 'h',
+      DB_USER: 'u',
+      DB_NAME: 'n',
+      SERVER_API_KEY: 'k',
     });
     const broker = await createClusterBroker(settings, {} as any);
     const seen: string[] = [];
@@ -23,8 +27,10 @@ describe('Multi-instance broker & distributed rate limiter', () => {
       dialect: 'mysql',
       query: async () => (row ? [row] : []),
       execute: async (sql: string, p: any[]) => {
-        if (sql.includes('INSERT INTO _lls_rate_limits')) row = { hits: 1, reset_at: p[1] };
-        else if (sql.includes('UPDATE _lls_rate_limits')) row = { hits: p[0], reset_at: row!.reset_at };
+        if (sql.includes('INSERT INTO _lls_rate_limits'))
+          row = { hits: 1, reset_at: p[1] };
+        else if (sql.includes('UPDATE _lls_rate_limits'))
+          row = { hits: p[0], reset_at: row!.reset_at };
         return { affectedRows: 1 };
       },
       withTransaction: async (fn: any) => fn(db),

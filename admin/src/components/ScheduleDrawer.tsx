@@ -137,7 +137,12 @@ export function ScheduleDrawer({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'save',
-          ...(isCreate ? {} : { job_key: drawer.job.job_key, config_json: drawer.job.config_json }),
+          ...(isCreate
+            ? {}
+            : {
+                job_key: drawer.job.job_key,
+                config_json: drawer.job.config_json,
+              }),
           label,
           action_type: isCreate ? formAction : drawer.job.action_type,
           ...(isCreate && formAction === 'http_webhook' && target
@@ -200,170 +205,161 @@ export function ScheduleDrawer({
       onClose={onClose}
       disabled={saving}
     >
-
-        {drawer.kind === 'delete' ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
-              Permanently delete schedule{' '}
-              <strong style={{ color: 'var(--text)' }}>
-                {drawer.job.label}
-              </strong>
-              ? This cannot be undone.
-            </p>
-            <div
-              style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}
+      {drawer.kind === 'delete' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
+            Permanently delete schedule{' '}
+            <strong style={{ color: 'var(--text)' }}>{drawer.job.label}</strong>
+            ? This cannot be undone.
+          </p>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={onClose}
+              style={secondaryBtnStyle}
             >
-              <button
-                type="button"
-                disabled={saving}
-                onClick={onClose}
-                style={secondaryBtnStyle}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void handleConfirmDelete()}
-                style={{
-                  ...primaryBtnStyle,
-                  background: 'var(--danger)',
-                }}
-              >
-                {saving ? 'Deleting...' : 'Confirm Delete'}
-              </button>
-            </div>
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void handleConfirmDelete()}
+              style={{
+                ...primaryBtnStyle,
+                background: 'var(--danger)',
+              }}
+            >
+              {saving ? 'Deleting...' : 'Confirm Delete'}
+            </button>
           </div>
-        ) : (
-          <form
-            onSubmit={(e) => void handleSave(e)}
-            style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
-          >
-            <div>
-              <div style={labelStyle}>Schedule Name</div>
-              <input
-                value={formLabel}
-                onChange={(e) => setFormLabel(e.target.value)}
-                placeholder="e.g. Nightly Backup"
-                style={inputStyle}
-              />
-            </div>
-
-            {drawer.kind === 'create' && (
-              <>
-                <div>
-                  <div style={labelStyle}>Action</div>
-                  <select
-                    value={formAction}
-                    onChange={(e) => setFormAction(e.target.value)}
-                    style={inputStyle}
-                  >
-                    {ACTION_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {formAction === 'http_webhook' && (
-                  <div>
-                    <div style={labelStyle}>Webhook URL</div>
-                    <input
-                      value={formTarget}
-                      onChange={(e) => setFormTarget(e.target.value)}
-                      placeholder="https://example.com/webhook"
-                      style={inputStyle}
-                    />
-                  </div>
-                )}
-              </>
-            )}
-
-            <div>
-              <div style={labelStyle}>Cron Schedule</div>
-              <input
-                value={formCron}
-                onChange={(e) => setFormCron(e.target.value)}
-                placeholder="0 3 * * *"
-                style={{ ...inputStyle, fontFamily: 'monospace' }}
-              />
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 6,
-                  flexWrap: 'wrap',
-                  marginTop: 6,
-                }}
-              >
-                {CRON_PRESETS.map((preset) => (
-                  <button
-                    key={preset.value}
-                    type="button"
-                    onClick={() => setFormCron(preset.value)}
-                    style={{
-                      ...secondaryBtnStyle,
-                      padding: '3px 8px',
-                      fontSize: 11,
-                    }}
-                  >
-                    {preset.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div style={labelStyle}>Timezone</div>
-              <select
-                value={formTimezone}
-                onChange={(e) => setFormTimezone(e.target.value)}
-                style={inputStyle}
-              >
-                {TIMEZONE_OPTIONS.map((tz) => (
-                  <option key={tz} value={tz}>
-                    {tz}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <ToggleSlider
-              checked={formEnabled}
-              onChange={setFormEnabled}
-              label="Schedule enabled"
+        </div>
+      ) : (
+        <form
+          onSubmit={(e) => void handleSave(e)}
+          style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
+        >
+          <div>
+            <div style={labelStyle}>Schedule Name</div>
+            <input
+              value={formLabel}
+              onChange={(e) => setFormLabel(e.target.value)}
+              placeholder="e.g. Nightly Backup"
+              style={inputStyle}
             />
+          </div>
 
+          {drawer.kind === 'create' && (
+            <>
+              <div>
+                <div style={labelStyle}>Action</div>
+                <select
+                  value={formAction}
+                  onChange={(e) => setFormAction(e.target.value)}
+                  style={inputStyle}
+                >
+                  {ACTION_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {formAction === 'http_webhook' && (
+                <div>
+                  <div style={labelStyle}>Webhook URL</div>
+                  <input
+                    value={formTarget}
+                    onChange={(e) => setFormTarget(e.target.value)}
+                    placeholder="https://example.com/webhook"
+                    style={inputStyle}
+                  />
+                </div>
+              )}
+            </>
+          )}
+
+          <div>
+            <div style={labelStyle}>Cron Schedule</div>
+            <input
+              value={formCron}
+              onChange={(e) => setFormCron(e.target.value)}
+              placeholder="0 3 * * *"
+              style={{ ...inputStyle, fontFamily: 'monospace' }}
+            />
             <div
               style={{
                 display: 'flex',
-                gap: 8,
-                justifyContent: 'space-between',
-                marginTop: 8,
+                gap: 6,
+                flexWrap: 'wrap',
+                marginTop: 6,
               }}
             >
-              <button
-                type="button"
-                disabled={saving}
-                onClick={onClose}
-                style={secondaryBtnStyle}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                style={primaryBtnStyle}
-              >
-                {saving
-                  ? 'Saving...'
-                  : drawer.kind === 'create'
-                    ? 'Create Schedule'
-                    : 'Save Changes'}
-              </button>
+              {CRON_PRESETS.map((preset) => (
+                <button
+                  key={preset.value}
+                  type="button"
+                  onClick={() => setFormCron(preset.value)}
+                  style={{
+                    ...secondaryBtnStyle,
+                    padding: '3px 8px',
+                    fontSize: 11,
+                  }}
+                >
+                  {preset.label}
+                </button>
+              ))}
             </div>
-          </form>
-        )}
+          </div>
+
+          <div>
+            <div style={labelStyle}>Timezone</div>
+            <select
+              value={formTimezone}
+              onChange={(e) => setFormTimezone(e.target.value)}
+              style={inputStyle}
+            >
+              {TIMEZONE_OPTIONS.map((tz) => (
+                <option key={tz} value={tz}>
+                  {tz}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <ToggleSlider
+            checked={formEnabled}
+            onChange={setFormEnabled}
+            label="Schedule enabled"
+          />
+
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              justifyContent: 'space-between',
+              marginTop: 8,
+            }}
+          >
+            <button
+              type="button"
+              disabled={saving}
+              onClick={onClose}
+              style={secondaryBtnStyle}
+            >
+              Cancel
+            </button>
+            <button type="submit" disabled={saving} style={primaryBtnStyle}>
+              {saving
+                ? 'Saving...'
+                : drawer.kind === 'create'
+                  ? 'Create Schedule'
+                  : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      )}
     </SlideDrawer>
   );
 }
